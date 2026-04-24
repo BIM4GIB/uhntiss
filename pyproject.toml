@@ -9,6 +9,7 @@ authors = [{ name = "Rene", email = "rene@pellicer.dk" }]
 dependencies = [
     "sounddevice==0.4.7",
     "soundfile==0.12.1",
+    "soxr==1.0.0",
     "librosa==0.10.2.post1",
     "numpy==1.26.4",
     "scipy==1.13.1",
@@ -37,3 +38,4 @@ packages = ["mouthflow"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
