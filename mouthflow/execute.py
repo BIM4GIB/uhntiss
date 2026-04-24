@@ -111,7 +111,7 @@ class AbletonClient:
     def load_instrument(self, track_idx: int, uri: str) -> None:
         # ``uri`` is the browser URI the Planner was handed in session_state.
         # In v0.1 we pass it straight through to ableton-mcp.
-        self.send_command("load_browser_item", {"track_index": track_idx, "uri": uri})
+        self.send_command("load_browser_item", {"track_index": track_idx, "item_uri": uri})
 
     def insert_midi_clip(self, track_idx: int, midi_path: Path, bars: float) -> None:
         length_beats = float(bars) * 4.0  # assume 4/4; Planner's tempo is what matters
