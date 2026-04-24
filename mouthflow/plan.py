@@ -104,10 +104,21 @@ def make_plan(
             raise RuntimeError("ANTHROPIC_API_KEY not set; pass client= for tests.")
         client = anthropic.Anthropic(api_key=api_key)
 
+    # Prompt caching: the system prompt + tool schema are static across
+    # every invocation, so we mark the system block ephemeral. A single
+    # cache_control breakpoint on the last prefix block caches everything
+    # up to it (system + tools), per Anthropic docs. Worth it after ~2
+    # calls when the prefix is >1024 tokens.
     response = client.messages.create(
         model=model,
         max_tokens=1024,
-        system=_system_prompt(),
+        system=[
+            {
+                "type": "text",
+                "text": _system_prompt(),
+                "cache_control": {"type": "ephemeral"},
+            }
+        ],
         tools=[_tool_schema()],
         tool_choice={"type": "tool", "name": "emit_plan"},
         messages=[

@@ -21,4 +21,64 @@ Hard rules:
 
 ## Few-shot examples
 
-_TODO: add 2–3 examples drawn from the labelled corpus once it exists._
+> **These are placeholders.** Replace each with a real input/output pair
+> drawn from the 20-clip corpus once it's labelled. The point of a
+> few-shot is to show the model your taste — generic examples teach
+> generic taste.
+
+### Example 1 — laid-back boom-bap
+
+Input summary:
+```json
+{
+  "tempo_bpm": 88,
+  "bars": 2.0,
+  "hit_count": 14,
+  "hit_histogram": {"kick": 4, "snare": 4, "hat_closed": 6}
+}
+```
+Available instruments: `["query:Drums#Kit-Core%20808", "query:Drums#Kit-Core%20Dusty", "query:Drums#Kit-Core%20Jazz"]`
+
+Expected `emit_plan` call:
+```json
+{
+  "tempo": 88,
+  "clips": [
+    {
+      "track_name": "Drums",
+      "instrument_path": "query:Drums#Kit-Core%20Dusty",
+      "length_bars": 2.0
+    }
+  ],
+  "rationale": "Dusty kit suits the sub-90 BPM pocket; hat density is moderate so the kit's softer ceiling won't feel muddy."
+}
+```
+
+### Example 2 — tight trap-style pattern
+
+Input summary:
+```json
+{
+  "tempo_bpm": 140,
+  "bars": 4.0,
+  "hit_count": 48,
+  "hit_histogram": {"kick": 8, "snare": 8, "hat_closed": 32}
+}
+```
+Available instruments: `["query:Drums#Kit-Core%20808", "query:Drums#Kit-Core%20Dusty"]`
+
+Expected `emit_plan` call:
+```json
+{
+  "tempo": 140,
+  "clips": [
+    {
+      "track_name": "Drums",
+      "instrument_path": "query:Drums#Kit-Core%20808",
+      "length_bars": 4.0
+    }
+  ],
+  "rationale": "High hat density and 140 BPM read as trap; the 808 kit's low sub and crisp hats match the pattern shape."
+}
+```
+

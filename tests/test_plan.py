@@ -100,6 +100,9 @@ def test_make_plan_round_trips_valid_tool_output(tmp_path):
     assert req["model"].startswith("claude-sonnet-4")
     assert req["tool_choice"] == {"type": "tool", "name": "emit_plan"}
     assert req["tools"][0]["name"] == "emit_plan"
+    # System prompt is a content block list with ephemeral cache_control.
+    assert isinstance(req["system"], list)
+    assert req["system"][0]["cache_control"] == {"type": "ephemeral"}
 
 
 def test_make_plan_falls_back_when_instrument_hallucinated(tmp_path):
