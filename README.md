@@ -4,7 +4,9 @@ A voice-driven arrangement agent for Ableton Live. Beatbox a rhythm, get a
 drum pattern in your session. That's it.
 
 Status: **v0 — pre-corpus.** See [`docs/spec.md`](docs/spec.md) for the full
-spec and [`docs/corpus.md`](docs/corpus.md) for the labelling convention.
+spec, [`docs/corpus.md`](docs/corpus.md) for the labelling convention,
+and [`docs/mac-handoff.md`](docs/mac-handoff.md) for first-run setup on
+the Mac (Ableton + microphone live there).
 
 > Repo codename: `uhntiss`. Project name `mouthflow` is a placeholder —
 > rename before the first public release if something better shows up.
