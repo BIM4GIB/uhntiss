@@ -6,6 +6,7 @@ Logs progress to stderr. On ``--json`` the Plan is echoed to stdout.
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -13,7 +14,7 @@ import typer
 
 from mouthflow import capture
 from mouthflow.classify import classify
-from mouthflow.execute import AbletonClient, apply_plan
+from mouthflow.execute import AbletonClient, AbletonError, apply_plan
 from mouthflow.plan import make_plan
 from mouthflow.schemas import Intent, Plan
 from mouthflow.transcribe import transcribe_drums
@@ -198,6 +199,57 @@ def dry_run(
         instruments_override=_parse_instruments(instruments),
     )
     _emit_or_apply(plan, json_out=json_out, client=None)
+
+
+@app.command()
+def doctor(
+    host: str = typer.Option("127.0.0.1"),
+    port: int = typer.Option(9877),
+) -> None:
+    """Preflight checks for a first end-to-end run.
+
+    Verifies ANTHROPIC_API_KEY is set, AbletonMCP is reachable on the
+    socket, and the Drums browser returns loadable kits. Exits non-zero if
+    any check fails, so it's safe to chain in scripts.
+    """
+    failures: list[str] = []
+
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        _log("ok   ANTHROPIC_API_KEY is set")
+    else:
+        failures.append("ANTHROPIC_API_KEY not set")
+        _log("FAIL ANTHROPIC_API_KEY not set")
+
+    # OSError covers ConnectionRefusedError / socket timeouts when Live
+    # isn't running or the Remote Script isn't loaded; AbletonError covers
+    # a reachable socket that replies with status=error.
+    try:
+        with AbletonClient(host, port) as client:
+            info = client.get_session_info()
+            tempo = info.get("tempo") if isinstance(info, dict) else None
+            detail = f"tempo {tempo}" if tempo is not None else "no session info"
+            _log(f"ok   AbletonMCP reachable at {host}:{port} ({detail})")
+            try:
+                kits = client.list_drum_instruments()
+            except (AbletonError, OSError) as exc:
+                failures.append(f"browser traversal failed: {exc}")
+                _log(f"FAIL browser traversal: {exc}")
+            else:
+                if kits:
+                    first = kits[0]
+                    name = first.get("name") if isinstance(first, dict) else first
+                    _log(f"ok   {len(kits)} drum kit(s) discovered; first: {name}")
+                else:
+                    failures.append("no loadable drum kits found in browser")
+                    _log("FAIL no loadable drum kits found in browser")
+    except (AbletonError, OSError) as exc:
+        failures.append(f"AbletonMCP not reachable at {host}:{port}: {exc}")
+        _log(f"FAIL AbletonMCP not reachable at {host}:{port}: {exc}")
+
+    if failures:
+        _log(f"{len(failures)} check(s) failed")
+        raise typer.Exit(code=1)
+    _log("all checks passed — ready to run")
 
 
 if __name__ == "__main__":
