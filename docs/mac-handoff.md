@@ -183,12 +183,16 @@ uv run python -m eval.taste_review
 
 ## 10. Known friction and limits
 
-- **`--instruments` is manual.** ableton-mcp exposes a browser tree;
-  v0.1 doesn't traverse it and hands you a fallback list. If you want
-  real session-aware instrument choice, add a `get_session_info` call
-  that recurses `get_browser_items_at_path` for the Drums category and
-  passes real URIs into `available_instruments`. Noted in
-  [`cli.py`](../mouthflow/cli.py) near `_FALLBACK_INSTRUMENTS`.
+- **Instrument selection is session-aware.** When Live is reachable the
+  CLI walks ableton-mcp's browser via
+  `AbletonClient.list_drum_instruments()` (recursing the Drums category,
+  keeping `is_loadable` leaves) and hands the planner real
+  `query:Drums#FileId_NNNNN` URIs as `{name, uri}` pairs — so `run` /
+  `record` load a real kit with no `--instruments` flag. `--instruments`
+  still overrides if you want a specific set. The synthetic
+  `_FALLBACK_INSTRUMENTS` in [`cli.py`](../mouthflow/cli.py) is only used
+  for the offline `dry-run` path; those URIs do **not** load in a real
+  install.
 - **Heuristic classifier** is hand-tuned, not trained. Expect
   misclassifications on breath-heavy hats and tonal snares. Fixing
   this is v0.2 (real classifier trained on the corpus).

@@ -83,6 +83,50 @@ def test_send_command_raises_on_error():
                 client.send_command("get_track_info", {"track_index": 99})
 
 
+def test_list_drum_instruments_filters_loadable_and_recurses():
+    # Top-level "Drums" mixes a loadable kit, a folder, and a non-loadable
+    # leaf; the folder holds another loadable kit one level down.
+    drums = {
+        "status": "ok",
+        "result": {
+            "path": "Drums",
+            "items": [
+                {"name": "808 Core Kit", "is_folder": False, "is_loadable": True,
+                 "uri": "query:Drums#FileId_5006"},
+                {"name": "Kits", "is_folder": True, "is_loadable": False, "uri": None},
+                {"name": "Header", "is_folder": False, "is_loadable": False,
+                 "uri": "query:Drums#FileId_9999"},
+            ],
+        },
+    }
+    folder = {
+        "status": "ok",
+        "result": {
+            "path": "Drums/Kits",
+            "items": [
+                {"name": "Dusty Breaks", "is_folder": False, "is_loadable": True,
+                 "uri": "query:Drums#FileId_5012"},
+            ],
+        },
+    }
+    with FakeAbleton([drums, folder]) as fake:
+        with AbletonClient(port=fake.port) as client:
+            kits = client.list_drum_instruments()
+    assert kits == [
+        {"name": "808 Core Kit", "uri": "query:Drums#FileId_5006"},
+        {"name": "Dusty Breaks", "uri": "query:Drums#FileId_5012"},
+    ]
+    assert fake.requests[0] == {"type": "get_browser_items_at_path", "params": {"path": "Drums"}}
+    assert fake.requests[1]["params"]["path"] == "Drums/Kits"
+
+
+def test_list_drum_instruments_empty_when_no_loadable():
+    resp = {"status": "ok", "result": {"path": "Drums", "error": "Unknown category", "items": []}}
+    with FakeAbleton([resp]) as fake:
+        with AbletonClient(port=fake.port) as client:
+            assert client.list_drum_instruments() == []
+
+
 def test_create_midi_track_sets_name():
     responses = [
         {"status": "ok", "result": {"index": 3}},  # create_midi_track

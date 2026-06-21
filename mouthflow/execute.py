@@ -100,6 +100,69 @@ class AbletonClient:
     def get_session_info(self) -> dict:
         return self.send_command("get_session_info")
 
+    def get_browser_items_at_path(self, path: str) -> dict:
+        """Raw ableton-mcp browser listing at ``path`` (e.g. ``"Drums"``).
+
+        Returns the command's ``result`` dict: ``{path, name, uri,
+        is_folder, is_loadable, items: [...]}`` where each item is
+        ``{name, is_folder, is_device, is_loadable, uri}``.
+        """
+        return self.send_command("get_browser_items_at_path", {"path": path})
+
+    def list_drum_instruments(
+        self,
+        path: str = "Drums",
+        *,
+        max_depth: int = 2,
+        hard_cap: int = 1000,
+    ) -> list[dict[str, str]]:
+        """Discover loadable drum kits in the live set as ``[{name, uri}]``.
+
+        Walks ableton-mcp's browser under ``path``. The "Drums" category
+        mixes directly-loadable drum racks with folders, so we descend
+        folders up to ``max_depth`` and keep only ``is_loadable`` leaves
+        carrying a real URI. Those URIs (``query:Drums#FileId_NNNNN``) are
+        what ``load_browser_item`` actually accepts — unlike the synthetic
+        ``query:Drums#Kit-Core%20808`` fallback URIs, which do not resolve
+        in a real install.
+
+        Returns the *full* set (Live returns a whole level in one call, so
+        this is cheap); ``hard_cap`` is only a runaway guard. Callers that
+        need to bound a prompt should sample the result rather than relying
+        on traversal order, which is alphabetical and would bias toward
+        early letters. The ``name`` lets the planner reason about kit
+        character; the ``uri`` is what it must hand back as
+        ``instrument_path``.
+        """
+        found: list[dict[str, str]] = []
+        seen: set[str] = set()
+
+        def walk(p: str, depth: int) -> None:
+            if len(found) >= hard_cap:
+                return
+            try:
+                result = self.get_browser_items_at_path(p)
+            except AbletonError:
+                return  # unreachable subtree; skip it
+            folders: list[str] = []
+            for item in result.get("items", []):
+                uri = item.get("uri")
+                if item.get("is_loadable") and uri and uri not in seen:
+                    seen.add(uri)
+                    found.append({"name": str(item.get("name") or uri), "uri": str(uri)})
+                    if len(found) >= hard_cap:
+                        return
+                elif item.get("is_folder") and item.get("name"):
+                    folders.append(item["name"])
+            if depth < max_depth:
+                for name in folders:
+                    walk("{0}/{1}".format(p, name), depth + 1)
+                    if len(found) >= hard_cap:
+                        return
+
+        walk(path, 0)
+        return found
+
     def create_midi_track(self, name: str, index: int = -1) -> int:
         result = self.send_command("create_midi_track", {"index": index})
         track_idx = int(result.get("index", result.get("track_index", -1)))

@@ -62,9 +62,31 @@ def _hit_histogram(transcription: Transcription) -> dict[str, int]:
     return dict(counts)
 
 
+def _normalise_instruments(available: list) -> list[dict[str, str]]:
+    """Coerce ``available_instruments`` to ``[{name, uri}]``.
+
+    The session list arrives in two shapes: bare URI strings (from
+    ``--instruments`` or the offline fallback) and ``{name, uri}`` dicts
+    (from a live browser walk, where ``uri`` is an opaque
+    ``query:Drums#FileId_NNNNN``). Strings get ``name == uri``; dicts
+    without a ``uri`` are dropped. Giving the planner the human ``name``
+    lets it judge kit character even when the URI is opaque.
+    """
+    out: list[dict[str, str]] = []
+    for item in available:
+        if isinstance(item, dict):
+            uri = item.get("uri")
+            if not uri:
+                continue
+            out.append({"name": str(item.get("name") or uri), "uri": str(uri)})
+        elif isinstance(item, str) and item.strip():
+            out.append({"name": item, "uri": item})
+    return out
+
+
 def _user_message(
     transcription: Transcription,
-    available_instruments: list[str],
+    available_instruments: list[dict[str, str]],
     user_hint: str | None,
 ) -> str:
     summary = {
@@ -77,7 +99,9 @@ def _user_message(
         "Transcription summary:",
         json.dumps(summary, indent=2),
         "",
-        "Available instruments (browser URIs — pick one of these verbatim):",
+        "Available instruments — each has a human `name` (use it to judge kit",
+        "character) and an opaque `uri`. Choose ONE and return its `uri`",
+        "verbatim as instrument_path:",
         json.dumps(available_instruments, indent=2),
     ]
     if user_hint:
@@ -94,9 +118,10 @@ def make_plan(
     client: anthropic.Anthropic | None = None,
     model: str = DEFAULT_MODEL,
 ) -> Plan:
-    available = session_state.get("available_instruments", [])
+    available = _normalise_instruments(session_state.get("available_instruments", []))
     if not available:
         raise ValueError("session_state['available_instruments'] must be non-empty")
+    uris = {a["uri"] for a in available}
 
     if client is None:
         api_key = os.environ.get("ANTHROPIC_API_KEY")
@@ -144,8 +169,8 @@ def make_plan(
     fixed_clips: list[ClipPlan] = []
     for clip in llm_plan.clips:
         instrument = clip.instrument_path
-        if instrument not in available:
-            instrument = available[0]
+        if instrument not in uris:
+            instrument = available[0]["uri"]
             rationale = f"[fallback: chosen instrument not in session] {rationale}"
         fixed_clips.append(
             ClipPlan(

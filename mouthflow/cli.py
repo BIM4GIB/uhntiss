@@ -20,10 +20,13 @@ from mouthflow.transcribe import transcribe_drums
 
 app = typer.Typer(add_completion=False, help="Voice-driven arrangement agent for Ableton Live.")
 
-# Fallback drum rack URIs used when the caller doesn't supply --instruments
-# and get_session_info doesn't include any. These are common Live Core
-# Library kits; real projects should pass --instruments to pick from the
-# actual set. Values mirror ableton-mcp's get_browser_items_at_path output.
+# Fallback drum-kit URIs, used ONLY when Live is unreachable (no socket)
+# or its browser returns no loadable kits. NOTE: these synthetic
+# "query:Drums#Kit-Core%20<name>" URIs do NOT resolve in a real Live
+# install — load_browser_item raises "Browser item ... not found". When
+# Live is reachable, the CLI resolves real "query:Drums#FileId_NNNNN" URIs
+# via AbletonClient.list_drum_instruments(); this list only keeps the
+# offline dry-run path producing a Plan.
 _FALLBACK_INSTRUMENTS: tuple[str, ...] = (
     "query:Drums#Kit-Core%20808",
     "query:Drums#Kit-Core%20Jazz",
@@ -31,24 +34,58 @@ _FALLBACK_INSTRUMENTS: tuple[str, ...] = (
 )
 
 
+# How many discovered kits to put in front of the planner. A real Live
+# library can hold hundreds of drum racks; sending them all would bloat
+# every planning call. We sample down to this budget — see _sample_kits.
+_PLANNER_KIT_BUDGET = 150
+
+
 def _log(msg: str) -> None:
     print(f"[mouthflow] {msg}", file=sys.stderr)
+
+
+def _sample_kits(kits: list[dict[str, str]], budget: int) -> list[dict[str, str]]:
+    """Even-stride sample of ``kits`` capped at ``budget``, order preserved.
+
+    Live returns kits alphabetically, so a head-truncation would only ever
+    show the planner early-letter kits. Striding spreads the sample across
+    the whole library so kit *character* (the names) stays representative.
+    """
+    if budget <= 0 or len(kits) <= budget:
+        return list(kits)
+    step = len(kits) / budget
+    return [kits[int(i * step)] for i in range(budget)]
 
 
 def _resolve_instruments(
     override: list[str] | None,
     client: AbletonClient | None,
-) -> list[str]:
+) -> list[str | dict[str, str]]:
+    """Resolve the instrument set handed to the planner.
+
+    Priority: explicit ``--instruments`` (bare URIs) > a live browser walk
+    of the Drums category ({name, uri} dicts with real, loadable URIs) >
+    the hardcoded fallback, used only when Live is unreachable or empty.
+    """
     if override:
-        return override
+        return list(override)
     if client is not None:
         try:
-            info = client.get_session_info()
-            got = info.get("available_instruments") or info.get("instruments") or []
-            if got:
-                return list(got)
+            kits = client.list_drum_instruments()
+            if kits:
+                sampled = _sample_kits(kits, _PLANNER_KIT_BUDGET)
+                if len(sampled) < len(kits):
+                    _log(
+                        f"discovered {len(kits)} loadable drum kits; sampled "
+                        f"{len(sampled)} across the library for the planner "
+                        f"(pass --instruments to choose explicitly)"
+                    )
+                else:
+                    _log(f"discovered {len(kits)} loadable drum kit(s) from Live")
+                return sampled
+            _log("Live returned no loadable drum kits; using fallback list")
         except Exception as exc:  # pragma: no cover — diagnostic path
-            _log(f"get_session_info failed, using fallback: {exc}")
+            _log(f"browser walk failed ({exc}); using fallback list")
     return list(_FALLBACK_INSTRUMENTS)
 
 
