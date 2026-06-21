@@ -13,7 +13,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from mouthflow.plan import _hit_histogram, _user_message, make_plan
+from mouthflow.plan import _hit_histogram, _normalise_instruments, _user_message, make_plan
 from mouthflow.schemas import DrumHit, Transcription
 
 
@@ -61,10 +61,35 @@ def test_hit_histogram_counts_gm_notes(tmp_path):
     assert _hit_histogram(t) == {"kick": 2, "snare": 1, "hat_closed": 1}
 
 
+def test_normalise_instruments_accepts_strings_and_dicts():
+    out = _normalise_instruments(
+        [
+            "query:Drums#A",
+            {"name": "Dusty", "uri": "query:Drums#FileId_1"},
+            {"uri": "query:Drums#FileId_2"},  # name defaults to uri
+            {"name": "no uri"},  # dropped — no uri
+            "",  # dropped — blank
+        ]
+    )
+    assert out == [
+        {"name": "query:Drums#A", "uri": "query:Drums#A"},
+        {"name": "Dusty", "uri": "query:Drums#FileId_1"},
+        {"name": "query:Drums#FileId_2", "uri": "query:Drums#FileId_2"},
+    ]
+
+
 def test_user_message_includes_instruments_and_hint(tmp_path):
     t = _transcription(tmp_path)
-    msg = _user_message(t, ["query:Drums#A", "query:Drums#B"], user_hint="harder")
-    assert "query:Drums#A" in msg
+    msg = _user_message(
+        t,
+        [
+            {"name": "808 Kit", "uri": "query:Drums#FileId_1"},
+            {"name": "Jazz", "uri": "query:Drums#FileId_2"},
+        ],
+        user_hint="harder",
+    )
+    assert "808 Kit" in msg  # name shown so the planner can judge character
+    assert "query:Drums#FileId_1" in msg  # uri shown so it can return it
     assert "harder" in msg
     assert "tempo_bpm" in msg
 
@@ -103,6 +128,37 @@ def test_make_plan_round_trips_valid_tool_output(tmp_path):
     # System prompt is a content block list with ephemeral cache_control.
     assert isinstance(req["system"], list)
     assert req["system"][0]["cache_control"] == {"type": "ephemeral"}
+
+
+def test_make_plan_accepts_dict_instruments_and_returns_uri(tmp_path):
+    t = _transcription(tmp_path)
+    instruments = [
+        {"name": "808 Core Kit", "uri": "query:Drums#FileId_5006"},
+        {"name": "Dusty Breaks", "uri": "query:Drums#FileId_5012"},
+    ]
+    client = _FakeClient(
+        {
+            "tempo": 96.0,
+            "clips": [
+                {
+                    "track_name": "Drums",
+                    "instrument_path": "query:Drums#FileId_5012",
+                    "length_bars": 4.0,
+                }
+            ],
+            "rationale": "Dusty Breaks fits the laid-back pocket.",
+        }
+    )
+    plan = make_plan(
+        t,
+        session_state={"available_instruments": instruments},
+        client=client,  # type: ignore[arg-type]
+    )
+    assert plan.clips[0].instrument_path == "query:Drums#FileId_5012"
+    assert "fallback" not in plan.rationale.lower()
+    # The user message exposed kit names so the planner could choose by character.
+    sent = client.messages.last_request["messages"][0]["content"]
+    assert "Dusty Breaks" in sent
 
 
 def test_make_plan_falls_back_when_instrument_hallucinated(tmp_path):

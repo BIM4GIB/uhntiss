@@ -33,6 +33,17 @@ def _four_on_the_floor_wav(path: Path, seconds: float = 2.0) -> None:
     sf.write(path, y, SR, subtype="PCM_16")
 
 
+def test_sample_kits_strides_across_full_range():
+    kits = [{"name": str(i), "uri": f"u{i}"} for i in range(300)]
+    sampled = cli_module._sample_kits(kits, 150)
+    assert len(sampled) == 150
+    # Order preserved and the spread reaches the tail (not a head-truncation).
+    assert sampled[0] == kits[0]
+    assert int(sampled[-1]["name"]) > 250
+    # Small lists pass through untouched.
+    assert cli_module._sample_kits(kits[:10], 150) == kits[:10]
+
+
 def test_cli_dry_run_end_to_end(tmp_path, monkeypatch):
     wav = tmp_path / "loop.wav"
     _four_on_the_floor_wav(wav)
