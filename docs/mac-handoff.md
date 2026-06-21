@@ -124,7 +124,15 @@ on top of a broken pipeline is a trap.
 
 1. Open Ableton, confirm AbletonMCP is loaded (see §3).
 2. Open an empty set (File → New Live Set).
-3. Run:
+3. Preflight with `mouthflow doctor` — it checks that `ANTHROPIC_API_KEY`
+   is set, that AbletonMCP answers on :9877, and that the browser returns
+   loadable kits, exiting non-zero if anything's missing:
+
+```bash
+uv run mouthflow doctor
+```
+
+4. Run:
 
 ```bash
 uv run mouthflow run tests/fixtures/clips/01_basic_4to4.wav \
@@ -138,6 +146,7 @@ Gotchas and how to diagnose:
 
 | Symptom | Likely cause |
 |---|---|
+| Not sure which prereq is broken | Run `mouthflow doctor` — it isolates key vs socket vs kit-discovery |
 | `ConnectionRefusedError` on :9877 | Remote Script not loaded or Live not running |
 | `AbletonError: Unknown command ...` | ableton-mcp version mismatch; update both sides |
 | Track created but empty | `instrument_path` URI doesn't exist; check `--instruments` values |
