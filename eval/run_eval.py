@@ -41,6 +41,8 @@ class ClipResult:
     onset_fn: int
     class_correct: int
     class_matched: int
+    tempo_det_bpm: float
+    tempo_gt_bpm: float | None
     tempo_err_bpm: float
     tempo_hit: bool
 
@@ -121,6 +123,8 @@ def _evaluate_clip(wav: Path) -> ClipResult | None:
         onset_fn=fn,
         class_correct=class_correct,
         class_matched=len(matches),
+        tempo_det_bpm=transcription.tempo_bpm,
+        tempo_gt_bpm=gt_tempo,
         tempo_err_bpm=tempo_err,
         tempo_hit=tempo_hit,
     )
@@ -150,11 +154,30 @@ def _format_report(results: list[ClipResult]) -> str:
     def tick(ok: bool) -> str:
         return "OK" if ok else "MISS"
 
+    # Per-clip breakdown — with N this small, the aggregate hides which clip
+    # regressed and whether a miss is an onset problem or a tempo problem.
+    per_clip = [
+        "per clip:",
+        f"  {'name':<22} {'P':>4} {'R':>4} {'F1':>5}  {'det/gt bpm':>11} {'Δ':>5}",
+    ]
+    for r in sorted(results, key=lambda r: r.name):
+        matched_p = r.onset_tp + r.onset_fp
+        matched_r = r.onset_tp + r.onset_fn
+        p = r.onset_tp / matched_p if matched_p else 0.0
+        rec = r.onset_tp / matched_r if matched_r else 0.0
+        gt = f"{r.tempo_gt_bpm:g}" if r.tempo_gt_bpm is not None else "?"
+        per_clip.append(
+            f"  {r.name:<22} {p:>4.2f} {rec:>4.2f} {_f1(r.onset_tp, r.onset_fp, r.onset_fn):>5.2f}"
+            f"  {r.tempo_det_bpm:>5.1f}/{gt:<5} {r.tempo_err_bpm:>5.1f} {tick(r.tempo_hit)}"
+        )
+
     today = date.today().isoformat()
     return "\n".join(
         [
             f"MOUTHFLOW EVAL - {today}",
             "-" * 30,
+            *per_clip,
+            "",
             f"Transcription (N={n})",
             f"  onset F1:         {f1:.2f}   {tick(f1 >= 0.75)} (target 0.75)",
             f"  drum class acc:   {class_acc:.2f}   {tick(class_acc >= 0.65)} (target 0.65)",

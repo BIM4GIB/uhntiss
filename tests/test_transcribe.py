@@ -22,8 +22,12 @@ from mouthflow.transcribe import (
     GM_KICK,
     GM_SNARE,
     _classify_heuristic,
+    _detect_tempo,
+    _detect_onsets,
     _features_at,
+    _grid_phase,
     _quantise_16th,
+    _quantise_grid,
     transcribe_drums,
 )
 
@@ -93,6 +97,54 @@ def test_quantise_16th_snaps_to_grid():
     step = 60 / 120 / 4  # 125 ms at 120 BPM
     assert _quantise_16th(0.123, 120) == pytest.approx(step)
     assert _quantise_16th(0.0, 120) == 0.0
+
+
+def test_quantise_grid_phase():
+    step = 60 / 120 / 4
+    # phase=0 reduces to the plain 16th quantiser.
+    assert _quantise_grid(0.123, 120, 0.0) == pytest.approx(_quantise_16th(0.123, 120))
+    # A half-step phase offsets every grid line by step/2.
+    assert _quantise_grid(0.0, 120, 0.5) == pytest.approx(0.5 * step)
+    # _grid_phase recovers a known phase: onsets laid on the +0.25-step grid.
+    onsets = np.array([(n + 0.25) * step for n in range(8)])
+    assert _grid_phase(onsets, 120) == pytest.approx(0.25, abs=0.02)
+
+
+def _drum_pattern(bpm: float, bars: int = 6) -> np.ndarray:
+    """A boombap-ish kick/snare/hat loop at ``bpm`` (8th-note hats)."""
+    beat = 60.0 / bpm
+    events: list[tuple[float, np.ndarray]] = []
+    for b in range(bars):
+        base = b * 4 * beat
+        events += [(base + s * beat, _kick_sample()) for s in (0, 2)]
+        events += [(base + s * beat, _snare_sample()) for s in (1, 3)]
+        events += [(base + s * beat, _hat_sample()) for s in (0.5, 1.5, 2.5, 3.5)]
+    return _place(events, bars * 4 * beat + 0.3)
+
+
+@pytest.mark.parametrize("bpm", [84, 100, 120])
+def test_detect_tempo_no_octave_error(tmp_path, monkeypatch, bpm):
+    # beat_track reports ~2x on beatbox; the estimator must land on the right
+    # octave and refine to within the +-3 BPM eval tolerance.
+    monkeypatch.setattr(transcribe, "_MODEL", None)
+    y = _drum_pattern(bpm)
+    onsets = _detect_onsets(y, SR)
+    coarse, conf = _detect_tempo(y, SR, onsets)
+    assert conf > 0.0
+    assert coarse < bpm * 1.5, f"octave error: {coarse} for true {bpm}"
+
+    wav = tmp_path / "pattern.wav"
+    sf.write(wav, y, SR, subtype="PCM_16")
+    assert transcribe_drums(wav).tempo_bpm == pytest.approx(bpm, abs=3.0)
+
+
+def test_explicit_tempo_overrides_detection(tmp_path, monkeypatch):
+    monkeypatch.setattr(transcribe, "_MODEL", None)
+    # Explicit tempo is honored verbatim, regardless of the audio's real tempo.
+    y = _drum_pattern(100)
+    wav = tmp_path / "pattern.wav"
+    sf.write(wav, y, SR, subtype="PCM_16")
+    assert transcribe_drums(wav, tempo=128.0).tempo_bpm == 128.0
 
 
 def test_transcribe_drums_end_to_end(tmp_path, monkeypatch):

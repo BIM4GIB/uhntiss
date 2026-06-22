@@ -4,36 +4,60 @@ Last updated: 2026-06-22. Read this first when picking up work.
 
 ## TL;DR
 Mouthflow turns a beatbox clip into a drum pattern in Ableton Live. The full
-pipeline works end-to-end. This session rebuilt the **drum classifier** as a
-per-user k-NN model (the big win) and added an in-Ableton **Max for Live**
-device. **The next frontier is onset detection + tempo** — now the dominant
-bottleneck per the eval.
+pipeline works end-to-end. A prior session rebuilt the **drum classifier**
+(per-user k-NN). **This session fixed onset detection + tempo** — all three eval
+metrics are now green. The win was an **octave-corrected tempo estimator** plus
+**phase-aware quantization** (snap to a grid aligned to the performance, not
+phase-0). **The next frontier is corpus expansion** — the eval is only N=2, so
+0.87 F1 is on thin ice; record more mimic takes to harden it.
 
 ## Pipeline
 `mic/WAV → capture → classify-intent (hardcoded DRUM) → transcribe (onset +
-classify → MIDI + tempo) → plan (Claude picks a kit) → execute (JSON/TCP
-:9877 → ableton-mcp → Live)`. Only `plan` calls an LLM; the rest is
-deterministic Python. CLI process spawns, runs, exits (no server).
+classify → octave-corrected tempo + phase-aware quantize → MIDI) → plan (Claude
+picks a kit) → execute (JSON/TCP :9877 → ableton-mcp → Live)`. Only `plan` calls
+an LLM; the rest is deterministic Python. CLI process spawns, runs, exits.
 
 ## Eval scoreboard (`uv run python -m eval.run_eval`, 2 corpus clips)
 | metric | result | target | status |
 |---|---|---|---|
-| drum-class acc | **0.97** | 0.65 | ✅ fixed this session (was 0.62) |
-| onset F1 | 0.44 | 0.75 | ❌ **next** |
-| tempo within ±3 | 0/2 | ≥80% | ❌ **next** |
+| drum-class acc | **0.97** | 0.65 | ✅ |
+| onset F1 | **0.87** | 0.75 | ✅ fixed this session (was 0.44) |
+| tempo within ±3 | **2/2** | ≥80% | ✅ fixed this session (was 0/2) |
 
-## ▶ NEXT WORK: onset detection + tempo (the remaining "detecting" problem)
-The classifier is solid; detecting is what's still weak.
-- **Onsets** — `transcribe._detect_onsets` (librosa `onset_detect`) misses fast
-  hi-hat rolls and mis-segments. Onset F1 0.44.
-- **Tempo** — `transcribe._detect_tempo` (librosa `beat_track`) is unreliable on
-  beatbox. Wrong tempo also corrupts `transcribe._quantise_16th`, which shifts
-  every hit off-grid → drags onset F1 down too.
-- **How to iterate (measurable loop):** gather labeled clips with the mimic
-  harness → `eval/run_eval.py` after each change.
-- **Ideas:** tune `onset_detect` (delta, pre/post-max, backtrack) or a
-  percussive-specific onset; derive tempo from inter-onset intervals or accept a
-  `--tempo`/`--hint`; consider skipping quantization until tempo is trustworthy.
+The report now prints a **per-clip** P/R/F1 + detected-vs-GT tempo table.
+`uv run python -m eval.onset_sanity` scores the raw detector against the mimic
+grids (tempo-independent) — use it as the detector regression guard.
+
+## What fixed onset+tempo this session (so you don't re-derive it)
+- **The bug was a 2× octave error.** `librosa.beat.beat_track` reports ~172/207
+  BPM on the 84/100 clips. `transcribe._detect_tempo` now takes a base from the
+  onset-strength tempogram and **disambiguates the octave** by grid-fit + an
+  IOI/band prior, then **`_refine_tempo` sharpens to sub-BPM** (a 0.5 BPM error
+  drifts the grid past tolerance late in a clip). Returns `(bpm, confidence)`.
+- **Quantization was the other half.** The eval scores *quantized* hit times and
+  GT is the *performed* timing, so snapping to a phase-0 grid sheared every hit.
+  `_quantise_grid` snaps to a grid **phase-aligned** to the onsets
+  (`_grid_phase`), gated on confidence (`_QUANT_CONF_MIN`); low confidence →
+  emit raw onset times. Same-slot+pitch collisions dedupe to one hit.
+- **Onset detector: leave it mostly alone.** With grid-snapping, onset *timing*
+  precision no longer matters — only FP/FN. Tuning experiments (finer hop,
+  HF-emphasis envelope, lower delta) all *hurt*; HF-emphasis (`fmin=500`) is
+  catastrophic (kills low mouth-kicks). Only kept a mild `delta=0.10` + 40 ms
+  `wait` floor (double-trigger suppression). Don't chase detector params on N=2.
+- **`--tempo` override** added: `mouthflow record/run/dry-run --tempo 90` skips
+  detection; a `"NN bpm"` token in `--hint` does too; M4L has a `tempo` inlet.
+
+## ▶ NEXT WORK: expand the corpus, then the hard timbre cases
+1. **Corpus expansion (highest value).** N=2 is too few to trust 0.87. Record
+   ~9 mimic takes across 80–120 BPM × boombap/snareheavy/fourfloor (see the
+   mimic commands below; ~20 min, headphones). This also feeds the k-NN model.
+   *Re-record only after detector changes are stable* — auto-labels depend on
+   `_detect_onsets`.
+2. **Open vs closed hat** are still collapsed to one `hat` class (needs a
+   sustain feature + open-hat data).
+3. **Fast-tempo classification** (0.59 held-out @100 BPM) — more exemplars.
+- **Measurable loop:** `eval/run_eval.py` (end-to-end) + `eval/onset_sanity.py`
+  (detector only) after each change.
 
 ## How to run / iterate (this Mac)
 ```bash
@@ -108,12 +132,14 @@ MIDI placement.
 ## Key files
 | path | what |
 |---|---|
-| `mouthflow/transcribe.py` | onsets, features, `_classify` (+heuristic), tempo, quantize, MIDI |
+| `mouthflow/transcribe.py` | onsets, features, `_classify` (+heuristic), octave-corrected tempo (`_detect_tempo`/`_refine_tempo`), phase-aware quantize (`_grid_phase`/`_quantise_grid`), MIDI |
 | `mouthflow/drum_model.json` | trained k-NN model |
-| `mouthflow/cli.py` | `record` / `run` / `dry-run` / `doctor` / `list-kits` |
+| `mouthflow/cli.py` | `record` / `run` / `dry-run` / `doctor` / `list-kits`; `--tempo` override |
 | `mouthflow/plan.py` | Claude planner (`prompts/plan.md`) |
 | `mouthflow/execute.py` | ableton-mcp socket client, `list_drum_instruments` |
-| `eval/run_eval.py`, `eval/train_classifier.py` | scoring + training |
+| `eval/run_eval.py` | end-to-end scoring (now per-clip table) |
+| `eval/onset_sanity.py` | tempo-independent onset-detector F1 vs mimic grids |
+| `eval/train_classifier.py` | k-NN training |
 | `mimic/take.py` | mimic-a-beat labeling harness |
 | `calibration/`, `mimic/bb*.*`, `tests/fixtures/clips/` | training + eval data |
 | `m4l/` | Max for Live device |

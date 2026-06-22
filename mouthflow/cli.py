@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -90,12 +91,21 @@ def _resolve_instruments(
     return list(_FALLBACK_INSTRUMENTS)
 
 
+def _tempo_from_hint(hint: str | None) -> float | None:
+    """Pull an explicit BPM out of a freeform hint, e.g. "boombap 90 bpm"."""
+    if not hint:
+        return None
+    m = re.search(r"\b(\d{2,3})\s*bpm\b", hint, re.IGNORECASE)
+    return float(m.group(1)) if m else None
+
+
 def _run_pipeline(
     wav: Path,
     *,
     client: AbletonClient | None,
     hint: str | None,
     instruments_override: list[str] | None,
+    tempo: float | None = None,
 ) -> Plan:
     _log(f"normalising {wav}")
     normalised = capture.from_file(wav)
@@ -104,9 +114,13 @@ def _run_pipeline(
     if intent != Intent.DRUM:
         raise typer.BadParameter(f"v0.1 only handles DRUM intent; got {intent}")
 
+    # Explicit --tempo wins; otherwise a "NN bpm" in the hint forces tempo too.
+    forced_tempo = tempo if tempo and tempo > 0 else _tempo_from_hint(hint)
+
     _log("transcribing drums")
-    transcription = transcribe_drums(normalised)
-    _log(f"  tempo={transcription.tempo_bpm:.1f} BPM, hits={len(transcription.hits)}")
+    transcription = transcribe_drums(normalised, tempo=forced_tempo)
+    forced = " (forced)" if forced_tempo else ""
+    _log(f"  tempo={transcription.tempo_bpm:.1f} BPM{forced}, hits={len(transcription.hits)}")
 
     instruments = _resolve_instruments(instruments_override, client)
     plan = make_plan(
@@ -139,6 +153,9 @@ def record(
     host: str = typer.Option("127.0.0.1"),
     port: int = typer.Option(9877),
     hint: str | None = typer.Option(None, "--hint", help="Optional freeform hint to the planner."),
+    tempo: float | None = typer.Option(
+        None, "--tempo", help="Force tempo in BPM (skips detection). Also reads 'NN bpm' from --hint."
+    ),
     instruments: str | None = typer.Option(
         None, "--instruments", help="Comma-separated browser URIs. Overrides session lookup."
     ),
@@ -153,6 +170,7 @@ def record(
             client=client,
             hint=hint,
             instruments_override=_parse_instruments(instruments),
+            tempo=tempo,
         )
         _emit_or_apply(plan, json_out=json_out, client=client)
 
@@ -163,6 +181,7 @@ def run(
     host: str = typer.Option("127.0.0.1"),
     port: int = typer.Option(9877),
     hint: str | None = typer.Option(None, "--hint"),
+    tempo: float | None = typer.Option(None, "--tempo", help="Force tempo in BPM (skips detection)."),
     instruments: str | None = typer.Option(None, "--instruments"),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
@@ -173,6 +192,7 @@ def run(
             client=client,
             hint=hint,
             instruments_override=_parse_instruments(instruments),
+            tempo=tempo,
         )
         _emit_or_apply(plan, json_out=json_out, client=client)
 
@@ -181,6 +201,7 @@ def run(
 def dry_run(
     wav: Path = typer.Argument(..., exists=True, readable=True, dir_okay=False),
     hint: str | None = typer.Option(None, "--hint"),
+    tempo: float | None = typer.Option(None, "--tempo", help="Force tempo in BPM (skips detection)."),
     instruments: str | None = typer.Option(None, "--instruments"),
     json_out: bool = typer.Option(False, "--json", help="Echo the Plan as JSON to stdout."),
 ) -> None:
@@ -197,6 +218,7 @@ def dry_run(
         client=None,
         hint=hint,
         instruments_override=_parse_instruments(instruments),
+        tempo=tempo,
     )
     _emit_or_apply(plan, json_out=json_out, client=None)
 
