@@ -11,6 +11,7 @@
  *   uv <path>              set the absolute path to the uv binary
  *   duration <seconds>     recording length for the next take
  *   hint <text...>         free-text planner hint (joined into one string)
+ *   tempo <bpm>            force tempo in BPM (0 = auto-detect)
  *   countin <seconds>      silent count-in before recording (0 = off)
  *   list_kits              query Live, populate the kit menu
  *   kit_index <i>          choose kit by menu index (resolved to its URI)
@@ -39,6 +40,7 @@ const state = {
   uv: path.join(os.homedir(), ".local", "bin", "uv"),
   duration: 8,
   hint: "",
+  tempo: 0,
   kitUri: "",
   countin: 3,
 };
@@ -106,6 +108,7 @@ function generate() {
   }
   const args = ["record", "--duration", String(state.duration), "--json"];
   if (state.hint) args.push("--hint", state.hint);
+  if (state.tempo) args.push("--tempo", String(state.tempo));
   if (state.kitUri) args.push("--instruments", state.kitUri);
 
   Max.outlet("busy", 1);
@@ -183,6 +186,7 @@ Max.addHandler("repo", (...a) => (state.repo = a.join(" ")));
 Max.addHandler("uv", (...a) => (state.uv = a.join(" ")));
 Max.addHandler("duration", (d) => (state.duration = Number(d) || state.duration));
 Max.addHandler("countin", (n) => (state.countin = Number(n) || 0));
+Max.addHandler("tempo", (n) => (state.tempo = Number(n) || 0));
 Max.addHandler("hint", (...a) => (state.hint = a.join(" ").trim()));
 Max.addHandler("kit_uri", (...a) => (state.kitUri = a.join(" ").trim()));
 Max.addHandler("kit_index", (i) => {
