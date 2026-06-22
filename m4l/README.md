@@ -78,9 +78,15 @@ maxpat JSON), so edit the generator rather than wiring by hand. Layout:
 
 </details>
 
-The current prebuilt panel wires Generate/duration/count-in/hint/status. The
-`list_kits` / kit-menu handlers exist in `mouthflow.js` but aren't on the panel
-yet (a kit dropdown is the next addition).
+The prebuilt panel wires Generate / duration / count-in / hint / **kit dropdown
++ List Kits** / status.
+
+> **Kit dropdown caveat:** the **List Kits** button shells out to
+> `mouthflow list-kits`, which must exist on the repo the device targets
+> (default `~/UhnTiss/uhntiss`). Until that command is on `main`, the dropdown
+> can't populate — Generate still works (the planner picks a kit from the
+> hint). Merge the branch that adds `list-kits`, or point the device at a repo
+> that has it (`repo <path>` message to `node.script`).
 
 ## Message reference (inlet → script)
 `repo <path>` · `uv <path>` · `duration <s>` · `countin <s>` · `hint <text…>` ·
