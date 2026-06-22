@@ -252,5 +252,28 @@ def doctor(
     _log("all checks passed — ready to run")
 
 
+@app.command("list-kits")
+def list_kits(
+    host: str = typer.Option("127.0.0.1"),
+    port: int = typer.Option(9877),
+    limit: int = typer.Option(0, help="Cap the result (0 = all); strided sample."),
+) -> None:
+    """Print loadable drum kits from the running Live set as JSON.
+
+    Emits a JSON array of ``{"name", "uri"}`` to stdout — machine-facing,
+    for UIs (e.g. the Max for Live device's kit picker). Exits non-zero if
+    Live is unreachable.
+    """
+    try:
+        with AbletonClient(host, port) as client:
+            kits = client.list_drum_instruments()
+    except (AbletonError, OSError) as exc:
+        _log(f"FAIL AbletonMCP not reachable at {host}:{port}: {exc}")
+        raise typer.Exit(code=1)
+    if limit and limit > 0:
+        kits = _sample_kits(kits, limit)
+    print(json.dumps(kits))
+
+
 if __name__ == "__main__":
     app()

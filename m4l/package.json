@@ -1,0 +1,8 @@
+{
+  "name": "mouthflow-m4l",
+  "version": "0.1.0",
+  "description": "Node for Max glue for the Mouthflow Ableton Live device",
+  "main": "mouthflow.js",
+  "scripts": {},
+  "dependencies": {}
+}
