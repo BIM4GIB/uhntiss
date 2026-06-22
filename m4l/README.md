@@ -21,11 +21,32 @@ the ableton-mcp socket — exactly the verified command-line path.
 - `ableton-mcp` Remote Script enabled (the apply step still uses `:9877`).
 
 ## Files (keep them together)
-Save the device **in this `m4l/` folder**, next to:
+- `Mouthflow.amxd` — **the prebuilt device** (drop it on a track and use it)
 - `mouthflow.js` — Node for Max script (the glue)
 - `package.json` — declares `mouthflow.js` as main (no external deps)
 
-## Build the device in Max (one time)
+## Use it
+1. In Live, drag **`Mouthflow.amxd`** onto a track (it's an audio-effect device).
+2. The device panel opens in Presentation with: **duration (s)** (default 8),
+   **count-in (s)** (default 3), a **hint** field, a **Generate** button, and a
+   **status** line.
+3. Type a hint (e.g. "punchy 808 trap"), set duration, click **Generate** →
+   count-in → beatbox → a new track with a kit + clip lands in Live, tempo
+   matched. The status line tracks `recording → transcribing → plan → done`.
+
+The panel drives the same `uv run mouthflow record` path as the CLI; it reads
+your key from the repo `.env` and targets `~/UhnTiss/uhntiss` by default
+(override with a `repo <path>` / `uv <path>` message to `node.script`).
+
+## How it's wired (reference — regenerate, don't hand-edit)
+The `.amxd` is generated programmatically (an `ampf` container wrapping the
+maxpat JSON), so edit the generator rather than wiring by hand. Layout:
+`generate` message + `duration`/`countin` numbers + `hint` textedit →
+`prepend …` → `node.script`; `node.script` outlet → `route status` →
+`prepend set` → status message; a `loadbang` seeds the 8/3 defaults.
+
+<details><summary>Manual build (if you ever rebuild in the Max editor)</summary>
+
 1. In Live: **Create → Max Audio Effect** (or drag an empty *Max Audio Effect*
    onto a track), then click **Edit** (the pencil) to open the Max editor.
 2. Add the brain: an object box `node.script mouthflow.js @autostart 1`.
@@ -55,12 +76,11 @@ Save the device **in this `m4l/` folder**, next to:
    | `done` / `error` | optional status LED / message |
 6. **Save** the device into this `m4l/` folder (e.g. `Mouthflow.amxd`).
 
-## Use
-1. Drop **Mouthflow** on a track; open an empty-ish set; confirm AbletonMCP is on.
-2. (Optional) click **List kits** to populate the menu from your Live library.
-3. Set **duration** + **hint**, pick a **kit** (or leave on "let planner choose").
-4. Click **Generate** → a count-in plays → beatbox → the status line tracks
-   `recording → transcribing → plan → done`, and the clip lands in Live.
+</details>
+
+The current prebuilt panel wires Generate/duration/count-in/hint/status. The
+`list_kits` / kit-menu handlers exist in `mouthflow.js` but aren't on the panel
+yet (a kit dropdown is the next addition).
 
 ## Message reference (inlet → script)
 `repo <path>` · `uv <path>` · `duration <s>` · `countin <s>` · `hint <text…>` ·
