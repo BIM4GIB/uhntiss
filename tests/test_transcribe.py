@@ -21,7 +21,7 @@ from mouthflow.transcribe import (
     GM_HAT_CLOSED,
     GM_KICK,
     GM_SNARE,
-    _classify,
+    _classify_heuristic,
     _features_at,
     _quantise_16th,
     transcribe_drums,
@@ -74,17 +74,19 @@ def _place(events: list[tuple[float, np.ndarray]], total_s: float) -> np.ndarray
 
 
 def test_classify_kick_snare_hat_drop():
+    # The deterministic heuristic is the always-present baseline; the per-user
+    # trained model is data-dependent and graded by eval/run_eval instead.
     y = _kick_sample()
-    assert _classify(_features_at(y, SR, 0.0)) == GM_KICK
+    assert _classify_heuristic(_features_at(y, SR, 0.0)) == GM_KICK
 
     y = _snare_sample()
-    assert _classify(_features_at(y, SR, 0.0)) == GM_SNARE
+    assert _classify_heuristic(_features_at(y, SR, 0.0)) == GM_SNARE
 
     y = _hat_sample()
-    assert _classify(_features_at(y, SR, 0.0)) == GM_HAT_CLOSED
+    assert _classify_heuristic(_features_at(y, SR, 0.0)) == GM_HAT_CLOSED
 
     silence = np.zeros(int(SR * 0.12), dtype=np.float32)
-    assert _classify(_features_at(silence, SR, 0.0)) == DROP
+    assert _classify_heuristic(_features_at(silence, SR, 0.0)) == DROP
 
 
 def test_quantise_16th_snaps_to_grid():
@@ -93,7 +95,10 @@ def test_quantise_16th_snaps_to_grid():
     assert _quantise_16th(0.0, 120) == 0.0
 
 
-def test_transcribe_drums_end_to_end(tmp_path):
+def test_transcribe_drums_end_to_end(tmp_path, monkeypatch):
+    # Force the deterministic heuristic: the per-user model is trained on real
+    # beatbox, so synthetic tones aren't guaranteed to classify "correctly".
+    monkeypatch.setattr(transcribe, "_MODEL", None)
     # 2s of a steady 4-on-the-floor kick at 120 BPM, beat every 500 ms.
     y = _place([(t, _kick_sample()) for t in (0.0, 0.5, 1.0, 1.5)], total_s=2.0)
     wav = tmp_path / "kick.wav"
