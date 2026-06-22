@@ -135,7 +135,7 @@ _MODEL_PATH = Path(__file__).resolve().parent / "drum_model.json"
 
 
 def _load_model() -> dict | None:
-    """Load the per-user nearest-centroid model, or None if absent/invalid."""
+    """Load the per-user trained model, or None if absent/invalid."""
     try:
         return json.loads(_MODEL_PATH.read_text())
     except (OSError, ValueError):
@@ -149,9 +149,10 @@ def _classify(f: dict[str, float]) -> int:
     """Classify one onset to a GM pitch (or DROP).
 
     Uses the per-user trained model (``drum_model.json``) when present:
-    loudness gates silence, then the timbre features are standardised and
-    matched to the nearest class centroid. Falls back to the hand-tuned
-    heuristic when no model is available.
+    loudness gates silence, then the standardised timbre features are matched
+    to the model. Supports a k-NN model (exemplar vote — handles multi-modal
+    classes like fast vs slow hats) or a nearest-centroid model. Falls back to
+    the hand-tuned heuristic when no model is available.
     """
     if _MODEL is None:
         return _classify_heuristic(f)
@@ -159,6 +160,17 @@ def _classify(f: dict[str, float]) -> int:
         return DROP
     mean, std, feats = _MODEL["mean"], _MODEL["std"], _MODEL["features"]
     z = [(f[k] - mean[j]) / std[j] for j, k in enumerate(feats)]
+    if _MODEL.get("type") == "knn":
+        ex, labels, k = _MODEL["exemplars"], _MODEL["labels"], _MODEL.get("k", 5)
+        order = sorted(
+            range(len(ex)),
+            key=lambda i: sum((ex[i][j] - z[j]) ** 2 for j in range(len(z))),
+        )
+        from collections import Counter
+
+        label = Counter(labels[i] for i in order[:k]).most_common(1)[0][0]
+        return int(_MODEL["classes"][label])
+    # nearest-centroid
     best_label, best_d = None, float("inf")
     for label, c in _MODEL["centroids"].items():
         d = sum((z[j] - c[j]) ** 2 for j in range(len(z)))

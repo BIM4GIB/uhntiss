@@ -1,12 +1,16 @@
-"""Train a per-user drum classifier from calibration clips.
+"""Train a per-user drum classifier (k-NN) from calibration + in-context data.
 
-Each ``calibration/<label>.wav`` is an isolated take of one drum sound, so
-every onset in it is a labelled example. We extract the same timbre features
-``transcribe`` uses, standardise them, and fit a nearest-centroid model.
-Loudness (rms) is deliberately excluded — that's velocity, not class.
+Two data sources, same 5 timbre features (loudness excluded):
+- calibration/<label>.wav : isolated one-shots (clean class anchors)
+- mimic/<take>.labeled.json : in-context hits auto-labeled by the mimic-a-beat
+  harness (realistic timbre across tempos)
 
-Reports leave-one-out accuracy + a confusion matrix so we can see which
-classes actually separate, then writes the model to mouthflow/drum_model.json.
+k-NN (not nearest-centroid) because a drum class is multi-modal: a hat sounds
+bright when played slowly and darker when played fast, so a single centroid
+blurs it. k-NN keeps the exemplars and votes by nearest neighbours.
+
+Reports held-out-take accuracy (does in-context from other takes generalise?)
+and combined leave-one-out, then writes mouthflow/drum_model.json.
 
 Run: ``uv run python -m eval.train_classifier``
 """
@@ -23,99 +27,95 @@ from mouthflow import transcribe as T
 
 REPO = Path(__file__).resolve().parent.parent
 CAL_DIR = REPO / "calibration"
+MIMIC_DIR = REPO / "mimic"
 MODEL_OUT = REPO / "mouthflow" / "drum_model.json"
 
 FEATURES = ["centroid", "sub100_ratio", "decay_s", "zcr", "flatness"]
-RMS_FLOOR = 0.005  # drop near-silent onsets
-
+RMS_FLOOR = 0.005
+K = 5
 LABEL_TO_PITCH = {"kick": 36, "snare": 38, "hat": 42, "clap": 39}
 
-# Closed vs open hat aren't separable with the current 120ms timbre features
-# (no sustain cue) and open-hat is under-sampled, so collapse both to "hat"
-# (GM closed hat, 42). Distinguishing them is a follow-up: add a sustain
-# feature + more open-hat data.
-def _norm_label(stem: str) -> str:
+
+def _norm(stem: str) -> str:
     return "hat" if stem.startswith("hat") else stem
 
 
-def _samples() -> tuple[list[list[float]], list[str]]:
-    X: list[list[float]] = []
-    y: list[str] = []
+def load_isolated():
+    rows = []
     for wav in sorted(CAL_DIR.glob("*.wav")):
-        label = _norm_label(wav.stem)
+        lab = _norm(wav.stem)
         yf, _ = librosa.load(str(wav), sr=T._SR, mono=True)
         for t in T._detect_onsets(yf, T._SR):
             f = T._features_at(yf, T._SR, t)
-            if f["rms"] < RMS_FLOOR:
-                continue
-            X.append([f[k] for k in FEATURES])
-            y.append(label)
-    return X, y
+            if f["rms"] >= RMS_FLOOR:
+                rows.append(([f[k] for k in FEATURES], lab, "isolated"))
+    return rows
 
 
-def _standardise(X: list[list[float]]):
+def load_incontext():
+    rows = []
+    for j in sorted(MIMIC_DIR.glob("*.labeled.json")):
+        take = j.stem.replace(".labeled", "")
+        for s in json.loads(j.read_text()):
+            rows.append((s["x"], _norm(s["y"]), take))
+    return rows
+
+
+def _scaler(X):
     n, d = len(X), len(FEATURES)
-    mean = [sum(row[j] for row in X) / n for j in range(d)]
-    std = [
-        (sum((row[j] - mean[j]) ** 2 for row in X) / n) ** 0.5 or 1.0 for j in range(d)
-    ]
-    Z = [[(row[j] - mean[j]) / std[j] for j in range(d)] for row in X]
-    return Z, mean, std
+    mean = [sum(r[j] for r in X) / n for j in range(d)]
+    std = [(sum((r[j] - mean[j]) ** 2 for r in X) / n) ** 0.5 or 1.0 for j in range(d)]
+    return mean, std
 
 
-def _centroids(Z, y, labels):
-    cen = {}
-    for lab in labels:
-        rows = [Z[i] for i in range(len(Z)) if y[i] == lab]
-        cen[lab] = [sum(r[j] for r in rows) / len(rows) for j in range(len(FEATURES))]
-    return cen
+def _z(x, mean, std):
+    return [(x[j] - mean[j]) / std[j] for j in range(len(FEATURES))]
 
 
-def _nearest(z, cen):
-    best, bestd = None, float("inf")
-    for lab, c in cen.items():
-        d = sum((z[j] - c[j]) ** 2 for j in range(len(z)))
-        if d < bestd:
-            best, bestd = lab, d
-    return best
+def _knn(Ztr, ytr, z, k=K):
+    d = sorted(range(len(Ztr)), key=lambda i: sum((Ztr[i][j] - z[j]) ** 2 for j in range(len(z))))
+    return Counter(ytr[i] for i in d[:k]).most_common(1)[0][0]
+
+
+def _fit_eval(train, test, k=K):
+    X = [r[0] for r in train]
+    mean, std = _scaler(X)
+    Ztr = [_z(r[0], mean, std) for r in train]
+    ytr = [r[1] for r in train]
+    ok = sum(_knn(Ztr, ytr, _z(x, mean, std), k) == y for x, y, _ in test)
+    return ok, len(test)
 
 
 def main() -> int:
-    X, y = _samples()
-    labels = sorted(set(y))
-    print(f"calibration: {dict(Counter(y))}  ({len(X)} labelled onsets)\n")
+    iso = load_isolated()
+    ctx = load_incontext()
+    allr = iso + ctx
+    print(f"isolated:  {dict(Counter(r[1] for r in iso))}  ({len(iso)})")
+    print(f"in-context:{dict(Counter(r[1] for r in ctx))}  ({len(ctx)})\n")
 
-    Z, mean, std = _standardise(X)
+    print("held-out take (k-NN accuracy on that take):")
+    for t in sorted({r[2] for r in ctx}):
+        test = [r for r in ctx if r[2] == t]
+        a = _fit_eval(iso + [r for r in ctx if r[2] != t], test)
+        print(f"  {t:8} iso+other-takes {a[0]}/{a[1]} = {a[0]/a[1]:.2f}")
 
-    # Leave-one-out: recompute centroids without sample i each time.
-    conf = Counter()
-    correct = 0
-    for i in range(len(Z)):
-        sub_Z = [Z[k] for k in range(len(Z)) if k != i]
-        sub_y = [y[k] for k in range(len(y)) if k != i]
-        pred = _nearest(Z[i], _centroids(sub_Z, sub_y, sorted(set(sub_y))))
-        conf[(y[i], pred)] += 1
-        correct += pred == y[i]
-    print(f"leave-one-out accuracy: {correct}/{len(Z)} = {correct/len(Z):.2f}\n")
+    # combined leave-one-out
+    mean, std = _scaler([r[0] for r in allr])
+    Z = [_z(r[0], mean, std) for r in allr]
+    y = [r[1] for r in allr]
+    correct = sum(
+        _knn([Z[k] for k in range(len(Z)) if k != i], [y[k] for k in range(len(y)) if k != i], Z[i]) == y[i]
+        for i in range(len(Z))
+    )
+    print(f"\ncombined model leave-one-out (k-NN, k={K}): {correct}/{len(Z)} = {correct/len(Z):.2f}")
 
-    print("confusion (true -> pred):")
-    print("            " + "  ".join(f"{l[:9]:>9}" for l in labels))
-    for t in labels:
-        row = "  ".join(f"{conf[(t, p)]:>9}" for p in labels)
-        print(f"  {t:9} {row}")
-
-    # Fit final model on all data and persist.
-    cen = _centroids(Z, y, labels)
-    model = {
-        "features": FEATURES,
-        "mean": mean,
-        "std": std,
-        "classes": {lab: LABEL_TO_PITCH.get(lab, 39) for lab in labels},
-        "centroids": cen,
-        "rms_floor": RMS_FLOOR,
-    }
-    MODEL_OUT.write_text(json.dumps(model, indent=2))
-    print(f"\nwrote model -> {MODEL_OUT.relative_to(REPO)}")
+    MODEL_OUT.write_text(json.dumps({
+        "type": "knn", "k": K,
+        "features": FEATURES, "mean": mean, "std": std,
+        "classes": {lab: LABEL_TO_PITCH.get(lab, 39) for lab in sorted(set(y))},
+        "exemplars": Z, "labels": y, "rms_floor": RMS_FLOOR,
+    }))
+    print(f"wrote model -> {MODEL_OUT.relative_to(REPO)} ({len(Z)} exemplars)")
     return 0
 
 
