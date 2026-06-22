@@ -15,6 +15,7 @@ Thresholds are sensible defaults. The 20-clip corpus is what tunes them.
 
 from __future__ import annotations
 
+import json
 import tempfile
 from pathlib import Path
 
@@ -130,10 +131,45 @@ def _features_at(y: np.ndarray, sr: int, t: float) -> dict[str, float]:
     }
 
 
-def _classify(f: dict[str, float]) -> int:
-    """Heuristic drum classifier. Returns a GM pitch or DROP.
+_MODEL_PATH = Path(__file__).resolve().parent / "drum_model.json"
 
-    Thresholds are sensible defaults; the 20-clip corpus tunes them.
+
+def _load_model() -> dict | None:
+    """Load the per-user nearest-centroid model, or None if absent/invalid."""
+    try:
+        return json.loads(_MODEL_PATH.read_text())
+    except (OSError, ValueError):
+        return None
+
+
+_MODEL = _load_model()
+
+
+def _classify(f: dict[str, float]) -> int:
+    """Classify one onset to a GM pitch (or DROP).
+
+    Uses the per-user trained model (``drum_model.json``) when present:
+    loudness gates silence, then the timbre features are standardised and
+    matched to the nearest class centroid. Falls back to the hand-tuned
+    heuristic when no model is available.
+    """
+    if _MODEL is None:
+        return _classify_heuristic(f)
+    if f["rms"] < _MODEL.get("rms_floor", 0.005):
+        return DROP
+    mean, std, feats = _MODEL["mean"], _MODEL["std"], _MODEL["features"]
+    z = [(f[k] - mean[j]) / std[j] for j, k in enumerate(feats)]
+    best_label, best_d = None, float("inf")
+    for label, c in _MODEL["centroids"].items():
+        d = sum((z[j] - c[j]) ** 2 for j in range(len(z)))
+        if d < best_d:
+            best_label, best_d = label, d
+    return int(_MODEL["classes"][best_label])
+
+
+def _classify_heuristic(f: dict[str, float]) -> int:
+    """Hand-tuned fallback classifier. Returns a GM pitch or DROP.
+
     Ordering: kick (sub-bass dominant) > hat (very high centroid) > snare
     (mid band) > drop.
     """
