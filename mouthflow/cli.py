@@ -13,26 +13,15 @@ from pathlib import Path
 import typer
 
 from mouthflow import capture
-from mouthflow.classify import classify
+from mouthflow.devices import get_device_by_id
+from mouthflow.devices.base import DeviceSpec
 from mouthflow.execute import AbletonClient, AbletonError, apply_plan
 from mouthflow.plan import make_plan
-from mouthflow.schemas import Intent, Plan
-from mouthflow.transcribe import transcribe_drums
+from mouthflow.schemas import Plan
 
 app = typer.Typer(add_completion=False, help="Voice-driven arrangement agent for Ableton Live.")
 
-# Fallback drum-kit URIs, used ONLY when Live is unreachable (no socket)
-# or its browser returns no loadable kits. NOTE: these synthetic
-# "query:Drums#Kit-Core%20<name>" URIs do NOT resolve in a real Live
-# install — load_browser_item raises "Browser item ... not found". When
-# Live is reachable, the CLI resolves real "query:Drums#FileId_NNNNN" URIs
-# via AbletonClient.list_drum_instruments(); this list only keeps the
-# offline dry-run path producing a Plan.
-_FALLBACK_INSTRUMENTS: tuple[str, ...] = (
-    "query:Drums#Kit-Core%20808",
-    "query:Drums#Kit-Core%20Jazz",
-    "query:Drums#Kit-Core%20Kit",
-)
+_DEFAULT_DEVICE = "drums"
 
 
 # How many discovered kits to put in front of the planner. A real Live
@@ -61,33 +50,37 @@ def _sample_kits(kits: list[dict[str, str]], budget: int) -> list[dict[str, str]
 def _resolve_instruments(
     override: list[str] | None,
     client: AbletonClient | None,
+    spec: DeviceSpec,
 ) -> list[str | dict[str, str]]:
-    """Resolve the instrument set handed to the planner.
+    """Resolve the instrument set handed to the planner for ``spec``.
 
     Priority: explicit ``--instruments`` (bare URIs) > a live browser walk
-    of the Drums category ({name, uri} dicts with real, loadable URIs) >
-    the hardcoded fallback, used only when Live is unreachable or empty.
+    of the device's ``browser_category`` ({name, uri} dicts with real,
+    loadable URIs) > the device's fallback, used only when Live is
+    unreachable or empty.
     """
     if override:
         return list(override)
     if client is not None:
         try:
-            kits = client.list_drum_instruments()
+            kits = client.list_instruments(
+                spec.browser_category, name_filter=spec.instrument_filter
+            )
             if kits:
                 sampled = _sample_kits(kits, _PLANNER_KIT_BUDGET)
                 if len(sampled) < len(kits):
                     _log(
-                        f"discovered {len(kits)} loadable drum kits; sampled "
+                        f"discovered {len(kits)} loadable {spec.id} instruments; sampled "
                         f"{len(sampled)} across the library for the planner "
                         f"(pass --instruments to choose explicitly)"
                     )
                 else:
-                    _log(f"discovered {len(kits)} loadable drum kit(s) from Live")
+                    _log(f"discovered {len(kits)} loadable {spec.id} instrument(s) from Live")
                 return sampled
-            _log("Live returned no loadable drum kits; using fallback list")
+            _log(f"Live returned no loadable {spec.id} instruments; using fallback list")
         except Exception as exc:  # pragma: no cover — diagnostic path
             _log(f"browser walk failed ({exc}); using fallback list")
-    return list(_FALLBACK_INSTRUMENTS)
+    return list(spec.fallback_instruments)
 
 
 def _run_pipeline(
@@ -96,23 +89,26 @@ def _run_pipeline(
     client: AbletonClient | None,
     hint: str | None,
     instruments_override: list[str] | None,
+    device_id: str = _DEFAULT_DEVICE,
 ) -> Plan:
+    try:
+        spec = get_device_by_id(device_id)
+    except KeyError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
     _log(f"normalising {wav}")
     normalised = capture.from_file(wav)
 
-    intent, _conf = classify(normalised)
-    if intent != Intent.DRUM:
-        raise typer.BadParameter(f"v0.1 only handles DRUM intent; got {intent}")
+    _log(f"transcribing ({spec.id})")
+    transcription = spec.transcriber.transcribe(normalised)
+    _log(f"  tempo={transcription.tempo_bpm:.1f} BPM, notes={len(transcription.hits)}")
 
-    _log("transcribing drums")
-    transcription = transcribe_drums(normalised)
-    _log(f"  tempo={transcription.tempo_bpm:.1f} BPM, hits={len(transcription.hits)}")
-
-    instruments = _resolve_instruments(instruments_override, client)
+    instruments = _resolve_instruments(instruments_override, client, spec)
     plan = make_plan(
         transcription,
         session_state={"available_instruments": instruments},
         user_hint=hint,
+        device=spec,
     )
     _log(f"plan: {plan.rationale}")
     return plan
@@ -133,9 +129,13 @@ def _parse_instruments(value: str | None) -> list[str] | None:
     return [s.strip() for s in value.split(",") if s.strip()]
 
 
+_DEVICE_HELP = "Which voice to transcribe: drums | bass | lead | drone."
+
+
 @app.command()
 def record(
     duration: float = typer.Option(15.0, help="Recording length in seconds."),
+    device: str = typer.Option(_DEFAULT_DEVICE, "--device", help=_DEVICE_HELP),
     host: str = typer.Option("127.0.0.1"),
     port: int = typer.Option(9877),
     hint: str | None = typer.Option(None, "--hint", help="Optional freeform hint to the planner."),
@@ -153,6 +153,7 @@ def record(
             client=client,
             hint=hint,
             instruments_override=_parse_instruments(instruments),
+            device_id=device,
         )
         _emit_or_apply(plan, json_out=json_out, client=client)
 
@@ -160,6 +161,7 @@ def record(
 @app.command()
 def run(
     wav: Path = typer.Argument(..., exists=True, readable=True, dir_okay=False),
+    device: str = typer.Option(_DEFAULT_DEVICE, "--device", help=_DEVICE_HELP),
     host: str = typer.Option("127.0.0.1"),
     port: int = typer.Option(9877),
     hint: str | None = typer.Option(None, "--hint"),
@@ -173,6 +175,7 @@ def run(
             client=client,
             hint=hint,
             instruments_override=_parse_instruments(instruments),
+            device_id=device,
         )
         _emit_or_apply(plan, json_out=json_out, client=client)
 
@@ -180,6 +183,7 @@ def run(
 @app.command("dry-run")
 def dry_run(
     wav: Path = typer.Argument(..., exists=True, readable=True, dir_okay=False),
+    device: str = typer.Option(_DEFAULT_DEVICE, "--device", help=_DEVICE_HELP),
     hint: str | None = typer.Option(None, "--hint"),
     instruments: str | None = typer.Option(None, "--instruments"),
     json_out: bool = typer.Option(False, "--json", help="Echo the Plan as JSON to stdout."),
@@ -197,6 +201,7 @@ def dry_run(
         client=None,
         hint=hint,
         instruments_override=_parse_instruments(instruments),
+        device_id=device,
     )
     _emit_or_apply(plan, json_out=json_out, client=None)
 

@@ -17,12 +17,15 @@ import os
 from collections import Counter
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import anthropic
 from pydantic import BaseModel, Field, ValidationError
 
 from mouthflow.schemas import ClipPlan, Plan, Transcription
+
+if TYPE_CHECKING:
+    from mouthflow.devices.base import DeviceSpec
 
 DEFAULT_MODEL = "claude-sonnet-4-6"
 _PROMPT_PATH = Path(__file__).parent / "prompts" / "plan.md"
@@ -42,9 +45,11 @@ class _LLMPlan(BaseModel):
     rationale: str
 
 
-@lru_cache(maxsize=1)
-def _system_prompt() -> str:
-    return _PROMPT_PATH.read_text(encoding="utf-8")
+@lru_cache(maxsize=None)
+def _system_prompt(path: Path = _PROMPT_PATH) -> str:
+    # Keyed by path so multiple devices' prompts can be cached in one process
+    # (the Max for Live device runs e.g. bass then drum back-to-back).
+    return Path(path).read_text(encoding="utf-8")
 
 
 def _tool_schema() -> dict[str, Any]:
@@ -84,17 +89,25 @@ def _normalise_instruments(available: list) -> list[dict[str, str]]:
     return out
 
 
-def _user_message(
-    transcription: Transcription,
-    available_instruments: list[dict[str, str]],
-    user_hint: str | None,
-) -> str:
-    summary = {
+def _default_summary(transcription: Transcription) -> dict:
+    """Drum transcription summary (the historic shape)."""
+    return {
         "tempo_bpm": round(transcription.tempo_bpm, 2),
         "bars": round(transcription.bars, 2),
         "hit_count": len(transcription.hits),
         "hit_histogram": _hit_histogram(transcription),
     }
+
+
+def _user_message(
+    transcription: Transcription,
+    available_instruments: list[dict[str, str]],
+    user_hint: str | None,
+    *,
+    summary: dict | None = None,
+) -> str:
+    if summary is None:
+        summary = _default_summary(transcription)
     parts = [
         "Transcription summary:",
         json.dumps(summary, indent=2),
@@ -117,11 +130,29 @@ def make_plan(
     *,
     client: anthropic.Anthropic | None = None,
     model: str = DEFAULT_MODEL,
+    device: "DeviceSpec | None" = None,
 ) -> Plan:
+    """Plan a clip for ``transcription``.
+
+    ``device`` (a ``DeviceSpec``) selects the per-voice system prompt and
+    transcription summary. When omitted, the drum defaults are used — and a
+    drums ``DeviceSpec`` produces a byte-identical request to ``device=None``.
+    """
     available = _normalise_instruments(session_state.get("available_instruments", []))
     if not available:
         raise ValueError("session_state['available_instruments'] must be non-empty")
     uris = {a["uri"] for a in available}
+
+    if device is not None:
+        prompt_path = device.prompt_path
+        summary = {
+            "tempo_bpm": round(transcription.tempo_bpm, 2),
+            "bars": round(transcription.bars, 2),
+            **device.plan_summary(transcription),
+        }
+    else:
+        prompt_path = _PROMPT_PATH
+        summary = None  # _user_message builds the drum default
 
     if client is None:
         api_key = os.environ.get("ANTHROPIC_API_KEY")
@@ -140,7 +171,7 @@ def make_plan(
         system=[
             {
                 "type": "text",
-                "text": _system_prompt(),
+                "text": _system_prompt(prompt_path),
                 "cache_control": {"type": "ephemeral"},
             }
         ],
@@ -149,7 +180,7 @@ def make_plan(
         messages=[
             {
                 "role": "user",
-                "content": _user_message(transcription, available, user_hint),
+                "content": _user_message(transcription, available, user_hint, summary=summary),
             }
         ],
     )

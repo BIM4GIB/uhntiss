@@ -11,16 +11,28 @@ from pydantic import BaseModel, Field
 
 class Intent(str, Enum):
     DRUM = "drum"
-    MELODY = "melody"
+    MELODY = "melody"   # lead synth
     BASS = "bass"
+    DRONE = "drone"     # ambient / pad
     UNKNOWN = "unknown"
 
 
 @dataclass
-class DrumHit:
+class NoteEvent:
+    """A single note: onset, pitch, velocity, and (optionally) a real duration.
+
+    ``duration_s=None`` means "use the writer's default length" (the drum path's
+    fixed 1/32 note); pitched and drone voices set a real sustain.
+    """
+
     time_s: float
     midi_note: int
     velocity: int
+    duration_s: float | None = None
+
+
+# Drums historically used ``DrumHit``; it's just a note event without a duration.
+DrumHit = NoteEvent
 
 
 @dataclass
@@ -28,7 +40,7 @@ class Transcription:
     midi_path: Path
     tempo_bpm: float
     bars: float
-    hits: list[DrumHit]
+    hits: list[NoteEvent]
 
 
 class ClipPlan(BaseModel):
