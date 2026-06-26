@@ -276,19 +276,25 @@ def doctor(
 
 @app.command("list-kits")
 def list_kits(
+    device: str = typer.Option(_DEFAULT_DEVICE, "--device", help=_DEVICE_HELP),
     host: str = typer.Option("127.0.0.1"),
     port: int = typer.Option(9877),
     limit: int = typer.Option(0, help="Cap the result (0 = all); strided sample."),
 ) -> None:
-    """Print loadable drum kits from the running Live set as JSON.
+    """Print loadable instruments for a device from the running Live set as JSON.
 
     Emits a JSON array of ``{"name", "uri"}`` to stdout — machine-facing,
-    for UIs (e.g. the Max for Live device's kit picker). Exits non-zero if
-    Live is unreachable.
+    for UIs (e.g. the Max for Live device's instrument picker). Defaults to the
+    drums device's browser category; ``--device`` selects another voice. Exits
+    non-zero if Live is unreachable.
     """
     try:
+        spec = get_device_by_id(device)
+    except KeyError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    try:
         with AbletonClient(host, port) as client:
-            kits = client.list_drum_instruments()
+            kits = client.list_instruments(spec.browser_category, name_filter=spec.instrument_filter)
     except (AbletonError, OSError) as exc:
         _log(f"FAIL AbletonMCP not reachable at {host}:{port}: {exc}")
         raise typer.Exit(code=1)

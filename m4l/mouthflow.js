@@ -9,6 +9,7 @@
  * Inlet messages (wire patch -> [node.script mouthflow.js]):
  *   repo <path>            set the mouthflow repo dir (has pyproject + .env)
  *   uv <path>              set the absolute path to the uv binary
+ *   device <id>            which voice: drums | bass | lead | drone | auto
  *   duration <seconds>     recording length for the next take
  *   hint <text...>         free-text planner hint (joined into one string)
  *   countin <seconds>      silent count-in before recording (0 = off)
@@ -37,6 +38,7 @@ const os = require("os");
 const state = {
   repo: path.join(os.homedir(), "UhnTiss", "uhntiss"),
   uv: path.join(os.homedir(), ".local", "bin", "uv"),
+  device: "drums", // which voice; per-voice panels set this via a loadbang msg
   duration: 8,
   hint: "",
   kitUri: "",
@@ -104,7 +106,7 @@ function generate() {
     status("a take is already running — cancel it first");
     return;
   }
-  const args = ["record", "--duration", String(state.duration), "--json"];
+  const args = ["record", "--duration", String(state.duration), "--device", state.device, "--json"];
   if (state.hint) args.push("--hint", state.hint);
   if (state.kitUri) args.push("--instruments", state.kitUri);
 
@@ -156,8 +158,8 @@ function generate() {
 }
 
 function listKits() {
-  status("querying Live for drum kits…");
-  runCli(["list-kits"], {
+  status(`querying Live for ${state.device} instruments…`);
+  runCli(["list-kits", "--device", state.device], {
     onLine: () => {}, // suppress the FAIL/log lines here; handled on close
     onDone: (code, stdout, errTail) => {
       if (code !== 0) {
@@ -181,6 +183,7 @@ function listKits() {
 
 Max.addHandler("repo", (...a) => (state.repo = a.join(" ")));
 Max.addHandler("uv", (...a) => (state.uv = a.join(" ")));
+Max.addHandler("device", (d) => (state.device = String(d).trim() || state.device));
 Max.addHandler("duration", (d) => (state.duration = Number(d) || state.duration));
 Max.addHandler("countin", (n) => (state.countin = Number(n) || 0));
 Max.addHandler("hint", (...a) => (state.hint = a.join(" ").trim()));
