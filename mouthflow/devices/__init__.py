@@ -17,3 +17,5 @@ from mouthflow.devices.registry import (  # noqa: F401
 
 # Register built-in devices (import for side effect).
 from mouthflow.devices.drum import device as _drum_device  # noqa: E402,F401
+from mouthflow.devices.bass import device as _bass_device  # noqa: E402,F401
+from mouthflow.devices.lead import device as _lead_device  # noqa: E402,F401
