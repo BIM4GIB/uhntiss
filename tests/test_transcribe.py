@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 import soundfile as sf
 
-from mouthflow import transcribe
+from mouthflow.devices.drum import classify as drum_classify
 from mouthflow.transcribe import (
     DROP,
     GM_HAT_CLOSED,
@@ -98,7 +98,8 @@ def test_quantise_16th_snaps_to_grid():
 def test_transcribe_drums_end_to_end(tmp_path, monkeypatch):
     # Force the deterministic heuristic: the per-user model is trained on real
     # beatbox, so synthetic tones aren't guaranteed to classify "correctly".
-    monkeypatch.setattr(transcribe, "_MODEL", None)
+    # _classify reads _MODEL from its own module at call time, so patch there.
+    monkeypatch.setattr(drum_classify, "_MODEL", None)
     # 2s of a steady 4-on-the-floor kick at 120 BPM, beat every 500 ms.
     y = _place([(t, _kick_sample()) for t in (0.0, 0.5, 1.0, 1.5)], total_s=2.0)
     wav = tmp_path / "kick.wav"
