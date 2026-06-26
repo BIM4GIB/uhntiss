@@ -41,12 +41,12 @@ class PitchedTranscriber:
     def __init__(self, config: VoiceConfig) -> None:
         self.cfg = config
 
-    def transcribe(self, wav_path) -> Transcription:
+    def transcribe(self, wav_path, *, tempo: float | None = None) -> Transcription:
         import librosa
 
         cfg = self.cfg
         y, sr = librosa.load(str(wav_path), sr=signal._SR, mono=True)
-        tempo_bpm = signal.detect_tempo(y, sr)
+        tempo_bpm = float(tempo) if tempo and tempo > 0 else signal.detect_tempo(y, sr)
 
         f0, voiced_flag, voiced_prob = librosa.pyin(
             y,

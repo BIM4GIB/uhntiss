@@ -21,8 +21,20 @@ import numpy as np
 _SR = 44_100
 _WINDOW_S = 0.120
 
+# Onset peak-picking. Broadband envelope + default hop keep low mouth-kicks
+# (an HF-emphasised envelope drops them). delta slightly above librosa's 0.07
+# trims marginal false onsets; the wait floor suppresses double-triggers on a
+# single transient — both well under a 16th note at any beatbox tempo.
+_ONSET_DELTA = 0.10
+_ONSET_WAIT_S = 0.040
+
 
 def detect_tempo(y: np.ndarray, sr: int) -> float:
+    """Simple beat-track tempo (used by the pitched/drone voices for sizing).
+
+    The drum device uses its own octave-correct estimator — see
+    ``mouthflow.devices.drum.tempo``.
+    """
     tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
     tempo = float(np.asarray(tempo).item() if np.ndim(tempo) > 0 else tempo)
     if tempo <= 0:
@@ -31,7 +43,14 @@ def detect_tempo(y: np.ndarray, sr: int) -> float:
 
 
 def detect_onsets(y: np.ndarray, sr: int) -> np.ndarray:
-    frames = librosa.onset.onset_detect(y=y, sr=sr, backtrack=True, units="frames")
+    frames = librosa.onset.onset_detect(
+        y=y,
+        sr=sr,
+        backtrack=True,
+        units="frames",
+        delta=_ONSET_DELTA,
+        wait=max(1, int(_ONSET_WAIT_S * sr / 512)),  # 512 = librosa default hop
+    )
     return librosa.frames_to_time(frames, sr=sr)
 
 

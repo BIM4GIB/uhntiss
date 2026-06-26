@@ -72,8 +72,11 @@ the router classify by ear). Default is `drums`.
    (dev dep), and extend `mimic/take.py` with a tonal reference + pitch scorer
    so labeled pitched ground truth can be gathered. Infrastructure can be built
    now; scoring needs the user to record tonal mimic takes.
-4. **Drums onset/tempo** (the pre-existing weak spot) — still open: onset F1
-   0.44, tempo 0/2. See the drum classifier notes below.
+4. **Drums onset/tempo** — PR #6's octave-correct tempo + phase-aware
+   quantization is **merged and integrated into the drum device**
+   (`devices/drum/tempo.py`, `devices/drum/transcriber.py`); confidence-gated
+   so it only quantises when the tempo is trusted. Re-check the eval on the
+   current corpus and keep expanding it (N is small).
 
 ## How to run / iterate (this Mac)
 ```bash

@@ -81,6 +81,7 @@ maxpat JSON), so edit the generator rather than wiring by hand. Layout:
    | List kits | `live.text` (Mode: Button) | `t list_kits` |
    | Duration (s) | `live.numbox` | `prepend duration` |
    | Count-in (s) | `live.numbox` (default 3) | `prepend countin` |
+   | Tempo (BPM) | `live.numbox` (0 = auto) | `prepend tempo` |
    | Hint | `textedit` | `prepend hint` |
    | Kit | `live.menu` — selection outlet | `prepend kit_index` |
 4. Add config (so paths are explicit/portable): a `loadbang` →
@@ -113,8 +114,9 @@ The prebuilt panel wires Generate / duration / count-in / hint / **kit dropdown
 > that has it (`repo <path>` message to `node.script`).
 
 ## Message reference (inlet → script)
-`repo <path>` · `uv <path>` · `duration <s>` · `countin <s>` · `hint <text…>` ·
-`list_kits` · `kit_index <i>` · `kit_uri <uri>` · `generate` · `cancel`
+`repo <path>` · `uv <path>` · `duration <s>` · `countin <s>` · `tempo <bpm>` ·
+`hint <text…>` · `list_kits` · `kit_index <i>` · `kit_uri <uri>` · `generate` ·
+`cancel`
 
 ## Outlet reference (script → patch)
 `status <text>` · `busy <0|1>` · `tempo <bpm>` · `rationale <text>` ·

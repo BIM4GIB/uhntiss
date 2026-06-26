@@ -34,9 +34,13 @@ class ClipMode(str, Enum):
 
 @runtime_checkable
 class Transcriber(Protocol):
-    """WAV -> ``Transcription``. The one behaviour each device must supply."""
+    """WAV -> ``Transcription``. The one behaviour each device must supply.
 
-    def transcribe(self, wav: Path) -> Transcription: ...
+    ``tempo`` is an optional forced BPM (from ``--tempo``). The drum device
+    honours it; pitched/drone voices accept it for interface uniformity.
+    """
+
+    def transcribe(self, wav: Path, *, tempo: float | None = None) -> Transcription: ...
 
 
 @dataclass(frozen=True)
