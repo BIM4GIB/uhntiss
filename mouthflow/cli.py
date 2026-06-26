@@ -13,7 +13,7 @@ from pathlib import Path
 import typer
 
 from mouthflow import capture
-from mouthflow.devices import get_device_by_id
+from mouthflow.devices import get_device, get_device_by_id
 from mouthflow.devices.base import DeviceSpec
 from mouthflow.execute import AbletonClient, AbletonError, apply_plan
 from mouthflow.plan import make_plan
@@ -91,13 +91,25 @@ def _run_pipeline(
     instruments_override: list[str] | None,
     device_id: str = _DEFAULT_DEVICE,
 ) -> Plan:
-    try:
-        spec = get_device_by_id(device_id)
-    except KeyError as exc:
-        raise typer.BadParameter(str(exc)) from exc
-
     _log(f"normalising {wav}")
     normalised = capture.from_file(wav)
+
+    if device_id == "auto":
+        from mouthflow.classify import classify
+
+        intent, conf = classify(normalised)
+        try:
+            spec = get_device(intent)
+        except KeyError as exc:
+            raise typer.BadParameter(
+                f"router classified intent={intent.value} but no device handles it"
+            ) from exc
+        _log(f"router: {intent.value} (conf {conf:.2f}) -> {spec.id} device")
+    else:
+        try:
+            spec = get_device_by_id(device_id)
+        except KeyError as exc:
+            raise typer.BadParameter(str(exc)) from exc
 
     _log(f"transcribing ({spec.id})")
     transcription = spec.transcriber.transcribe(normalised)
@@ -134,7 +146,7 @@ def _parse_instruments(value: str | None) -> list[str] | None:
     return [s.strip() for s in value.split(",") if s.strip()]
 
 
-_DEVICE_HELP = "Which voice to transcribe: drums | bass | lead | drone."
+_DEVICE_HELP = "Which voice to transcribe: drums | bass | lead | drone | auto (route by ear)."
 
 
 @app.command()
