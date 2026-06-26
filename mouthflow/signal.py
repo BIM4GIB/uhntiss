@@ -1,0 +1,156 @@
+"""Shared, voice-agnostic DSP primitives.
+
+Extracted from ``transcribe.py`` so every device (drums, bass, lead, drone)
+draws onset/tempo/feature/quantize/MIDI helpers from one place. Nothing here
+knows about drums, pitch classes, or GM note maps — those policies live in the
+per-device transcribers under ``mouthflow/devices/``.
+
+``transcribe.py`` re-exports the names it historically owned (``_SR``,
+``_detect_onsets``, ``_features_at``, ``_quantise_16th``, ``_write_midi`` …) so
+existing callers (``eval/``, ``mimic/``, the tests) keep working unchanged.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import librosa
+import mido
+import numpy as np
+
+_SR = 44_100
+_WINDOW_S = 0.120
+
+
+def detect_tempo(y: np.ndarray, sr: int) -> float:
+    tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
+    tempo = float(np.asarray(tempo).item() if np.ndim(tempo) > 0 else tempo)
+    if tempo <= 0:
+        tempo = 120.0
+    return tempo
+
+
+def detect_onsets(y: np.ndarray, sr: int) -> np.ndarray:
+    frames = librosa.onset.onset_detect(y=y, sr=sr, backtrack=True, units="frames")
+    return librosa.frames_to_time(frames, sr=sr)
+
+
+def features_at(y: np.ndarray, sr: int, t: float) -> dict[str, float]:
+    """Timbre feature vector for the ~120 ms window starting at time ``t``.
+
+    Voice-neutral DSP: spectral centroid, flatness, ZCR, RMS, sub-100 Hz energy
+    ratio, and decay. Drums classify on these; the drone contour extractor will
+    reuse centroid/RMS. Pitch (for bass/lead) is computed separately via pyin.
+    """
+    start = int(t * sr)
+    end = min(start + int(_WINDOW_S * sr), len(y))
+    frame = y[start:end]
+    if len(frame) < 64:
+        return {
+            "centroid": 0.0,
+            "flatness": 0.0,
+            "zcr": 0.0,
+            "rms": 0.0,
+            "sub100_ratio": 0.0,
+            "decay_s": 0.0,
+        }
+
+    # n_fft capped to frame length (librosa warns otherwise).
+    n_fft = min(1024, 1 << (len(frame) - 1).bit_length())
+
+    centroid = float(librosa.feature.spectral_centroid(y=frame, sr=sr, n_fft=n_fft).mean())
+    flatness = float(librosa.feature.spectral_flatness(y=frame, n_fft=n_fft).mean())
+    zcr = float(librosa.feature.zero_crossing_rate(y=frame).mean())
+    rms = float(np.sqrt(np.mean(frame**2)))
+
+    spec = np.abs(np.fft.rfft(frame, n=n_fft))
+    freqs = np.fft.rfftfreq(n_fft, d=1 / sr)
+    total = spec.sum() + 1e-9
+    sub100_ratio = float(spec[freqs < 100].sum() / total)
+
+    # Decay: time from peak RMS to -12dB, computed in 10ms hops.
+    hop = max(1, int(0.010 * sr))
+    rms_env = np.array([np.sqrt(np.mean(frame[i : i + hop] ** 2)) for i in range(0, len(frame) - hop, hop)])
+    if rms_env.size > 1 and rms_env.max() > 0:
+        peak = rms_env.argmax()
+        threshold = rms_env.max() * 0.25  # -12 dB
+        tail = rms_env[peak:]
+        below = np.where(tail < threshold)[0]
+        decay_s = (below[0] if below.size else len(tail)) * hop / sr
+    else:
+        decay_s = 0.0
+
+    return {
+        "centroid": centroid,
+        "flatness": flatness,
+        "zcr": zcr,
+        "rms": rms,
+        "sub100_ratio": sub100_ratio,
+        "decay_s": decay_s,
+    }
+
+
+def velocity_from_rms(rms: float) -> int:
+    # Map rms in [0.01, 0.3] logarithmically to [40, 120], clamp.
+    if rms <= 0:
+        return 40
+    db = 20 * np.log10(max(rms, 1e-4))
+    # -40 dB -> 40, -10 dB -> 120.
+    vel = 40 + (db - (-40)) * (120 - 40) / 30
+    return int(np.clip(vel, 1, 127))
+
+
+def quantise(t_s: float, tempo_bpm: float, division: int = 16) -> float:
+    """Snap ``t_s`` to the nearest 1/``division`` note at ``tempo_bpm``.
+
+    ``division=16`` (the default, and the drum path's behaviour) snaps to 16th
+    notes. Pitched devices pass a looser grid; drone skips quantization.
+    """
+    step = (60.0 / tempo_bpm) * (4.0 / division)
+    return round(t_s / step) * step
+
+
+def write_midi(
+    path: Path,
+    notes,
+    tempo_bpm: float,
+    *,
+    channel: int = 0,
+    default_dur_ticks: int | None = None,
+    tpb: int = 480,
+) -> None:
+    """Write ``notes`` (anything with ``time_s``/``midi_note``/``velocity``,
+    optionally ``duration_s``) to a MIDI file.
+
+    Per-note duration policy: an explicit ``duration_s`` wins (pitched + drone
+    sustains); else ``default_dur_ticks`` if given; else a fixed 1/32 note
+    (``tpb // 8``) — the drum default. ``channel`` is 9 for GM drums, 0 for
+    pitched instruments.
+    """
+    mid = mido.MidiFile(ticks_per_beat=tpb)
+    track = mido.MidiTrack()
+    mid.tracks.append(track)
+    track.append(mido.MetaMessage("set_tempo", tempo=mido.bpm2tempo(tempo_bpm), time=0))
+
+    events: list[tuple[int, str, int, int]] = []
+    for n in notes:
+        tick = int(round(n.time_s * tempo_bpm / 60.0 * tpb))
+        dur_s = getattr(n, "duration_s", None)
+        if dur_s is not None:
+            dur = max(1, int(round(dur_s * tempo_bpm / 60.0 * tpb)))
+        elif default_dur_ticks is not None:
+            dur = default_dur_ticks
+        else:
+            dur = tpb // 8  # 1/32-note duration (drum default)
+        events.append((tick, "on", n.midi_note, n.velocity))
+        events.append((tick + dur, "off", n.midi_note, 0))
+    events.sort()
+
+    last = 0
+    for tick, kind, note, vel in events:
+        delta = tick - last
+        last = tick
+        msg_type = "note_on" if kind == "on" else "note_off"
+        track.append(mido.Message(msg_type, note=note, velocity=vel, time=delta, channel=channel))
+
+    mid.save(path)
