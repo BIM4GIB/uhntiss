@@ -110,6 +110,11 @@ def _run_pipeline(
         user_hint=hint,
         device=spec,
     )
+    # Device-produced automation (e.g. the drone loudness contour) is attached
+    # to the plan's clip(s); the LLM never sees or generates it.
+    if transcription.automation:
+        for clip in plan.clips:
+            clip.automation = transcription.automation
     _log(f"plan: {plan.rationale}")
     return plan
 

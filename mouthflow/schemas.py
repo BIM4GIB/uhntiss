@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 
@@ -35,12 +35,27 @@ class NoteEvent:
 DrumHit = NoteEvent
 
 
+class AutomationEnvelope(BaseModel):
+    """A device-parameter automation curve for a clip, as normalized steps.
+
+    ``steps`` are ``(time_in_beats, value_0_1)``; the bridge scales ``value``
+    into the parameter's real range. ``parameter`` is resolved by name on the
+    device at ``device_index`` (default: the first rack Macro). Produced by a
+    transcriber (e.g. the drone loudness contour), not by the LLM planner.
+    """
+
+    parameter: str = "Macro 1"
+    device_index: int = 0
+    steps: list[tuple[float, float]]
+
+
 @dataclass
 class Transcription:
     midi_path: Path
     tempo_bpm: float
     bars: float
     hits: list[NoteEvent]
+    automation: list[AutomationEnvelope] = field(default_factory=list)
 
 
 class ClipPlan(BaseModel):
@@ -48,6 +63,7 @@ class ClipPlan(BaseModel):
     instrument_path: str
     midi_file: Path
     length_bars: float
+    automation: list[AutomationEnvelope] | None = None
 
 
 class Plan(BaseModel):

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import socket
+import sys
 from pathlib import Path
 from typing import Any, Callable
 
@@ -208,6 +209,33 @@ class AbletonClient:
     def fire_clip(self, track_idx: int, clip_idx: int = 0) -> None:
         self.send_command("fire_clip", {"track_index": track_idx, "clip_index": clip_idx})
 
+    def set_clip_envelope(
+        self,
+        track_idx: int,
+        clip_idx: int,
+        device_index: int,
+        parameter: str,
+        steps: list[tuple[float, float]],
+    ) -> None:
+        """Write a clip automation envelope for a device parameter.
+
+        Requires the forked ableton-mcp Remote Script that adds the
+        ``set_clip_envelope`` command (see ``bridge/``). ``steps`` are
+        ``(time_in_beats, value_0_1)``; the bridge scales value into the
+        parameter's real range. Raises ``AbletonError`` if the command is
+        unknown (stock bridge) — ``apply_plan`` treats that as "no automation".
+        """
+        self.send_command(
+            "set_clip_envelope",
+            {
+                "track_index": track_idx,
+                "clip_index": clip_idx,
+                "device_index": device_index,
+                "parameter": parameter,
+                "steps": [[float(t), float(v)] for t, v in steps],
+            },
+        )
+
 
 def _midi_to_notes(midi_path: Path) -> list[dict]:
     """Flatten a MIDI file to ableton-mcp's note dict format.
@@ -249,4 +277,11 @@ def apply_plan(plan: Plan, client: AbletonClient) -> None:
         track_idx = client.create_midi_track(clip.track_name)
         client.load_instrument(track_idx, clip.instrument_path)
         client.insert_midi_clip(track_idx, clip.midi_file, clip.length_bars)
+        for env in clip.automation or []:
+            try:
+                client.set_clip_envelope(track_idx, 0, env.device_index, env.parameter, env.steps)
+            except AbletonError as exc:
+                # Stock bridge lacks set_clip_envelope; the drone still plays as
+                # a held note/chord. Degrade gracefully rather than abort.
+                print(f"[mouthflow] automation skipped ({exc})", file=sys.stderr)
         client.fire_clip(track_idx, 0)

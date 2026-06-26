@@ -19,3 +19,4 @@ from mouthflow.devices.registry import (  # noqa: F401
 from mouthflow.devices.drum import device as _drum_device  # noqa: E402,F401
 from mouthflow.devices.bass import device as _bass_device  # noqa: E402,F401
 from mouthflow.devices.lead import device as _lead_device  # noqa: E402,F401
+from mouthflow.devices.drone import device as _drone_device  # noqa: E402,F401

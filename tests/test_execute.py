@@ -15,7 +15,7 @@ import mido
 import pytest
 
 from mouthflow.execute import AbletonClient, AbletonError, _midi_to_notes, apply_plan
-from mouthflow.schemas import ClipPlan, Plan
+from mouthflow.schemas import AutomationEnvelope, ClipPlan, Plan
 
 
 class FakeAbleton:
@@ -211,3 +211,66 @@ def test_apply_plan_sends_expected_commands(tmp_path):
     assert fake.requests[4]["params"]["length"] == pytest.approx(8.0)
     # notes made it through
     assert len(fake.requests[5]["params"]["notes"]) == 2
+
+
+def test_set_clip_envelope_serializes_steps():
+    with FakeAbleton([{"status": "ok", "result": {"parameter": "Macro 1", "steps": 2}}]) as fake:
+        with AbletonClient(port=fake.port) as client:
+            client.set_clip_envelope(2, 0, 0, "Macro 1", [(0.0, 0.0), (4.0, 1.0)])
+    req = fake.requests[0]
+    assert req["type"] == "set_clip_envelope"
+    assert req["params"]["track_index"] == 2
+    assert req["params"]["parameter"] == "Macro 1"
+    assert req["params"]["steps"] == [[0.0, 0.0], [4.0, 1.0]]
+
+
+def _drone_plan(midi: Path) -> Plan:
+    return Plan(
+        tempo=90.0,
+        clips=[
+            ClipPlan(
+                track_name="Drone",
+                instrument_path="query:Instruments#Pad",
+                midi_file=midi,
+                length_bars=4.0,
+                automation=[AutomationEnvelope(parameter="Macro 1", steps=[(0.0, 0.0), (4.0, 1.0)])],
+            )
+        ],
+        rationale="pad",
+    )
+
+
+def test_apply_plan_writes_automation_when_supported(tmp_path):
+    midi = tmp_path / "d.mid"
+    _write_simple_midi(midi)
+    responses = [{"status": "ok", "result": {"index": 0}} if i == 1 else {"status": "ok", "result": {}}
+                 for i in range(8)]  # set_tempo, create_track, name, load, clip, notes, envelope, fire
+    with FakeAbleton(responses) as fake:
+        with AbletonClient(port=fake.port) as client:
+            apply_plan(_drone_plan(midi), client)
+    types = [r["type"] for r in fake.requests]
+    assert types == [
+        "set_tempo", "create_midi_track", "set_track_name", "load_browser_item",
+        "create_clip", "add_notes_to_clip", "set_clip_envelope", "fire_clip",
+    ]
+
+
+def test_apply_plan_degrades_when_envelope_unsupported(tmp_path):
+    # Stock bridge: set_clip_envelope replies error. apply_plan must NOT abort
+    # and must still fire the clip (drone degrades to a held note/chord).
+    midi = tmp_path / "d.mid"
+    _write_simple_midi(midi)
+    responses = [
+        {"status": "ok", "result": {}},               # set_tempo
+        {"status": "ok", "result": {"index": 0}},      # create_midi_track
+        {"status": "ok", "result": {}},                # set_track_name
+        {"status": "ok", "result": {}},                # load_browser_item
+        {"status": "ok", "result": {}},                # create_clip
+        {"status": "ok", "result": {}},                # add_notes_to_clip
+        {"status": "error", "message": "Unknown command type: set_clip_envelope"},
+        {"status": "ok", "result": {}},                # fire_clip
+    ]
+    with FakeAbleton(responses) as fake:
+        with AbletonClient(port=fake.port) as client:
+            apply_plan(_drone_plan(midi), client)  # must not raise
+    assert fake.requests[-1]["type"] == "fire_clip"
