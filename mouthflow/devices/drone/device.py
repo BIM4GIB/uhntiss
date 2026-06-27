@@ -17,9 +17,12 @@ from mouthflow.schemas import Intent
 
 _PROMPT_PATH = Path(__file__).resolve().parent / "prompt.md"
 
+# Real category confirmed against Live 12.3: sounds/Ambient & Evolving holds
+# hundreds of loadable pad/texture/drone presets
+# (query:Sounds#Ambient%20&%20Evolving:FileId_NNNNN). Fallbacks are synthetic.
 _FALLBACK_INSTRUMENTS = (
-    "query:Instruments#Pad-Warm",
-    "query:Instruments#Pad-Evolving",
+    "query:Sounds#Ambient & Evolving:Pad",
+    "query:Sounds#Ambient & Evolving:Drone",
 )
 
 DRONE_DEVICE = DeviceSpec(
@@ -27,7 +30,7 @@ DRONE_DEVICE = DeviceSpec(
     intent=Intent.DRONE,
     transcriber=DroneTranscriber(),
     clip_mode=ClipMode.SUSTAINED,
-    browser_category="Instruments",  # confirm pad sub-paths at runtime (Phase D)
+    browser_category="sounds/Ambient & Evolving",
     prompt_path=_PROMPT_PATH,
     plan_summary=drone_plan_summary,
     instrument_filter=None,

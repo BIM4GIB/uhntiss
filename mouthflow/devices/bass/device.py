@@ -18,11 +18,11 @@ _PROMPT_PATH = Path(__file__).resolve().parent / "prompt.md"
 
 # Synthetic fallback URIs — keep offline dry-run producing a Plan; they do NOT
 # resolve in a real Live install (the planner picks a real preset when Live is
-# reachable). The browser_category string is confirmed at runtime (Phase D
-# doctor probe) — "Instruments" is the always-present root.
+# reachable). The real category below was confirmed against Live 12.3's browser:
+# sounds/Bass holds 515 loadable bass presets (query:Sounds#Bass:FileId_NNNNN).
 _FALLBACK_INSTRUMENTS = (
-    "query:Instruments#Bass-Operator",
-    "query:Instruments#Bass-Sub",
+    "query:Sounds#Bass:Bass",
+    "query:Sounds#Bass:Sub",
 )
 
 BASS_CONFIG = VoiceConfig(
@@ -41,7 +41,7 @@ BASS_DEVICE = DeviceSpec(
     intent=Intent.BASS,
     transcriber=PitchedTranscriber(BASS_CONFIG),
     clip_mode=ClipMode.MONOPHONIC,
-    browser_category="Instruments",
+    browser_category="sounds/Bass",
     prompt_path=_PROMPT_PATH,
     plan_summary=pitched_plan_summary,
     instrument_filter=None,
