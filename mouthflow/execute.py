@@ -18,8 +18,9 @@ from __future__ import annotations
 
 import json
 import socket
+import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import mido
 
@@ -109,30 +110,31 @@ class AbletonClient:
         """
         return self.send_command("get_browser_items_at_path", {"path": path})
 
-    def list_drum_instruments(
+    def list_instruments(
         self,
-        path: str = "Drums",
+        category: str = "Instruments",
         *,
         max_depth: int = 2,
         hard_cap: int = 1000,
+        name_filter: "Callable[[str], bool] | None" = None,
     ) -> list[dict[str, str]]:
-        """Discover loadable drum kits in the live set as ``[{name, uri}]``.
+        """Discover loadable instruments under a browser ``category`` as
+        ``[{name, uri}]``.
 
-        Walks ableton-mcp's browser under ``path``. The "Drums" category
-        mixes directly-loadable drum racks with folders, so we descend
-        folders up to ``max_depth`` and keep only ``is_loadable`` leaves
-        carrying a real URI. Those URIs (``query:Drums#FileId_NNNNN``) are
-        what ``load_browser_item`` actually accepts — unlike the synthetic
-        ``query:Drums#Kit-Core%20808`` fallback URIs, which do not resolve
-        in a real install.
+        Walks ableton-mcp's browser under ``category`` (e.g. ``"Drums"``,
+        ``"Instruments"``, ``"Sounds"``). A category mixes directly-loadable
+        devices/presets with folders, so we descend folders up to
+        ``max_depth`` and keep only ``is_loadable`` leaves carrying a real
+        URI. Those URIs (``query:<Cat>#FileId_NNNNN``) are what
+        ``load_browser_item`` actually accepts — unlike the synthetic
+        fallback URIs, which do not resolve in a real install.
 
-        Returns the *full* set (Live returns a whole level in one call, so
-        this is cheap); ``hard_cap`` is only a runaway guard. Callers that
-        need to bound a prompt should sample the result rather than relying
-        on traversal order, which is alphabetical and would bias toward
-        early letters. The ``name`` lets the planner reason about kit
-        character; the ``uri`` is what it must hand back as
-        ``instrument_path``.
+        ``name_filter`` (a device's ``instrument_filter``) keeps only leaves
+        whose human name passes — e.g. pad/ambient presets for the drone
+        device. Returns the *full* matching set; ``hard_cap`` is a runaway
+        guard. Callers that need to bound a prompt should sample the result
+        rather than relying on traversal order (alphabetical → early-letter
+        bias).
         """
         found: list[dict[str, str]] = []
         seen: set[str] = set()
@@ -148,8 +150,11 @@ class AbletonClient:
             for item in result.get("items", []):
                 uri = item.get("uri")
                 if item.get("is_loadable") and uri and uri not in seen:
+                    name = str(item.get("name") or uri)
+                    if name_filter is not None and not name_filter(name):
+                        continue
                     seen.add(uri)
-                    found.append({"name": str(item.get("name") or uri), "uri": str(uri)})
+                    found.append({"name": name, "uri": str(uri)})
                     if len(found) >= hard_cap:
                         return
                 elif item.get("is_folder") and item.get("name"):
@@ -160,8 +165,18 @@ class AbletonClient:
                     if len(found) >= hard_cap:
                         return
 
-        walk(path, 0)
+        walk(category, 0)
         return found
+
+    def list_drum_instruments(
+        self,
+        path: str = "Drums",
+        *,
+        max_depth: int = 2,
+        hard_cap: int = 1000,
+    ) -> list[dict[str, str]]:
+        """Back-compat shim: ``list_instruments`` over the Drums category."""
+        return self.list_instruments(path, max_depth=max_depth, hard_cap=hard_cap)
 
     def create_midi_track(self, name: str, index: int = -1) -> int:
         result = self.send_command("create_midi_track", {"index": index})
@@ -193,6 +208,33 @@ class AbletonClient:
 
     def fire_clip(self, track_idx: int, clip_idx: int = 0) -> None:
         self.send_command("fire_clip", {"track_index": track_idx, "clip_index": clip_idx})
+
+    def set_clip_envelope(
+        self,
+        track_idx: int,
+        clip_idx: int,
+        device_index: int,
+        parameter: str,
+        steps: list[tuple[float, float]],
+    ) -> None:
+        """Write a clip automation envelope for a device parameter.
+
+        Requires the forked ableton-mcp Remote Script that adds the
+        ``set_clip_envelope`` command (see ``bridge/``). ``steps`` are
+        ``(time_in_beats, value_0_1)``; the bridge scales value into the
+        parameter's real range. Raises ``AbletonError`` if the command is
+        unknown (stock bridge) — ``apply_plan`` treats that as "no automation".
+        """
+        self.send_command(
+            "set_clip_envelope",
+            {
+                "track_index": track_idx,
+                "clip_index": clip_idx,
+                "device_index": device_index,
+                "parameter": parameter,
+                "steps": [[float(t), float(v)] for t, v in steps],
+            },
+        )
 
 
 def _midi_to_notes(midi_path: Path) -> list[dict]:
@@ -235,4 +277,11 @@ def apply_plan(plan: Plan, client: AbletonClient) -> None:
         track_idx = client.create_midi_track(clip.track_name)
         client.load_instrument(track_idx, clip.instrument_path)
         client.insert_midi_clip(track_idx, clip.midi_file, clip.length_bars)
+        for env in clip.automation or []:
+            try:
+                client.set_clip_envelope(track_idx, 0, env.device_index, env.parameter, env.steps)
+            except AbletonError as exc:
+                # Stock bridge lacks set_clip_envelope; the drone still plays as
+                # a held note/chord. Degrade gracefully rather than abort.
+                print(f"[mouthflow] automation skipped ({exc})", file=sys.stderr)
         client.fire_clip(track_idx, 0)

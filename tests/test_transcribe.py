@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 import soundfile as sf
 
-from mouthflow import transcribe
+from mouthflow.devices.drum import classify as drum_classify
 from mouthflow.transcribe import (
     DROP,
     GM_HAT_CLOSED,
@@ -126,7 +126,7 @@ def _drum_pattern(bpm: float, bars: int = 6) -> np.ndarray:
 def test_detect_tempo_no_octave_error(tmp_path, monkeypatch, bpm):
     # beat_track reports ~2x on beatbox; the estimator must land on the right
     # octave and refine to within the +-3 BPM eval tolerance.
-    monkeypatch.setattr(transcribe, "_MODEL", None)
+    monkeypatch.setattr(drum_classify, "_MODEL", None)
     y = _drum_pattern(bpm)
     onsets = _detect_onsets(y, SR)
     coarse, conf = _detect_tempo(y, SR, onsets)
@@ -139,7 +139,7 @@ def test_detect_tempo_no_octave_error(tmp_path, monkeypatch, bpm):
 
 
 def test_explicit_tempo_overrides_detection(tmp_path, monkeypatch):
-    monkeypatch.setattr(transcribe, "_MODEL", None)
+    monkeypatch.setattr(drum_classify, "_MODEL", None)
     # Explicit tempo is honored verbatim, regardless of the audio's real tempo.
     y = _drum_pattern(100)
     wav = tmp_path / "pattern.wav"
@@ -150,7 +150,8 @@ def test_explicit_tempo_overrides_detection(tmp_path, monkeypatch):
 def test_transcribe_drums_end_to_end(tmp_path, monkeypatch):
     # Force the deterministic heuristic: the per-user model is trained on real
     # beatbox, so synthetic tones aren't guaranteed to classify "correctly".
-    monkeypatch.setattr(transcribe, "_MODEL", None)
+    # _classify reads _MODEL from its own module at call time, so patch there.
+    monkeypatch.setattr(drum_classify, "_MODEL", None)
     # 2s of a steady 4-on-the-floor kick at 120 BPM, beat every 500 ms.
     y = _place([(t, _kick_sample()) for t in (0.0, 0.5, 1.0, 1.5)], total_s=2.0)
     wav = tmp_path / "kick.wav"

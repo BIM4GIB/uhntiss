@@ -1,10 +1,13 @@
 # Mouthflow
 
-A voice-driven arrangement agent for Ableton Live. Beatbox a rhythm, get a
-drum pattern in your session. That's it.
+A voice-driven arrangement agent for Ableton Live. Make a sound with your
+voice, get it into your session — as **drums**, **bass**, **lead**, or an
+**ambient drone**.
 
-Status: **v0 — working pipeline; per-user classifier + in-Ableton (Max for
-Live) device done; onset detection + tempo are the next focus.**
+Status: **umbrella product — a shared voice→MIDI→Ableton engine with a device
+registry. Four voices ship (drums/bass/lead/drone); drum behaviour is unchanged
+and byte-identical. Next: confirm Live browser categories at runtime + install
+the drone automation bridge.**
 **Picking up work? Start with [`docs/handover.md`](docs/handover.md).**
 See also [`docs/spec.md`](docs/spec.md) (full spec),
 [`docs/corpus.md`](docs/corpus.md) (labelling convention), and
@@ -21,13 +24,14 @@ Remote Script, and an `ANTHROPIC_API_KEY` in your environment.
 
 ```bash
 uv sync
-uv run mouthflow record        # 15s capture → pipeline → applied to Live
-uv run mouthflow run clip.wav  # skip the capture step
-uv run mouthflow dry-run clip.wav --json  # pipeline, print Plan, don't touch Live
+uv run mouthflow record --device bass     # 15s capture → pipeline → applied to Live
+uv run mouthflow run clip.wav --device drone   # skip the capture step
+uv run mouthflow dry-run clip.wav --device lead --json  # pipeline, print Plan, don't touch Live
 ```
 
-None of the above commands do anything yet. See the spec for what's
-implemented when.
+`--device` is one of `drums | bass | lead | drone` (default `drums`), or
+`auto` to route by ear. See [`docs/handover.md`](docs/handover.md) for the
+current state of each voice.
 
 ## Layout
 

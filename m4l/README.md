@@ -21,9 +21,33 @@ the ableton-mcp socket — exactly the verified command-line path.
 - `ableton-mcp` Remote Script enabled (the apply step still uses `:9877`).
 
 ## Files (keep them together)
-- `Mouthflow.amxd` — **the prebuilt device** (drop it on a track and use it)
-- `mouthflow.js` — Node for Max script (the glue)
+- `Mouthflow.amxd` — **the prebuilt drums device** (drop it on a track and use it)
+- `MouthflowBass.amxd` / `MouthflowLead.amxd` / `MouthflowDrone.amxd` — per-voice
+  panels (generated; see below)
+- `mouthflow.js` — Node for Max script (the glue), shared by all panels
+- `generate.py` — regenerates the per-voice panels from `Mouthflow.amxd`
 - `package.json` — declares `mouthflow.js` as main (no external deps)
+
+## Per-voice panels (bass / lead / drone)
+All panels share one `mouthflow.js`, which forwards `--device <id>` to the CLI.
+A panel selects its voice with a `loadbang`-driven `device <id>` message wired
+into `node.script`; the drums panel omits it (defaults to `drums`).
+
+Regenerate the bass/lead/drone panels from the drums template with:
+
+```bash
+python m4l/generate.py     # writes MouthflowBass/Lead/Drone.amxd + a container self-check
+```
+
+> The generator reproduces the `.amxd` container exactly (verified) and injects
+> the device message, but it can't open Max — **smoke-test each generated panel
+> once** (drag onto a track, click Generate) before relying on it. The committed
+> `Mouthflow.amxd` is the proven drums panel. You can also drive any voice from
+> the drums panel by sending it a `device bass` (etc.) message.
+
+The bass/lead/drone instrument categories are confirmed at runtime (the kit
+dropdown shells out to `mouthflow list-kits --device <id>`); see the
+device-discovery note in the main repo handover.
 
 ## Use it
 1. In Live, drag **`Mouthflow.amxd`** onto a track (it's an audio-effect device).
