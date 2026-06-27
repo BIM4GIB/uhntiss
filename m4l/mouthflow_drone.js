@@ -39,7 +39,7 @@ const os = require("os");
 const state = {
   repo: path.join(os.homedir(), "UhnTiss", "uhntiss"),
   uv: path.join(os.homedir(), ".local", "bin", "uv"),
-  device: "drums", // which voice; per-voice panels load a copy with this baked
+  device: "drone", // which voice; per-voice panels load a copy with this baked
   duration: 8,
   hint: "",
   tempo: 0,
