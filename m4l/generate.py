@@ -9,35 +9,36 @@ maxpat JSON:
 ``ptch`` is the last chunk). We only ever rewrite the ``ptch`` length + payload,
 so the container is reproduced exactly (verified by an identity round-trip).
 
-A per-voice panel is the template with one addition: a ``loadbang``-driven
-``device <id>`` message wired into ``node.script`` (mirroring the existing
-``repo``/``uv`` config messages), plus a retitled header. All panels share the
-one ``mouthflow.js`` glue, which forwards ``--device <id>`` to the CLI.
+A per-voice panel is the template with two tiny changes: its ``node.script``
+points at a per-voice glue file (``mouthflow_<voice>.js``, a copy of
+``mouthflow.js`` whose ``device`` default is that voice), and the header is
+retitled. **The voice is baked into the JS default — NOT sent as a loadbang
+message** — because Node for Max starts asynchronously and a loadbang message
+races (and usually loses) the script's startup, leaving the device on its
+default. Baking it in the JS the panel loads removes the race entirely.
 
-NOTE: the container handling is verified here, but the generated panels should
-get a ~30s smoke test in Live (drag on a track, click Generate) before relying
-on them — this script can't open Max. The committed ``Mouthflow.amxd`` remains
-the proven drums panel.
+NOTE: the container handling is verified here; smoke-test the panels in Live
+once. The committed ``Mouthflow.amxd`` (+ ``mouthflow.js``) is the proven drums
+panel and is left untouched.
 
 Usage::
 
-    python m4l/generate.py            # regenerate bass/lead/drone panels + self-check
+    python m4l/generate.py            # regenerate bass/lead/drone panels + glue
 """
 
 from __future__ import annotations
 
 import json
+import re
 import struct
 from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
 _TEMPLATE = _HERE / "Mouthflow.amxd"
+_GLUE = _HERE / "mouthflow.js"
 _PTCH = b"ptch"
 
-_NODE_ID = "obj-4"        # node.script mouthflow.js
-_LOADBANG_ID = "obj-140"  # loadbang that seeds defaults
-_TITLE_ID = "obj-100"     # the "MOUTHFLOW" header comment
-_DEVICE_MSG_ID = "obj-300"  # our injected message box (above the existing ids)
+_TITLE_ID = "obj-100"  # the "MOUTHFLOW" header comment
 
 
 # --- container (de)serialization ---
@@ -65,49 +66,50 @@ def write_amxd(path: Path, prefix: bytes, maxpat: dict) -> None:
     Path(path).write_bytes(_wrap(prefix, payload))
 
 
+# --- per-voice glue ---
+
+def write_voice_glue(voice: str) -> str:
+    """Write ``mouthflow_<voice>.js`` (a copy of the glue with ``device``
+    defaulted to ``voice``) and return its filename."""
+    text = _GLUE.read_text(encoding="utf-8")
+    patched, n = re.subn(r'device:\s*"[^"]*"', f'device: "{voice}"', text, count=1)
+    if n != 1:
+        raise RuntimeError("could not find the `device:` default in mouthflow.js")
+    name = f"mouthflow_{voice}.js"
+    (_HERE / name).write_text(patched, encoding="utf-8")
+    return name
+
+
 # --- panel construction ---
 
-def make_panel(maxpat: dict, device_id: str, title: str) -> dict:
-    """Inject a loadbang-driven ``device <id>`` message and retitle the header."""
-    patcher = maxpat["patcher"]
-    boxes = patcher["boxes"]
-    lines = patcher.setdefault("lines", [])
+def _node_script_box(maxpat: dict) -> dict:
+    for b in maxpat["patcher"]["boxes"]:
+        box = b["box"]
+        if box.get("maxclass") == "newobj" and str(box.get("text", "")).startswith("node.script"):
+            return box
+    raise RuntimeError("no node.script object found in the patch")
 
-    # Don't double-inject if regenerating from an already-patched file.
-    if not any(b["box"].get("id") == _DEVICE_MSG_ID for b in boxes):
-        boxes.append(
-            {
-                "box": {
-                    "id": _DEVICE_MSG_ID,
-                    "maxclass": "message",
-                    "numinlets": 2,
-                    "numoutlets": 1,
-                    "outlettype": [""],
-                    "text": f"device {device_id}",
-                    "patching_rect": [720.0, 235.0, 100.0, 20.0],
-                    "fontsize": 12.0,
-                }
-            }
-        )
-        lines.append({"patchline": {"source": [_LOADBANG_ID, 0], "destination": [_DEVICE_MSG_ID, 0]}})
-        lines.append({"patchline": {"source": [_DEVICE_MSG_ID, 0], "destination": [_NODE_ID, 0]}})
-    else:
-        for b in boxes:
-            if b["box"].get("id") == _DEVICE_MSG_ID:
-                b["box"]["text"] = f"device {device_id}"
 
-    for b in boxes:
+def make_panel(maxpat: dict, js_filename: str, title: str) -> dict:
+    """Point the panel's node.script at ``js_filename`` and retitle the header."""
+    node = _node_script_box(maxpat)
+    node["text"] = f"node.script {js_filename} @autostart 1"
+    if isinstance(node.get("textfile"), dict):
+        node["textfile"]["filename"] = js_filename
+
+    for b in maxpat["patcher"]["boxes"]:
         if b["box"].get("id") == _TITLE_ID:
             b["box"]["text"] = title
     return maxpat
 
 
-def generate_panel(device_id: str, out_name: str, title: str) -> Path:
+def generate_panel(voice: str, out_name: str, title: str) -> tuple[Path, str]:
+    js_name = write_voice_glue(voice)
     prefix, maxpat = read_maxpat(_TEMPLATE)
-    make_panel(maxpat, device_id, title)
+    make_panel(maxpat, js_name, title)
     out = _HERE / out_name
     write_amxd(out, prefix, maxpat)
-    return out
+    return out, js_name
 
 
 def _self_check() -> None:
@@ -126,9 +128,9 @@ _PANELS = [
 
 def main() -> None:
     _self_check()
-    for device_id, out_name, title in _PANELS:
-        out = generate_panel(device_id, out_name, title)
-        print(f"ok   wrote {out.name}  (device {device_id})")
+    for voice, out_name, title in _PANELS:
+        out, js_name = generate_panel(voice, out_name, title)
+        print(f"ok   wrote {out.name}  ->  node.script {js_name}  (device {voice})")
 
 
 if __name__ == "__main__":

@@ -1,8 +1,14 @@
-"""Tests for the Max for Live panel generator (container + patch injection)."""
+"""Tests for the Max for Live panel generator (container + node.script swap).
+
+Per-voice panels bake the device into a per-voice glue file (``mouthflow_<voice>.js``)
+that the panel's ``node.script`` loads directly — not via a loadbang message,
+which races Node-for-Max startup and gets dropped.
+"""
 
 from __future__ import annotations
 
 import importlib.util
+import re
 from pathlib import Path
 
 _REPO = Path(__file__).resolve().parents[1]
@@ -18,29 +24,29 @@ def test_container_round_trips_byte_identical():
     assert gen._wrap(*gen._split(raw)) == raw
 
 
-def test_make_panel_injects_device_message_and_retitles():
+def test_make_panel_points_node_script_at_voice_glue_and_retitles():
     _prefix, maxpat = gen.read_maxpat(_REPO / "m4l" / "Mouthflow.amxd")
     n_boxes = len(maxpat["patcher"]["boxes"])
 
-    gen.make_panel(maxpat, "bass", "MOUTHFLOW · BASS")
+    gen.make_panel(maxpat, "mouthflow_bass.js", "MOUTHFLOW · BASS")
 
-    boxes = maxpat["patcher"]["boxes"]
-    lines = maxpat["patcher"]["lines"]
-    assert len(boxes) == n_boxes + 1
-    msg = [b["box"] for b in boxes if b["box"].get("id") == gen._DEVICE_MSG_ID]
-    assert msg and msg[0]["text"] == "device bass"
-    title = [b["box"]["text"] for b in boxes if b["box"].get("id") == gen._TITLE_ID]
+    # No boxes added — it's an in-place edit of the existing node.script.
+    assert len(maxpat["patcher"]["boxes"]) == n_boxes
+    node = gen._node_script_box(maxpat)
+    assert node["text"] == "node.script mouthflow_bass.js @autostart 1"
+    assert node["textfile"]["filename"] == "mouthflow_bass.js"
+    title = [b["box"]["text"] for b in maxpat["patcher"]["boxes"] if b["box"].get("id") == gen._TITLE_ID]
     assert title == ["MOUTHFLOW · BASS"]
-    # loadbang -> device message -> node.script
-    assert {"patchline": {"source": [gen._LOADBANG_ID, 0], "destination": [gen._DEVICE_MSG_ID, 0]}} in lines
-    assert {"patchline": {"source": [gen._DEVICE_MSG_ID, 0], "destination": [gen._NODE_ID, 0]}} in lines
 
 
-def test_make_panel_is_idempotent():
-    _prefix, maxpat = gen.read_maxpat(_REPO / "m4l" / "Mouthflow.amxd")
-    gen.make_panel(maxpat, "bass", "T1")
-    n = len(maxpat["patcher"]["boxes"])
-    gen.make_panel(maxpat, "lead", "T2")  # re-patch same dict
-    assert len(maxpat["patcher"]["boxes"]) == n  # no duplicate box
-    msg = [b["box"]["text"] for b in maxpat["patcher"]["boxes"] if b["box"].get("id") == gen._DEVICE_MSG_ID]
-    assert msg == ["device lead"]  # text updated in place
+def test_generated_panels_reference_their_voice_glue():
+    # The committed panels + glue must stay in sync with the generator.
+    for voice, amxd in [("bass", "MouthflowBass.amxd"), ("lead", "MouthflowLead.amxd"),
+                        ("drone", "MouthflowDrone.amxd")]:
+        js_name = f"mouthflow_{voice}.js"
+        _prefix, maxpat = gen.read_maxpat(_REPO / "m4l" / amxd)
+        assert gen._node_script_box(maxpat)["text"] == f"node.script {js_name} @autostart 1"
+
+        glue = (_REPO / "m4l" / js_name).read_text(encoding="utf-8")
+        default = re.search(r'device:\s*"([^"]*)"', glue).group(1)
+        assert default == voice, f"{js_name} device default is {default!r}, expected {voice!r}"
