@@ -55,14 +55,12 @@ the router classify by ear). Default is `drums`.
   pad preset. Plus a loudness **contour → device-macro automation** envelope.
 
 ## ▶ NEXT WORK
-1. **Confirm Live browser categories at runtime (biggest unknown).** bass/lead/
-   drone default to `browser_category="Instruments"` with synthetic fallback
-   URIs. Run `get_browser_tree("instruments")` / `("sounds")` against the real
-   Live 12 set, capture the exact sub-folder paths for bass / lead-synth /
-   pad-ambient presets, confirm loadable leaves return real
-   `query:…#FileId_NNNNN` URIs, and bake them into each device's
-   `browser_category`/`instrument_filter`/fallback. Add per-category probes to
-   `doctor`.
+1. **Browser categories — DONE (confirmed against Live 12.3).** The voices use
+   the Sounds tree: bass=`sounds/Bass` (515 presets), lead=`sounds/Synth Lead`
+   (342), drone=`sounds/Ambient & Evolving` (hundreds of pad/drone presets).
+   `list-kits --device <voice>` returns real loadable
+   `query:Sounds#<folder>:FileId_NNNNN` URIs. (A `doctor` per-category probe is
+   still a nice-to-have but not blocking.)
 2. **Install + verify the drone automation bridge.** The contour→automation
    needs the forked Remote Script command `set_clip_envelope` — see `bridge/`
    (source + install + LOM runtime-verification checklist). Without it, drone

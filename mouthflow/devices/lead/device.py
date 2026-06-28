@@ -16,9 +16,12 @@ from mouthflow.schemas import Intent
 
 _PROMPT_PATH = Path(__file__).resolve().parent / "prompt.md"
 
+# Real category confirmed against Live 12.3: sounds/Synth Lead holds 342
+# loadable lead presets (query:Sounds#Synth%20Lead:FileId_NNNNN). Fallbacks are
+# synthetic and only keep offline dry-run producing a Plan.
 _FALLBACK_INSTRUMENTS = (
-    "query:Instruments#Lead-Wavetable",
-    "query:Instruments#Lead-Analog",
+    "query:Sounds#Synth Lead:Lead",
+    "query:Sounds#Synth Lead:Pluck",
 )
 
 LEAD_CONFIG = VoiceConfig(
@@ -38,7 +41,7 @@ LEAD_DEVICE = DeviceSpec(
     intent=Intent.MELODY,
     transcriber=PitchedTranscriber(LEAD_CONFIG),
     clip_mode=ClipMode.MONOPHONIC,
-    browser_category="Instruments",
+    browser_category="sounds/Synth Lead",
     prompt_path=_PROMPT_PATH,
     plan_summary=pitched_plan_summary,
     instrument_filter=None,
