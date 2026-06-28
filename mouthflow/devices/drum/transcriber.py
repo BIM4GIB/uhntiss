@@ -30,7 +30,7 @@ class DrumTranscriber:
         kept: list[tuple[float, int, int]] = []  # (time_s, midi_note, velocity)
         for t in signal.detect_onsets(y, sr):
             features = signal.features_at(y, sr, t)
-            note = _classify(features)
+            note = _classify(y, sr, t, features)
             if note == DROP:
                 continue
             kept.append((float(t), note, signal.velocity_from_rms(features["rms"])))

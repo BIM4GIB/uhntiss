@@ -151,8 +151,8 @@ def score(name, clip):
     for o, j in pairs:
         true = gl[j]
         f = feats[o]
-        labeled.append({"x": [f[k] for k in ["centroid", "sub100_ratio", "decay_s", "zcr", "flatness"]], "y": true})
-        rows.append((true, PITCH2LAB[T._classify(f)], PITCH2LAB[T._classify_heuristic(f)]))
+        labeled.append({"y": true})  # features are re-extracted from grids at train time
+        rows.append((true, PITCH2LAB[T._classify(yf, T._SR, o, f)], PITCH2LAB[T._classify_heuristic(f)]))
     n = len(rows)
     mc = sum(1 for t, m, h in rows if m == t)
     hc = sum(1 for t, m, h in rows if h == t)
