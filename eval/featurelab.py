@@ -57,8 +57,12 @@ def labeled_onsets() -> list[dict]:
         gl = [lab for _, lab in grid]
         y, _ = librosa.load(str(wav_path), sr=SR, mono=True)
         onsets = [t for t in signal.detect_onsets(y, SR) if signal.features_at(y, SR, t)["rms"] >= RMS_FLOOR]
-        offset = max(np.arange(0.12, 0.30, 0.005), key=lambda d: len(_match(onsets, gt, d)))
-        for o, j in _match(onsets, gt, offset):
+        # Alignment by rhythm only (no timbre — that's what we're trying to learn).
+        # The grids are bar-periodic and the takes are transport-synced, so the
+        # true offset is a small sub-bar latency; a narrow window has no phase
+        # ambiguity, so raw match-count locks it without the timbre crutch.
+        offset = max(np.arange(-0.20, 0.45, 0.005), key=lambda d: len(_match(onsets, gt, d, tol=0.10)))
+        for o, j in _match(onsets, gt, offset, tol=0.10):
             rows.append({"audio": y, "sr": SR, "t": float(o), "label": _norm(gl[j]), "take": take})
     return rows
 
