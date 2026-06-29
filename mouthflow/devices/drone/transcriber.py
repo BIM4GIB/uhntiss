@@ -45,7 +45,7 @@ class DroneTranscriber:
     def __init__(self, config: DroneConfig | None = None) -> None:
         self.cfg = config or DroneConfig()
 
-    def transcribe(self, wav_path, *, tempo: float | None = None) -> Transcription:
+    def transcribe(self, wav_path, *, tempo: float | None = None, bar_align: bool = False) -> Transcription:
         import librosa
 
         cfg = self.cfg

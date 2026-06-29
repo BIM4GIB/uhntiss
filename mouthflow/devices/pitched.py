@@ -41,7 +41,7 @@ class PitchedTranscriber:
     def __init__(self, config: VoiceConfig) -> None:
         self.cfg = config
 
-    def transcribe(self, wav_path, *, tempo: float | None = None) -> Transcription:
+    def transcribe(self, wav_path, *, tempo: float | None = None, bar_align: bool = False) -> Transcription:
         import librosa
 
         cfg = self.cfg

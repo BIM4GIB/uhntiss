@@ -100,6 +100,7 @@ def _run_pipeline(
     instruments_override: list[str] | None,
     device_id: str = _DEFAULT_DEVICE,
     tempo: float | None = None,
+    bar_align: bool = True,
 ) -> Plan:
     _log(f"normalising {wav}")
     normalised = capture.from_file(wav)
@@ -126,7 +127,7 @@ def _run_pipeline(
     forced_tempo = tempo if tempo and tempo > 0 else _tempo_from_hint(hint)
 
     _log(f"transcribing ({spec.id})")
-    transcription = spec.transcriber.transcribe(normalised, tempo=forced_tempo)
+    transcription = spec.transcriber.transcribe(normalised, tempo=forced_tempo, bar_align=bar_align)
     forced = " (forced)" if forced_tempo else ""
     _log(f"  tempo={transcription.tempo_bpm:.1f} BPM{forced}, notes={len(transcription.hits)}")
 
@@ -162,6 +163,7 @@ def _parse_instruments(value: str | None) -> list[str] | None:
 
 
 _DEVICE_HELP = "Which voice to transcribe: drums | bass | lead | drone | auto (route by ear)."
+_BAR_ALIGN_HELP = "Snap to the bar grid (tighter fit) vs the performance's timing."
 
 
 @app.command()
@@ -175,6 +177,7 @@ def record(
     tempo: float | None = typer.Option(
         None, "--tempo", help="Force tempo in BPM (skips detection). Also reads 'NN bpm' from --hint."
     ),
+    bar_align: bool = typer.Option(True, "--bar-align/--no-bar-align", help=_BAR_ALIGN_HELP),
     instruments: str | None = typer.Option(
         None, "--instruments", help="Comma-separated browser URIs. Overrides session lookup."
     ),
@@ -191,6 +194,7 @@ def record(
             instruments_override=_parse_instruments(instruments),
             device_id=device,
             tempo=tempo,
+            bar_align=bar_align,
         )
         _emit_or_apply(plan, json_out=json_out, client=client)
 
@@ -311,6 +315,7 @@ def transcribe_clip(
     port: int = typer.Option(9877),
     hint: str | None = typer.Option(None, "--hint"),
     tempo: float | None = typer.Option(None, "--tempo"),
+    bar_align: bool = typer.Option(True, "--bar-align/--no-bar-align", help=_BAR_ALIGN_HELP),
     instruments: str | None = typer.Option(None, "--instruments"),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
@@ -330,6 +335,17 @@ def transcribe_clip(
         if not (isinstance(info, dict) and info.get("is_audio") and path):
             raise typer.BadParameter("select an AUDIO clip in Live's detail view first")
         _log(f"selected clip: {info.get('name')} -> {path}")
+        # Default to the project tempo so the transcription lands exactly on the
+        # set's grid (the clip was recorded at it). --tempo still overrides.
+        if tempo is None:
+            try:
+                session = client.get_session_info()
+                proj_tempo = session.get("tempo") if isinstance(session, dict) else None
+                if proj_tempo:
+                    tempo = float(proj_tempo)
+                    _log(f"using project tempo {tempo:.1f} BPM")
+            except (AbletonError, OSError):
+                pass
         plan = _run_pipeline(
             Path(path),
             client=client,
@@ -337,6 +353,7 @@ def transcribe_clip(
             instruments_override=_parse_instruments(instruments),
             device_id=device,
             tempo=tempo,
+            bar_align=bar_align,
         )
         _emit_or_apply(plan, json_out=json_out, client=client)
 
