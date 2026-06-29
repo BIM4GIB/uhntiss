@@ -304,6 +304,43 @@ def input_devices() -> None:
     print(json.dumps(capture.list_input_devices()))
 
 
+@app.command("transcribe-clip")
+def transcribe_clip(
+    device: str = typer.Option(_DEFAULT_DEVICE, "--device", help=_DEVICE_HELP),
+    host: str = typer.Option("127.0.0.1"),
+    port: int = typer.Option(9877),
+    hint: str | None = typer.Option(None, "--hint"),
+    tempo: float | None = typer.Option(None, "--tempo"),
+    instruments: str | None = typer.Option(None, "--instruments"),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    """Transcribe the audio clip currently SELECTED in Live (no mic).
+
+    Asks the bridge for the detail-view clip's sample file and runs the normal
+    pipeline on it. Requires the forked Remote Script command
+    ``get_selected_clip`` (see ``bridge/``).
+    """
+    with AbletonClient(host, port) as client:
+        try:
+            info = client.get_selected_clip()
+        except (AbletonError, OSError) as exc:
+            _log(f"could not read the selected clip ({exc}); is the forked bridge installed?")
+            raise typer.Exit(code=1)
+        path = info.get("file_path") if isinstance(info, dict) else None
+        if not (isinstance(info, dict) and info.get("is_audio") and path):
+            raise typer.BadParameter("select an AUDIO clip in Live's detail view first")
+        _log(f"selected clip: {info.get('name')} -> {path}")
+        plan = _run_pipeline(
+            Path(path),
+            client=client,
+            hint=hint,
+            instruments_override=_parse_instruments(instruments),
+            device_id=device,
+            tempo=tempo,
+        )
+        _emit_or_apply(plan, json_out=json_out, client=client)
+
+
 @app.command("list-kits")
 def list_kits(
     device: str = typer.Option(_DEFAULT_DEVICE, "--device", help=_DEVICE_HELP),

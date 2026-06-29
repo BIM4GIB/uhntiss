@@ -178,6 +178,15 @@ class AbletonClient:
         """Back-compat shim: ``list_instruments`` over the Drums category."""
         return self.list_instruments(path, max_depth=max_depth, hard_cap=hard_cap)
 
+    def get_selected_clip(self) -> dict:
+        """The clip shown in Live's detail view, as ``{name, file_path, is_audio}``.
+
+        Requires the forked Remote Script command ``get_selected_clip`` (see
+        ``bridge/``). ``file_path`` is the on-disk sample for an audio clip —
+        what ``transcribe-clip`` feeds to the pipeline instead of the mic.
+        """
+        return self.send_command("get_selected_clip")
+
     def create_midi_track(self, name: str, index: int = -1) -> int:
         result = self.send_command("create_midi_track", {"index": index})
         track_idx = int(result.get("index", result.get("track_index", -1)))

@@ -20,7 +20,8 @@
  *   list_inputs            query input devices, populate the input menu
  *   input_index <i>        choose input device by menu index (0 = default)
  *   input <i>              choose input device by index ("" = default)
- *   file <path>            transcribe an existing audio file (the selected clip)
+ *   file <path>            transcribe an existing audio file (explicit path)
+ *   transcribe_clip        transcribe the SELECTED Live clip (path via bridge)
  *   generate               run a full take (record -> apply to Live)
  *   cancel                 kill an in-flight run
  *
@@ -186,6 +187,21 @@ function transcribeFile(path) {
   child = runCli(args, { onLine: (line) => status(line), onDone: onPipelineDone });
 }
 
+// Transcribe the clip currently SELECTED in Live (path fetched by the CLI from
+// the forked bridge). One button, no path wrangling in the patch.
+function transcribeClip() {
+  if (child) {
+    status("busy — cancel first");
+    return;
+  }
+  const args = ["transcribe-clip", "--device", state.device, "--json"];
+  if (state.hint) args.push("--hint", state.hint);
+  if (state.kitUri) args.push("--instruments", state.kitUri);
+  Max.outlet("busy", 1);
+  status(`transcribing selected clip (${state.device})…`);
+  child = runCli(args, { onLine: (line) => status(line), onDone: onPipelineDone });
+}
+
 function listInputs() {
   runCli(["input-devices"], {
     onLine: () => {},
@@ -259,6 +275,8 @@ Max.addHandler("input_index", (i) => {
 });
 // transcribe the selected clip's audio file (path from the patch's Live API)
 Max.addHandler("file", (...a) => transcribeFile(a.join(" ").trim()));
+// transcribe the selected clip (CLI fetches its path from the forked bridge)
+Max.addHandler("transcribe_clip", transcribeClip);
 Max.addHandler("generate", generate);
 Max.addHandler("cancel", () => {
   if (child) {

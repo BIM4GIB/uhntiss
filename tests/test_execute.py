@@ -127,6 +127,15 @@ def test_list_drum_instruments_empty_when_no_loadable():
             assert client.list_drum_instruments() == []
 
 
+def test_get_selected_clip():
+    info = {"name": "Audio 1", "file_path": "/tmp/a.aif", "is_audio": True}
+    with FakeAbleton([{"status": "ok", "result": info}]) as fake:
+        with AbletonClient(port=fake.port) as client:
+            got = client.get_selected_clip()
+    assert got == info
+    assert fake.requests[0] == {"type": "get_selected_clip", "params": {}}
+
+
 def test_create_midi_track_sets_name():
     responses = [
         {"status": "ok", "result": {"index": 3}},  # create_midi_track
