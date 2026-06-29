@@ -155,22 +155,26 @@ def _inject_controls(maxpat: dict) -> None:
     def wire(src, dst, so=0, di=0):
         add_l.append({"patchline": {"source": [src, so], "destination": [dst, di]}})
 
+    # Presentation layout: Live's device strip is FIXED-height (~196px, the
+    # template's "Device vertical limit") but grows horizontally, so the new
+    # controls go in a SECOND COLUMN to the right (x>=330), within the same
+    # vertical band as the originals — NOT stacked below (which Live clips).
     # Action buttons -> node inlet (literal messages the glue handles directly).
-    msg("obj-200", "transcribe_clip", [720, 100, 140, 20], [10, 205, 130, 22])
-    msg("obj-201", "record_start", [720, 130, 110, 20], [10, 231, 95, 22])
-    msg("obj-202", "record_stop", [840, 130, 110, 20], [110, 231, 95, 22])
+    msg("obj-200", "transcribe_clip", [720, 100, 140, 20], [330, 36, 152, 22])
+    msg("obj-201", "record_start", [720, 130, 110, 20], [330, 64, 100, 22])
+    msg("obj-202", "record_stop", [840, 130, 110, 20], [436, 64, 100, 22])
     for b in ("obj-200", "obj-201", "obj-202"):
         wire(b, _NODE_INLET)
 
     # bars: textedit -> prepend bars -> node
-    comment("obj-212", "bars (auto/4/8/16)", [860, 170, 150, 18], [10, 259, 92, 18])
-    textedit("obj-210", [720, 170, 120, 22], [104, 257, 42, 22])
+    comment("obj-212", "bars(4/8/16)", [860, 170, 150, 18], [330, 96, 60, 16])
+    textedit("obj-210", [720, 170, 120, 22], [392, 94, 44, 22])
     newobj("obj-211", "prepend bars", [720, 200, 110, 22])
     wire("obj-210", "obj-211"); wire("obj-211", _NODE_INLET)
 
     # correct: toggle (defaulted ON via loadbang) -> prepend correct -> node
-    comment("obj-222", "correct", [880, 240, 80, 18], [156, 259, 46, 18])
-    toggle("obj-220", [720, 240, 24, 24], [204, 256, 22, 22])
+    comment("obj-222", "correct", [880, 240, 80, 18], [444, 96, 46, 16])
+    toggle("obj-220", [720, 240, 24, 24], [492, 94, 20, 20])
     newobj("obj-221", "prepend correct", [760, 240, 120, 22])
     newobj("obj-223", "loadbang", [920, 240, 60, 22])
     msg("obj-224", "1", [920, 272, 32, 20])
@@ -178,19 +182,32 @@ def _inject_controls(maxpat: dict) -> None:
     wire("obj-223", "obj-224"); wire("obj-224", "obj-220")
 
     # key: textedit -> prepend key -> node
-    comment("obj-232", "key", [860, 290, 60, 18], [10, 285, 26, 18])
-    textedit("obj-230", [720, 290, 120, 22], [38, 283, 46, 22])
+    comment("obj-232", "key", [860, 290, 60, 18], [330, 124, 24, 16])
+    textedit("obj-230", [720, 290, 120, 22], [356, 122, 46, 22])
     newobj("obj-231", "prepend key", [720, 320, 100, 22])
     wire("obj-230", "obj-231"); wire("obj-231", _NODE_INLET)
 
     # scale: textedit -> prepend scale -> node
-    comment("obj-242", "scale", [860, 350, 60, 18], [96, 285, 40, 18])
-    textedit("obj-240", [720, 350, 120, 22], [138, 283, 88, 22])
+    comment("obj-242", "scale", [860, 350, 60, 18], [410, 124, 34, 16])
+    textedit("obj-240", [720, 350, 120, 22], [446, 122, 90, 22])
     newobj("obj-241", "prepend scale", [720, 380, 100, 22])
     wire("obj-240", "obj-241"); wire("obj-241", _NODE_INLET)
 
     boxes.extend(add_b)
     lines.extend(add_l)
+
+
+def _grow_device(maxpat: dict, width: float = 600.0, height: float = 240.0) -> None:
+    """Widen the device so the second control column is in view.
+
+    Live's device strip is fixed-height, so the fix is horizontal room, not
+    vertical — bump the patcher width to fit the right-hand column.
+    """
+    pat = maxpat["patcher"]
+    r = pat.get("rect", [236.0, 105.0, 385.0, 229.0])
+    pat["rect"] = [r[0], r[1], float(width), float(height)]
+    o = pat.get("openrect", [0.0, 0.0, 0.0, 169.0])
+    pat["openrect"] = [o[0], o[1], o[2], float(height)]
 
 
 def _validate(maxpat: dict) -> None:
@@ -212,6 +229,7 @@ def generate_panel(voice: str, out_name: str, title: str) -> tuple[Path, str]:
     prefix, maxpat = read_maxpat(_TEMPLATE)
     make_panel(maxpat, js_name, title)
     _inject_controls(maxpat)  # the pitched voices share one control set
+    _grow_device(maxpat)  # make room for the taller control stack
     _validate(maxpat)
     out = _HERE / out_name
     write_amxd(out, prefix, maxpat)
