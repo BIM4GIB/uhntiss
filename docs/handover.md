@@ -48,7 +48,11 @@ the router classify by ear). Default is `drums`.
 - **Pitched (bass/lead):** `librosa.pyin` → continuous f0 → segment by held
   semitone-change + gap (NOT onsets — they fire spuriously on sustained tones),
   merge same-pitch fragments, octave-snap. `signal.write_midi(channel=0)` with
-  real durations. Bass vs lead = a `VoiceConfig` row only.
+  real durations. Bass vs lead = a `VoiceConfig` row only. Segmentation uses
+  **hysteresis** (`min_stable_s`, default 80 ms): a pitch change must hold to
+  start a new note, so natural vibrato/glides don't shatter one note into many.
+  Known limit: pyin's analysis window (bass 4096 ≈ 93 ms) blurs notes faster
+  than ~1/8 in the bass register — inherent low-freq trade-off, not a bug.
 - **Drone:** stable-pitch regions → one dominant region = held note, several =
   a chord (notes enter in sequence, all sustain to the bar-snapped clip end and
   ring together). Clip loops in Live → continuous drone; movement comes from the
@@ -65,11 +69,13 @@ the router classify by ear). Default is `drums`.
    needs the forked Remote Script command `set_clip_envelope` — see `bridge/`
    (source + install + LOM runtime-verification checklist). Without it, drone
    still plays as a held note/chord (`apply_plan` logs "automation skipped").
-3. **Pitched eval + tonal mimic (needs recorded data).** Generalize
-   `eval/run_eval.py` with note-level P/R/F1 + octave-error via `mir_eval`
-   (dev dep), and extend `mimic/take.py` with a tonal reference + pitch scorer
-   so labeled pitched ground truth can be gathered. Infrastructure can be built
-   now; scoring needs the user to record tonal mimic takes.
+3. **Pitched eval + tonal mimic (foundation built; needs recorded data).**
+   `eval/note_eval.py` scores a take against a reference melody grid
+   (`mimic/<name>.notegrid.json`) — note P/R/F1 + octave-error, with onset
+   alignment; synthetic self-test passes (bass F1 1.0). Still TODO: place
+   hum-along reference melody clips in Live (like the drum references) so the
+   user can record bass/lead takes, then tune octave-continuity / segmentation
+   on real voice (deliberately NOT guessed in code — unsafe without real data).
 4. **Drums onset/tempo** — PR #6's octave-correct tempo + phase-aware
    quantization is **merged and integrated into the drum device**
    (`devices/drum/tempo.py`, `devices/drum/transcriber.py`); confidence-gated
