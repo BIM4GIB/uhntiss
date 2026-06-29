@@ -168,6 +168,7 @@ _DEVICE_HELP = "Which voice to transcribe: drums | bass | lead | drone | auto (r
 def record(
     duration: float = typer.Option(15.0, help="Recording length in seconds."),
     device: str = typer.Option(_DEFAULT_DEVICE, "--device", help=_DEVICE_HELP),
+    input: int | None = typer.Option(None, "--input", help="Input device index (see `input-devices`)."),
     host: str = typer.Option("127.0.0.1"),
     port: int = typer.Option(9877),
     hint: str | None = typer.Option(None, "--hint", help="Optional freeform hint to the planner."),
@@ -181,7 +182,7 @@ def record(
 ) -> None:
     """Capture audio, run the pipeline, apply to Ableton."""
     _log(f"recording {duration}s")
-    wav = capture.record(duration)
+    wav = capture.record(duration, input_device=input)
     with AbletonClient(host, port) as client:
         plan = _run_pipeline(
             wav,
@@ -295,6 +296,12 @@ def doctor(
         _log(f"{len(failures)} check(s) failed")
         raise typer.Exit(code=1)
     _log("all checks passed — ready to run")
+
+
+@app.command("input-devices")
+def input_devices() -> None:
+    """Print input-capable audio devices as JSON (for the M4L mic picker)."""
+    print(json.dumps(capture.list_input_devices()))
 
 
 @app.command("list-kits")

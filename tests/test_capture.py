@@ -21,10 +21,11 @@ def test_record_produces_target_format(tmp_path, monkeypatch):
     """`record` writes a WAV at 44.1 kHz / 16-bit / mono of the right length."""
     captured = {}
 
-    def fake_rec(frames, samplerate, channels, dtype):
+    def fake_rec(frames, samplerate, channels, dtype, device=None):
         captured["frames"] = frames
         captured["samplerate"] = samplerate
         captured["channels"] = channels
+        captured["device"] = device
         return np.zeros((frames, channels), dtype=np.int16)
 
     monkeypatch.setattr(capture.sd, "rec", fake_rec)

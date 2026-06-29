@@ -17,6 +17,10 @@
  *   list_kits              query Live, populate the kit menu
  *   kit_index <i>          choose kit by menu index (resolved to its URI)
  *   kit_uri <uri>          choose kit by explicit URI ("" = let planner pick)
+ *   list_inputs            query input devices, populate the input menu
+ *   input_index <i>        choose input device by menu index (0 = default)
+ *   input <i>              choose input device by index ("" = default)
+ *   file <path>            transcribe an existing audio file (the selected clip)
  *   generate               run a full take (record -> apply to Live)
  *   cancel                 kill an in-flight run
  *
@@ -28,6 +32,7 @@
  *   done <0|1>             1 on success, 0 on failure
  *   error <text>           failure detail
  *   kitmenu clear | append <name>   populate a umenu/live.menu
+ *   inputmenu clear | append <name> populate the input-device menu
  */
 
 const Max = require("max-api");
@@ -44,10 +49,12 @@ const state = {
   hint: "",
   tempo: 0,
   kitUri: "",
+  input: null, // input device index for record (null = system default)
   countin: 3,
 };
 
 let kits = []; // cached [{name, uri}] from list_kits
+let inputs = []; // cached [{index, name}] from list_inputs
 let child = null; // in-flight process
 
 function status(msg) {
@@ -103,12 +110,35 @@ function runCli(args, { onStdout, onLine, onDone }) {
   return proc;
 }
 
+// Shared completion handler for any pipeline run (record or file transcribe).
+function onPipelineDone(code, stdout, errTail) {
+  child = null;
+  Max.outlet("busy", 0);
+  if (code === 0) {
+    try {
+      const plan = JSON.parse(stdout.slice(stdout.indexOf("{")));
+      if (plan.tempo) Max.outlet("tempo", plan.tempo);
+      if (plan.rationale) Max.outlet("rationale", plan.rationale);
+      status("done — clip applied to Live");
+      Max.outlet("done", 1);
+    } catch (e) {
+      status("done, but could not parse plan");
+      Max.outlet("done", 1);
+    }
+  } else {
+    status(`failed (exit ${code}): ${errTail || "see Max console"}`);
+    Max.outlet("error", errTail || `exit ${code}`);
+    Max.outlet("done", 0);
+  }
+}
+
 function generate() {
   if (child) {
     status("a take is already running — cancel it first");
     return;
   }
   const args = ["record", "--duration", String(state.duration), "--device", state.device, "--json"];
+  if (state.input != null) args.push("--input", String(state.input));
   if (state.hint) args.push("--hint", state.hint);
   if (state.tempo) args.push("--tempo", String(state.tempo));
   if (state.kitUri) args.push("--instruments", state.kitUri);
@@ -117,30 +147,7 @@ function generate() {
 
   const launch = () => {
     status(`recording ${state.duration}s — beatbox now!`);
-    child = runCli(args, {
-      onLine: (line) => status(line),
-      onDone: (code, stdout, errTail) => {
-        child = null;
-        Max.outlet("busy", 0);
-        if (code === 0) {
-          try {
-            const start = stdout.indexOf("{");
-            const plan = JSON.parse(stdout.slice(start));
-            if (plan.tempo) Max.outlet("tempo", plan.tempo);
-            if (plan.rationale) Max.outlet("rationale", plan.rationale);
-            status("done — clip applied to Live");
-            Max.outlet("done", 1);
-          } catch (e) {
-            status("done, but could not parse plan");
-            Max.outlet("done", 1);
-          }
-        } else {
-          status(`failed (exit ${code}): ${errTail || "see Max console"}`);
-          Max.outlet("error", errTail || `exit ${code}`);
-          Max.outlet("done", 0);
-        }
-      },
-    });
+    child = runCli(args, { onLine: (line) => status(line), onDone: onPipelineDone });
   };
 
   // Silent count-in so the user knows when to start (the CLI records
@@ -158,6 +165,47 @@ function generate() {
     }
   };
   tick();
+}
+
+// Transcribe an existing audio FILE (the selected Live clip's sample) instead
+// of recording the mic. The patch supplies the path via Live's API.
+function transcribeFile(path) {
+  if (!path) {
+    status("no clip path — select an audio clip in Live first");
+    return;
+  }
+  if (child) {
+    status("busy — cancel first");
+    return;
+  }
+  const args = ["run", path, "--device", state.device, "--json"];
+  if (state.hint) args.push("--hint", state.hint);
+  if (state.kitUri) args.push("--instruments", state.kitUri);
+  Max.outlet("busy", 1);
+  status(`transcribing clip (${state.device})…`);
+  child = runCli(args, { onLine: (line) => status(line), onDone: onPipelineDone });
+}
+
+function listInputs() {
+  runCli(["input-devices"], {
+    onLine: () => {},
+    onDone: (code, stdout) => {
+      if (code !== 0) {
+        status("could not list input devices");
+        return;
+      }
+      try {
+        inputs = JSON.parse(stdout.trim());
+      } catch (e) {
+        status("could not parse input list");
+        return;
+      }
+      Max.outlet("inputmenu", "clear");
+      Max.outlet("inputmenu", "append", "(default)");
+      inputs.forEach((d) => Max.outlet("inputmenu", "append", d.name));
+      status(`${inputs.length} input device(s)`);
+    },
+  });
 }
 
 function listKits() {
@@ -198,6 +246,19 @@ Max.addHandler("kit_index", (i) => {
   state.kitUri = idx >= 1 && kits[idx - 1] ? kits[idx - 1].uri : "";
 });
 Max.addHandler("list_kits", listKits);
+Max.addHandler("list_inputs", listInputs);
+// raw input device index ("" / "default" -> system default)
+Max.addHandler("input", (...a) => {
+  const s = a.join(" ").trim();
+  state.input = s === "" || s.toLowerCase() === "default" ? null : Number(s);
+});
+// menu selection: index 0 is the "(default)" sentinel
+Max.addHandler("input_index", (i) => {
+  const idx = Number(i);
+  state.input = idx >= 1 && inputs[idx - 1] ? inputs[idx - 1].index : null;
+});
+// transcribe the selected clip's audio file (path from the patch's Live API)
+Max.addHandler("file", (...a) => transcribeFile(a.join(" ").trim()));
 Max.addHandler("generate", generate);
 Max.addHandler("cancel", () => {
   if (child) {

@@ -18,8 +18,12 @@ CHANNELS = 1
 SUBTYPE = "PCM_16"
 
 
-def record(duration_s: float = 15.0, out_path: Path | None = None) -> Path:
-    """Record `duration_s` seconds from the default input device.
+def record(
+    duration_s: float = 15.0,
+    out_path: Path | None = None,
+    input_device: int | None = None,
+) -> Path:
+    """Record `duration_s` seconds from an input device (default if None).
 
     Blocks until the recording completes. Returns the path to the WAV.
     """
@@ -27,7 +31,9 @@ def record(duration_s: float = 15.0, out_path: Path | None = None) -> Path:
         raise ValueError(f"duration_s must be positive, got {duration_s}")
 
     frames = int(round(duration_s * SAMPLE_RATE))
-    audio = sd.rec(frames, samplerate=SAMPLE_RATE, channels=CHANNELS, dtype="int16")
+    audio = sd.rec(
+        frames, samplerate=SAMPLE_RATE, channels=CHANNELS, dtype="int16", device=input_device
+    )
     sd.wait()
 
     if out_path is None:
@@ -35,6 +41,15 @@ def record(duration_s: float = 15.0, out_path: Path | None = None) -> Path:
     out_path = Path(out_path)
     sf.write(out_path, audio, SAMPLE_RATE, subtype=SUBTYPE)
     return out_path
+
+
+def list_input_devices() -> list[dict]:
+    """Input-capable audio devices as ``[{index, name}]`` (for a UI picker)."""
+    out: list[dict] = []
+    for i, d in enumerate(sd.query_devices()):
+        if d.get("max_input_channels", 0) > 0:
+            out.append({"index": i, "name": str(d.get("name", f"device {i}"))})
+    return out
 
 
 def from_file(path: Path) -> Path:
