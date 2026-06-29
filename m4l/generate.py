@@ -28,8 +28,10 @@ Usage::
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
+import shutil
 import struct
 from pathlib import Path
 
@@ -37,6 +39,10 @@ _HERE = Path(__file__).resolve().parent
 _TEMPLATE = _HERE / "Mouthflow.amxd"
 _GLUE = _HERE / "mouthflow.js"
 _PTCH = b"ptch"
+
+# Live loads M4L devices from here; node.script resolves the glue next to the
+# .amxd, so the panels AND their .js must both live in this folder.
+_USER_DEVICES = Path.home() / "Music" / "Ableton" / "User Library" / "Devices"
 
 _TITLE_ID = "obj-100"  # the "MOUTHFLOW" header comment
 
@@ -226,11 +232,43 @@ _PANELS = [
 ]
 
 
+def install_to_user_library(dest: Path = _USER_DEVICES) -> None:
+    """Copy the panels + glue into Live's User Library/Devices (with .bak backups).
+
+    Keeps the device Live actually loads in sync with the repo — otherwise a
+    regenerated panel here looks 'the same' in Live, which loads the stale copy.
+    Both the .amxd and its node.script .js must land here (node.script resolves
+    the glue next to the .amxd)."""
+    if not dest.is_dir():
+        raise SystemExit(f"User Library devices folder not found: {dest}")
+    names = ["Mouthflow.amxd", "mouthflow.js", "package.json"]
+    names += [out for _, out, _ in _PANELS]
+    names += [f"mouthflow_{voice}.js" for voice, _, _ in _PANELS]
+    for name in names:
+        src = _HERE / name
+        if not src.exists():
+            continue
+        target = dest / name
+        if target.exists():
+            shutil.copy2(target, target.with_name(target.name + ".bak"))
+        shutil.copy2(src, target)
+        print(f"ok   installed {name}")
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Generate the per-voice M4L panels.")
+    parser.add_argument(
+        "--install", action="store_true",
+        help="Also copy panels + glue into Live's User Library/Devices (with .bak backups).",
+    )
+    args = parser.parse_args()
+
     _self_check()
     for voice, out_name, title in _PANELS:
         out, js_name = generate_panel(voice, out_name, title)
         print(f"ok   wrote {out.name}  ->  node.script {js_name}  (device {voice})")
+    if args.install:
+        install_to_user_library()
 
 
 if __name__ == "__main__":
