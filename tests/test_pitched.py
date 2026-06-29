@@ -37,6 +37,20 @@ def _sine(freq: float, dur_s: float, amp: float = 0.5) -> np.ndarray:
     return y.astype(np.float32)
 
 
+def _sine_vibrato(freq: float, dur_s: float, depth_semitones: float = 0.6, rate_hz: float = 6.0, amp: float = 0.5) -> np.ndarray:
+    """A single sustained tone with vibrato — the realistic-humming case that
+    must transcribe to ONE note, not a flurry of fragments."""
+    t = np.arange(int(SR * dur_s)) / SR
+    inst_f = freq * 2 ** ((depth_semitones * np.sin(2 * np.pi * rate_hz * t)) / 12.0)
+    phase = 2 * np.pi * np.cumsum(inst_f) / SR
+    y = amp * np.sin(phase)
+    n_fade = int(0.005 * SR)
+    ramp = np.linspace(0, 1, n_fade)
+    y[:n_fade] *= ramp
+    y[-n_fade:] *= ramp[::-1]
+    return y.astype(np.float32)
+
+
 def _write(path: Path, y: np.ndarray) -> Path:
     sf.write(path, y, SR, subtype="PCM_16")
     return path
@@ -109,6 +123,16 @@ def test_two_note_line_yields_two_pitches(tmp_path):
     # First note is the lower A2, in time order.
     ordered = sorted(t.hits, key=lambda h: h.time_s)
     assert ordered[0].midi_note == 45
+
+
+def test_vibrato_note_does_not_shatter(tmp_path):
+    # A sustained A2 with ±0.6-semitone vibrato is ONE note. Before the
+    # segmentation hysteresis, the wobble crossed the semitone boundary and
+    # split it into several fragments.
+    wav = _write(tmp_path / "vib.wav", _sine_vibrato(110.0, 1.4))
+    t = PitchedTranscriber(BASS_CONFIG).transcribe(wav)
+    assert len(t.hits) == 1, [(round(h.time_s, 2), h.midi_note) for h in t.hits]
+    assert t.hits[0].midi_note == 45
 
 
 def test_pitched_plan_summary_reports_range(tmp_path):

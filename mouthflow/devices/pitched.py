@@ -35,6 +35,8 @@ class VoiceConfig:
     frame_length: int = 2048    # pyin analysis window; larger for low fmin
     min_note_s: float = 0.08    # drop segments shorter than this
     merge_gap_s: float = 0.10   # bridge unvoiced gaps (breaths) up to this long
+    min_stable_s: float = 0.08  # a pitch change must hold this long to start a new
+    #                             note — absorbs vibrato wobble + glide pass-through
 
 
 class PitchedTranscriber:
@@ -114,38 +116,64 @@ class PitchedTranscriber:
     def _segment(self, stones, merge_gap_frames):
         """Group consecutive same-semitone voiced frames into note segments.
 
-        A segment closes on a held semitone change or a long unvoiced gap.
-        Onsets are deliberately NOT used to split: ``onset_detect`` fires
-        spuriously on a sustained tone, which would shatter one held note into
-        many fragments. Re-articulated same-pitch notes are instead separated
-        by the silence between them (the gap rule) or merged downstream.
+        A segment closes on a *held* semitone change or a long unvoiced gap.
+        The change must persist >= ``min_stable`` frames to split a note — a
+        momentary excursion (a vibrato peak, or a glide passing through a
+        semitone on its way somewhere) is absorbed into the current note
+        instead of spawning a spurious fragment. Onsets are deliberately NOT
+        used to split: ``onset_detect`` fires on a sustained tone, which would
+        shatter one held note. Re-articulated same-pitch notes are separated by
+        the silence between them (the gap rule) or merged downstream.
         """
+        min_stable = max(2, int(self.cfg.min_stable_s * (signal._SR / _HOP)))
         segments: list[dict] = []
         cur: dict | None = None
         gap = 0
+        pend_pitch: int | None = None  # a candidate new pitch, not yet committed
+        pend_start = 0
+        pend_count = 0
 
         def close(seg):
             if seg is not None:
                 segments.append(seg)
 
         for i, stone in enumerate(stones):
-            if stone is not None:
-                if cur is None:
-                    cur = {"start": i, "end": i, "pitches": [stone]}
-                elif stone != _mode(cur["pitches"]):
-                    close(cur)
-                    cur = {"start": i, "end": i, "pitches": [stone]}
-                else:
-                    cur["end"] = i
-                    cur["pitches"].append(stone)
-                gap = 0
-            else:
+            if stone is None:
                 if cur is not None:
                     gap += 1
                     if gap > merge_gap_frames:
                         close(cur)
                         cur = None
                         gap = 0
+                        pend_pitch = None
+                        pend_count = 0
+                continue
+            gap = 0
+            if cur is None:
+                cur = {"start": i, "end": i, "pitches": [stone]}
+                pend_pitch = None
+                pend_count = 0
+            elif stone == _mode(cur["pitches"]):
+                cur["end"] = i
+                cur["pitches"].append(stone)
+                pend_pitch = None
+                pend_count = 0
+            else:
+                # different semitone: count how long it persists before trusting it
+                if stone == pend_pitch:
+                    pend_count += 1
+                else:
+                    pend_pitch = stone
+                    pend_start = i
+                    pend_count = 1
+                if pend_count >= min_stable:
+                    cur["end"] = pend_start - 1  # the new note owns its run
+                    close(cur)
+                    cur = {"start": pend_start, "end": i, "pitches": [stone] * pend_count}
+                    pend_pitch = None
+                    pend_count = 0
+                else:
+                    cur["end"] = i  # absorb the excursion; mode stays put
         close(cur)
         return segments
 
