@@ -20,7 +20,11 @@ import librosa
 import numpy as np
 
 from mouthflow import signal
+from mouthflow.devices.drum.classify import _classify_heuristic
 from mimic.take import _match
+
+# heuristic GM pitch -> class label, used to break grid phase ambiguity
+_H2LAB = {36: "kick", 38: "snare", 42: "hat", 46: "hat"}
 
 REPO = Path(__file__).resolve().parent.parent
 CAL_DIR = REPO / "calibration"
@@ -56,12 +60,19 @@ def labeled_onsets() -> list[dict]:
         gt = np.array([t for t, _ in grid])
         gl = [lab for _, lab in grid]
         y, _ = librosa.load(str(wav_path), sr=SR, mono=True)
-        onsets = [t for t in signal.detect_onsets(y, SR) if signal.features_at(y, SR, t)["rms"] >= RMS_FLOOR]
-        # Alignment by rhythm only (no timbre — that's what we're trying to learn).
-        # The grids are bar-periodic and the takes are transport-synced, so the
-        # true offset is a small sub-bar latency; a narrow window has no phase
-        # ambiguity, so raw match-count locks it without the timbre crutch.
-        offset = max(np.arange(-0.20, 0.45, 0.005), key=lambda d: len(_match(onsets, gt, d, tol=0.10)))
+        feats = {t: signal.features_at(y, SR, t) for t in signal.detect_onsets(y, SR)}
+        onsets = [t for t, f in feats.items() if f["rms"] >= RMS_FLOOR]
+        # Align by the offset that maximizes *timbre agreement* (each matched
+        # onset's heuristic class == its grid label). Raw match-count is
+        # ambiguous to a half-beat on the dense hat grid (it slides kicks onto
+        # hat slots); requiring timbre agreement breaks that tie. Grid tempo
+        # must match the take's record tempo for this to lock.
+        hlab = {t: _H2LAB.get(_classify_heuristic(feats[t])) for t in onsets}
+
+        def _score(d):
+            return sum(1 for o, j in _match(onsets, gt, d, tol=0.10) if hlab[o] == _norm(gl[j]))
+
+        offset = max(np.arange(-0.6, 0.6, 0.005), key=_score)
         for o, j in _match(onsets, gt, offset, tol=0.10):
             rows.append({"audio": y, "sr": SR, "t": float(o), "label": _norm(gl[j]), "take": take})
     return rows
