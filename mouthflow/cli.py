@@ -101,6 +101,10 @@ def _run_pipeline(
     device_id: str = _DEFAULT_DEVICE,
     tempo: float | None = None,
     bar_align: bool = True,
+    correct: bool = True,
+    key: str | None = None,
+    scale: str | None = None,
+    bars="auto",
 ) -> Plan:
     _log(f"normalising {wav}")
     normalised = capture.from_file(wav)
@@ -131,6 +135,18 @@ def _run_pipeline(
     forced = " (forced)" if forced_tempo else ""
     _log(f"  tempo={transcription.tempo_bpm:.1f} BPM{forced}, notes={len(transcription.hits)}")
 
+    # Pitched post-processing: scale-snap (autotune-style) + fit to a whole bar
+    # count that loops cleanly on the grid. Drums pass through untouched.
+    from mouthflow import refine as _refine
+
+    transcription, refine_meta = _refine.refine_transcription(
+        transcription, spec.clip_mode, correct=correct, key=key, scale=scale, bars=bars,
+    )
+    if refine_meta["key"]:
+        _log(f"  note correction -> {refine_meta['key']} ({'forced' if key else 'auto'})")
+    if refine_meta["bars"]:
+        _log(f"  fit to {refine_meta['bars']} bars (loops on the grid)")
+
     instruments = _resolve_instruments(instruments_override, client, spec)
     plan = make_plan(
         transcription,
@@ -138,6 +154,10 @@ def _run_pipeline(
         user_hint=hint,
         device=spec,
     )
+    # The chosen bar count wins over the planner's length guess so the clip loops.
+    if refine_meta["bars"]:
+        for clip in plan.clips:
+            clip.length_bars = float(refine_meta["bars"])
     # Device-produced automation (e.g. the drone loudness contour) is attached
     # to the plan's clip(s); the LLM never sees or generates it.
     if transcription.automation:
@@ -164,6 +184,10 @@ def _parse_instruments(value: str | None) -> list[str] | None:
 
 _DEVICE_HELP = "Which voice to transcribe: drums | bass | lead | drone | auto (route by ear)."
 _BAR_ALIGN_HELP = "Snap to the bar grid (tighter fit) vs the performance's timing."
+_CORRECT_HELP = "Note correction (pitched voices): snap notes to a scale so wobbly takes land in tune."
+_KEY_HELP = "Force the key for note correction, e.g. C, F#, Bb (default: auto-detect from the take)."
+_SCALE_HELP = "Scale for note correction: major|minor|dorian|harmonic_minor|major_pentatonic|minor_pentatonic|chromatic (default: auto)."
+_BARS_HELP = "Fit the clip to a whole bar count so it loops on the grid: auto | off | 4 | 8 | 16."
 
 
 @app.command()
@@ -178,6 +202,10 @@ def record(
         None, "--tempo", help="Force tempo in BPM (skips detection). Also reads 'NN bpm' from --hint."
     ),
     bar_align: bool = typer.Option(True, "--bar-align/--no-bar-align", help=_BAR_ALIGN_HELP),
+    correct: bool = typer.Option(True, "--correct/--no-correct", help=_CORRECT_HELP),
+    key: str | None = typer.Option(None, "--key", help=_KEY_HELP),
+    scale: str | None = typer.Option(None, "--scale", help=_SCALE_HELP),
+    bars: str = typer.Option("auto", "--bars", help=_BARS_HELP),
     instruments: str | None = typer.Option(
         None, "--instruments", help="Comma-separated browser URIs. Overrides session lookup."
     ),
@@ -195,6 +223,10 @@ def record(
             device_id=device,
             tempo=tempo,
             bar_align=bar_align,
+            correct=correct,
+            key=key,
+            scale=scale,
+            bars=bars,
         )
         _emit_or_apply(plan, json_out=json_out, client=client)
 
@@ -207,6 +239,10 @@ def run(
     port: int = typer.Option(9877),
     hint: str | None = typer.Option(None, "--hint"),
     tempo: float | None = typer.Option(None, "--tempo", help="Force tempo in BPM (skips detection)."),
+    correct: bool = typer.Option(True, "--correct/--no-correct", help=_CORRECT_HELP),
+    key: str | None = typer.Option(None, "--key", help=_KEY_HELP),
+    scale: str | None = typer.Option(None, "--scale", help=_SCALE_HELP),
+    bars: str = typer.Option("auto", "--bars", help=_BARS_HELP),
     instruments: str | None = typer.Option(None, "--instruments"),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
@@ -219,6 +255,10 @@ def run(
             instruments_override=_parse_instruments(instruments),
             device_id=device,
             tempo=tempo,
+            correct=correct,
+            key=key,
+            scale=scale,
+            bars=bars,
         )
         _emit_or_apply(plan, json_out=json_out, client=client)
 
@@ -229,6 +269,10 @@ def dry_run(
     device: str = typer.Option(_DEFAULT_DEVICE, "--device", help=_DEVICE_HELP),
     hint: str | None = typer.Option(None, "--hint"),
     tempo: float | None = typer.Option(None, "--tempo", help="Force tempo in BPM (skips detection)."),
+    correct: bool = typer.Option(True, "--correct/--no-correct", help=_CORRECT_HELP),
+    key: str | None = typer.Option(None, "--key", help=_KEY_HELP),
+    scale: str | None = typer.Option(None, "--scale", help=_SCALE_HELP),
+    bars: str = typer.Option("auto", "--bars", help=_BARS_HELP),
     instruments: str | None = typer.Option(None, "--instruments"),
     json_out: bool = typer.Option(False, "--json", help="Echo the Plan as JSON to stdout."),
 ) -> None:
@@ -247,6 +291,10 @@ def dry_run(
         instruments_override=_parse_instruments(instruments),
         device_id=device,
         tempo=tempo,
+        correct=correct,
+        key=key,
+        scale=scale,
+        bars=bars,
     )
     _emit_or_apply(plan, json_out=json_out, client=None)
 
@@ -316,6 +364,10 @@ def transcribe_clip(
     hint: str | None = typer.Option(None, "--hint"),
     tempo: float | None = typer.Option(None, "--tempo"),
     bar_align: bool = typer.Option(True, "--bar-align/--no-bar-align", help=_BAR_ALIGN_HELP),
+    correct: bool = typer.Option(True, "--correct/--no-correct", help=_CORRECT_HELP),
+    key: str | None = typer.Option(None, "--key", help=_KEY_HELP),
+    scale: str | None = typer.Option(None, "--scale", help=_SCALE_HELP),
+    bars: str = typer.Option("auto", "--bars", help=_BARS_HELP),
     instruments: str | None = typer.Option(None, "--instruments"),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
@@ -354,6 +406,10 @@ def transcribe_clip(
             device_id=device,
             tempo=tempo,
             bar_align=bar_align,
+            correct=correct,
+            key=key,
+            scale=scale,
+            bars=bars,
         )
         _emit_or_apply(plan, json_out=json_out, client=client)
 
