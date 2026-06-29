@@ -114,17 +114,40 @@ The prebuilt panel wires Generate / duration / count-in / hint / **kit dropdown
 > that has it (`repo <path>` message to `node.script`).
 
 ## Message reference (inlet → script)
-`repo <path>` · `uv <path>` · `duration <s>` · `countin <s>` · `tempo <bpm>` ·
-`hint <text…>` · `list_kits` · `kit_index <i>` · `kit_uri <uri>` · `generate` ·
-`cancel`
+`repo <path>` · `uv <path>` · `device <id>` · `duration <s>` · `countin <s>` ·
+`tempo <bpm>` · `hint <text…>` · `list_kits` · `kit_index <i>` · `kit_uri <uri>` ·
+`list_inputs` · `input_index <i>` · `input <i>` · `file <path>` ·
+`transcribe_clip` · `generate` · `cancel`
 
 ## Outlet reference (script → patch)
 `status <text>` · `busy <0|1>` · `tempo <bpm>` · `rationale <text>` ·
-`done <0|1>` · `error <text>` · `kitmenu clear|append <name>`
+`done <0|1>` · `error <text>` · `kitmenu clear|append <name>` ·
+`inputmenu clear|append <name>`
+
+## Transcribe a clip + pick the mic (no re-recording)
+The Generate button records the system mic. To instead **transcribe a clip you
+already have** — and to choose the input device — add two controls (clone the
+ones that already work; no new object types):
+
+| Control | Object (clone of) | Wire to node.script |
+|---|---|---|
+| **Transcribe Clip** | `live.text` Button (← Generate) | `t transcribe_clip` |
+| **List Inputs** | `live.text` Button (← List Kits) | `t list_inputs` |
+| **Input** dropdown | `live.menu` (← Kit menu) | `prepend input_index` |
+
+Then wire the node.script outlet's `route … inputmenu` branch into the Input
+`live.menu` (it sends `clear`/`append <name>`, same as the kit menu). Select an
+**audio** clip in Live, click **Transcribe Clip** → its sample is transcribed
+and a kit + MIDI clip lands, no mic involved.
+
+> `transcribe_clip` needs the forked `get_selected_clip` bridge command (see
+> [`../bridge/`](../bridge/README.md)). Without it, you can still transcribe a
+> file: send `file <absolute-path>` to `node.script`, or run
+> `mouthflow run "<clip.aif>"` from a terminal.
 
 ## Notes / known limits (MVP)
-- Audio is captured by the CLI (`sounddevice`, system default mic), not through
-  Live's audio engine — so arm/monitor state in Live doesn't affect it yet.
+- Generate captures the CLI mic (`--input` selects which); **Transcribe Clip**
+  reads the selected clip's file instead, bypassing the mic entirely.
 - GUI-spawned processes don't inherit your shell `PATH`; that's why the script
   calls `uv` by absolute path and reads the key from the repo `.env`.
 - The kit list reflects `list-kits`, which currently includes one-shot samples
