@@ -121,6 +121,15 @@ def fit_to_bars(notes, tempo_bpm: float, spec, beats_per_bar: int = 4):
     """
     if spec == "off":
         return notes, None
+    # Normalize a forced bar count; anything unrecognized falls back to auto so a
+    # stray value never raises mid-pipeline.
+    if spec != "auto":
+        try:
+            spec = int(spec)
+            if spec <= 0:
+                spec = "auto"
+        except (TypeError, ValueError):
+            spec = "auto"
     sec_per_bar = beats_per_bar * 60.0 / tempo_bpm if tempo_bpm > 0 else 0.0
     end_s = max((n.time_s + (n.duration_s or 0.0) for n in notes), default=0.0)
     content_bars = end_s / sec_per_bar if sec_per_bar > 0 else 0.0

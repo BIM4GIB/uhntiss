@@ -49,6 +49,37 @@ def test_record_rejects_non_positive_duration():
         capture.record(0)
 
 
+def test_record_until_stop_captures_streamed_blocks(tmp_path, monkeypatch):
+    """`record_until_stop` records streamed blocks until should_stop, then
+    drains the queue — the device's start/stop path."""
+    bs = 4_410  # 100 ms blocks
+
+    class FakeStream:
+        def __init__(self, *, callback, blocksize, **_):
+            self._cb, self._bs = callback, blocksize
+
+        def __enter__(self):
+            for _ in range(3):  # three blocks arrive while "recording"
+                self._cb(np.ones((self._bs, 1), dtype=np.int16), self._bs, None, None)
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+    monkeypatch.setattr(capture.sd, "InputStream", FakeStream)
+
+    calls = {"n": 0}
+
+    def should_stop():  # stop after the first loop read; the rest is drained
+        calls["n"] += 1
+        return calls["n"] > 1
+
+    out = capture.record_until_stop(should_stop, out_path=tmp_path / "s.wav", blocksize=bs)
+    info = sf.info(out)
+    assert info.samplerate == 44_100 and info.channels == 1 and info.subtype == "PCM_16"
+    assert info.frames == 3 * bs  # all three streamed blocks captured
+
+
 def test_from_file_passthrough_when_already_target(tmp_path):
     path = tmp_path / "ok.wav"
     _write_wav(path, 1.0, 44_100, 1, "PCM_16")

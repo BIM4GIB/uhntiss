@@ -231,6 +231,73 @@ def record(
         _emit_or_apply(plan, json_out=json_out, client=client)
 
 
+@app.command("record-stream")
+def record_stream(
+    device: str = typer.Option(_DEFAULT_DEVICE, "--device", help=_DEVICE_HELP),
+    input: int | None = typer.Option(None, "--input", help="Input device index (see `input-devices`)."),
+    host: str = typer.Option("127.0.0.1"),
+    port: int = typer.Option(9877),
+    hint: str | None = typer.Option(None, "--hint"),
+    tempo: float | None = typer.Option(None, "--tempo", help="Force tempo in BPM (else the project tempo)."),
+    bar_align: bool = typer.Option(True, "--bar-align/--no-bar-align", help=_BAR_ALIGN_HELP),
+    correct: bool = typer.Option(True, "--correct/--no-correct", help=_CORRECT_HELP),
+    key: str | None = typer.Option(None, "--key", help=_KEY_HELP),
+    scale: str | None = typer.Option(None, "--scale", help=_SCALE_HELP),
+    bars: str = typer.Option("auto", "--bars", help=_BARS_HELP),
+    instruments: str | None = typer.Option(None, "--instruments"),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    """Record the mic until 'stop' arrives on stdin, then transcribe + apply.
+
+    The device's start/stop button drives this: spawning the command starts
+    recording, writing 'stop' to stdin finishes it. The take's length is the
+    performer's, not a fixed timer; the project tempo is fetched so it fits the
+    grid (like transcribe-clip).
+    """
+    import sys as _sys
+    import threading
+
+    stop = threading.Event()
+
+    def _watch_stdin() -> None:
+        try:
+            for line in _sys.stdin:
+                if line.strip().lower() in ("stop", "q", "quit"):
+                    break
+        except (ValueError, OSError):
+            pass
+        stop.set()  # explicit stop, or stdin closed
+
+    threading.Thread(target=_watch_stdin, daemon=True).start()
+    _log("recording — send 'stop' to finish (or close stdin)")
+    wav = capture.record_until_stop(stop.is_set, input_device=input)
+    _log("stopped — transcribing")
+    with AbletonClient(host, port) as client:
+        if tempo is None:
+            try:
+                session = client.get_session_info()
+                proj = session.get("tempo") if isinstance(session, dict) else None
+                if proj:
+                    tempo = float(proj)
+                    _log(f"using project tempo {tempo:.1f} BPM")
+            except (AbletonError, OSError):
+                pass
+        plan = _run_pipeline(
+            wav,
+            client=client,
+            hint=hint,
+            instruments_override=_parse_instruments(instruments),
+            device_id=device,
+            tempo=tempo,
+            bar_align=bar_align,
+            correct=correct,
+            key=key,
+            scale=scale,
+            bars=bars,
+        )
+        _emit_or_apply(plan, json_out=json_out, client=client)
+
+
 @app.command()
 def run(
     wav: Path = typer.Argument(..., exists=True, readable=True, dir_okay=False),

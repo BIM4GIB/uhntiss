@@ -23,6 +23,13 @@
  *   file <path>            transcribe an existing audio file (explicit path)
  *   transcribe_clip        transcribe the SELECTED Live clip (path via bridge)
  *   generate               run a full take (record -> apply to Live)
+ *   bars <auto|off|4|8|16> fit the clip to a whole bar count (loops on grid)
+ *   correct <0|1>          note correction (scale snap) off/on
+ *   key <C|F#|Bb|...>      force the key for correction ("" = auto-detect)
+ *   scale <major|minor|..> force the scale for correction ("" = auto)
+ *   record_start           begin an open-ended mic recording
+ *   record_stop            finish recording -> transcribe + apply
+ *   record <0|1>           toggle form of record_start/record_stop
  *   cancel                 kill an in-flight run
  *
  * Outlet messages ([node.script] -> patch):
@@ -52,11 +59,28 @@ const state = {
   kitUri: "",
   input: null, // input device index for record (null = system default)
   countin: 3,
+  bars: "auto", // fit clip to bars: auto | off | 4 | 8 | 16
+  correct: 1, // note correction (scale snap) on/off
+  key: "", // force key for correction (e.g. "C", "F#"); "" = auto-detect
+  scale: "", // force scale (major|minor|...); "" = auto
 };
+
+// The pitched note-correction + bar-fit flags shared by every pipeline call.
+function correctionFlags() {
+  const a = [];
+  if (state.bars) a.push("--bars", String(state.bars));
+  if (!Number(state.correct)) a.push("--no-correct");
+  if (state.key) a.push("--key", String(state.key));
+  if (state.scale) a.push("--scale", String(state.scale));
+  return a;
+}
 
 let kits = []; // cached [{name, uri}] from list_kits
 let inputs = []; // cached [{index, name}] from list_inputs
 let child = null; // in-flight process
+let inFlight = false; // a run is initiated (covers the count-in window before child exists)
+let recording = false; // an open-ended record-stream is actively capturing (pre-stop)
+let countinTimer = null; // pending count-in setTimeout, so cancel can clear it
 
 function status(msg) {
   Max.outlet("status", String(msg));
@@ -114,6 +138,8 @@ function runCli(args, { onStdout, onLine, onDone }) {
 // Shared completion handler for any pipeline run (record or file transcribe).
 function onPipelineDone(code, stdout, errTail) {
   child = null;
+  inFlight = false;
+  recording = false;
   Max.outlet("busy", 0);
   if (code === 0) {
     try {
@@ -134,19 +160,22 @@ function onPipelineDone(code, stdout, errTail) {
 }
 
 function generate() {
-  if (child) {
+  if (child || inFlight) {
     status("a take is already running — cancel it first");
     return;
   }
+  inFlight = true; // gate other starts immediately, including during the count-in
   const args = ["record", "--duration", String(state.duration), "--device", state.device, "--json"];
   if (state.input != null) args.push("--input", String(state.input));
   if (state.hint) args.push("--hint", state.hint);
   if (state.tempo) args.push("--tempo", String(state.tempo));
   if (state.kitUri) args.push("--instruments", state.kitUri);
+  args.push(...correctionFlags());
 
   Max.outlet("busy", 1);
 
   const launch = () => {
+    countinTimer = null;
     status(`recording ${state.duration}s — beatbox now!`);
     child = runCli(args, { onLine: (line) => status(line), onDone: onPipelineDone });
   };
@@ -157,10 +186,11 @@ function generate() {
   if (n <= 0) return launch();
   let i = n;
   const tick = () => {
+    if (!inFlight) return; // cancelled during the count-in
     if (i > 0) {
       status(`get ready… ${i}`);
       i -= 1;
-      setTimeout(tick, 1000);
+      countinTimer = setTimeout(tick, 1000);
     } else {
       launch();
     }
@@ -175,13 +205,15 @@ function transcribeFile(path) {
     status("no clip path — select an audio clip in Live first");
     return;
   }
-  if (child) {
+  if (child || inFlight) {
     status("busy — cancel first");
     return;
   }
+  inFlight = true;
   const args = ["run", path, "--device", state.device, "--json"];
   if (state.hint) args.push("--hint", state.hint);
   if (state.kitUri) args.push("--instruments", state.kitUri);
+  args.push(...correctionFlags());
   Max.outlet("busy", 1);
   status(`transcribing clip (${state.device})…`);
   child = runCli(args, { onLine: (line) => status(line), onDone: onPipelineDone });
@@ -190,16 +222,60 @@ function transcribeFile(path) {
 // Transcribe the clip currently SELECTED in Live (path fetched by the CLI from
 // the forked bridge). One button, no path wrangling in the patch.
 function transcribeClip() {
-  if (child) {
+  if (child || inFlight) {
     status("busy — cancel first");
     return;
   }
+  inFlight = true;
   const args = ["transcribe-clip", "--device", state.device, "--json"];
   if (state.hint) args.push("--hint", state.hint);
   if (state.kitUri) args.push("--instruments", state.kitUri);
+  args.push(...correctionFlags());
   Max.outlet("busy", 1);
   status(`transcribing selected clip (${state.device})…`);
   child = runCli(args, { onLine: (line) => status(line), onDone: onPipelineDone });
+}
+
+// Start/stop recording: spawn `record-stream` (open-ended mic capture) on start;
+// write "stop" to its stdin on stop, which finishes the take and transcribes.
+// Replaces the fixed-duration timer with a performer-controlled length.
+function recordStart() {
+  if (child || inFlight) {
+    status("busy — stop or cancel the current take first");
+    return;
+  }
+  inFlight = true;
+  recording = true;
+  const args = ["record-stream", "--device", state.device, "--json"];
+  if (state.input != null) args.push("--input", String(state.input));
+  if (state.hint) args.push("--hint", state.hint);
+  if (state.tempo) args.push("--tempo", String(state.tempo));
+  if (state.kitUri) args.push("--instruments", state.kitUri);
+  args.push(...correctionFlags());
+  Max.outlet("busy", 1);
+  status("● recording — hit Stop when done");
+  child = runCli(args, { onLine: (line) => status(line), onDone: onPipelineDone });
+}
+
+// Stop is only meaningful while actively recording. Once stopped we're in the
+// transcribe phase — further stops / toggle-bounces are ignored so they can't
+// abort the in-flight pipeline. Killing only happens via the cancel handler.
+function recordStop() {
+  if (!recording || !child) {
+    status(inFlight ? "finishing…" : "not recording");
+    return;
+  }
+  recording = false; // -> transcribe phase; further record_stop is a no-op
+  if (child.stdin && child.stdin.writable) {
+    status("■ stopped — transcribing…");
+    try {
+      child.stdin.write("stop\n");
+    } catch (e) {
+      status("stop failed — use Cancel");
+    }
+  } else {
+    status("stop failed — use Cancel");
+  }
 }
 
 function listInputs() {
@@ -278,10 +354,32 @@ Max.addHandler("file", (...a) => transcribeFile(a.join(" ").trim()));
 // transcribe the selected clip (CLI fetches its path from the forked bridge)
 Max.addHandler("transcribe_clip", transcribeClip);
 Max.addHandler("generate", generate);
+// pitched note-correction + bar-fit controls
+Max.addHandler("bars", (...a) => {
+  // clamp the free-text field so a typo can't reach the CLI / raise downstream
+  const v = a.join(" ").trim().toLowerCase();
+  state.bars = ["auto", "off", "4", "8", "16"].includes(v) ? v : "auto";
+});
+Max.addHandler("correct", (v) => (state.correct = Number(v) ? 1 : 0));
+Max.addHandler("key", (...a) => (state.key = a.join(" ").trim()));
+Max.addHandler("scale", (...a) => (state.scale = a.join(" ").trim()));
+// start/stop recording (performer-controlled length)
+Max.addHandler("record_start", recordStart);
+Max.addHandler("record_stop", recordStop);
+// a single toggle: 1 -> start, 0 -> stop
+Max.addHandler("record", (v) => (Number(v) ? recordStart() : recordStop()));
 Max.addHandler("cancel", () => {
+  if (countinTimer) {
+    clearTimeout(countinTimer); // a count-in was pending; never let it launch
+    countinTimer = null;
+  }
   if (child) {
     child.kill();
     child = null;
+  }
+  if (inFlight || recording) {
+    inFlight = false;
+    recording = false;
     Max.outlet("busy", 0);
     status("cancelled");
   }
