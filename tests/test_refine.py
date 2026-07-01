@@ -48,6 +48,19 @@ def test_correct_notes_forced_key_snaps_accidentals():
     assert label == "C major"
 
 
+def test_correct_notes_keeps_confident_out_of_scale_note():
+    # F#4 is out of C major. A confident note is trusted (kept); an uncertain
+    # one is snapped. This is the fix for correction corrupting a clearly-hummed
+    # chromatic bass note (e.g. a confident E snapped down to D#).
+    confident = [NoteEvent(0.0, 66, 90, 0.5, confidence=0.95)]
+    out, _ = correct_notes(confident, key="C", scale="major")
+    assert out[0].midi_note == 66  # kept
+
+    uncertain = [NoteEvent(0.0, 66, 90, 0.5, confidence=0.4)]
+    out, _ = correct_notes(uncertain, key="C", scale="major")
+    assert out[0].midi_note in (65, 67)  # snapped to F or G
+
+
 def test_correct_notes_preserves_octave():
     out, _ = correct_notes(_notes([73]), key="C", scale="major")  # C#5 -> C5
     assert out[0].midi_note == 72

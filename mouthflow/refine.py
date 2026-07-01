@@ -64,7 +64,9 @@ def _pitch_class_histogram(notes) -> np.ndarray:
     hist = np.zeros(12)
     for n in notes:
         weight = n.duration_s if (n.duration_s and n.duration_s > 0) else 0.1
-        hist[n.midi_note % 12] += weight
+        # Confident notes define the key; uncertain ones shouldn't sway it.
+        conf = n.confidence if n.confidence is not None else 1.0
+        hist[n.midi_note % 12] += weight * conf
     return hist
 
 
@@ -93,9 +95,15 @@ def snap_to_scale(midi: int, tonic: int, intervals) -> int:
     return min((base - 12, base, base + 12), key=lambda m: abs(m - midi))
 
 
-def correct_notes(notes, *, key: str | None = None, scale: str | None = None):
+def correct_notes(notes, *, key: str | None = None, scale: str | None = None, keep_confident: float = 0.75):
     """Snap notes to a scale. Auto-detect the key unless ``key`` is forced.
-    ``scale`` overrides the mode (e.g. 'dorian'). Returns ``(new_notes, label)``."""
+    ``scale`` overrides the mode (e.g. 'dorian').
+
+    Only notes pyin is UNSURE about are snapped: a note whose ``confidence`` is
+    >= ``keep_confident`` is left as the performer pitched it. Basslines are
+    often chromatic, so forcing every note into one scale corrupts the clearly-
+    articulated notes; nudging only the wobbly ones fixes pitch without
+    rewriting the line. Returns ``(new_notes, label)``."""
     if not notes:
         return notes, None
     if key is not None:
@@ -105,7 +113,13 @@ def correct_notes(notes, *, key: str | None = None, scale: str | None = None):
         tonic, det_mode = detect_key(notes)
         mode = scale or det_mode
     intervals = SCALES.get(mode, SCALES["major"])
-    out = [replace(n, midi_note=snap_to_scale(n.midi_note, tonic, intervals)) for n in notes]
+    out = []
+    for n in notes:
+        confident = n.confidence is not None and n.confidence >= keep_confident
+        if confident:
+            out.append(n)  # trust a clearly-pitched note over the scale guess
+        else:
+            out.append(replace(n, midi_note=snap_to_scale(n.midi_note, tonic, intervals)))
     return out, f"{_PC_TO_NAME[tonic]} {mode}"
 
 

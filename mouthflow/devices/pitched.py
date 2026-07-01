@@ -37,6 +37,8 @@ class VoiceConfig:
     merge_gap_s: float = 0.10   # bridge unvoiced gaps (breaths) up to this long
     min_stable_s: float = 0.08  # a pitch change must hold this long to start a new
     #                             note — absorbs vibrato wobble + glide pass-through
+    min_confidence: float = 0.2  # drop notes whose mean pyin voiced-prob is below
+    #                              this (spurious attack/breath blips)
 
 
 class PitchedTranscriber:
@@ -70,7 +72,7 @@ class PitchedTranscriber:
         merge_gap_frames = max(1, int(cfg.merge_gap_s * sr / _HOP))
 
         segments = self._segment(stones, merge_gap_frames)
-        hits = self._segments_to_notes(segments, times, rms, tempo_bpm, merge_gap_frames)
+        hits = self._segments_to_notes(segments, times, rms, voiced_prob, tempo_bpm, merge_gap_frames)
 
         bars = len(y) / sr * (tempo_bpm / 60.0) / 4.0
 
@@ -177,8 +179,9 @@ class PitchedTranscriber:
         close(cur)
         return segments
 
-    def _segments_to_notes(self, segments, times, rms, tempo_bpm, merge_gap_frames):
+    def _segments_to_notes(self, segments, times, rms, voiced_prob, tempo_bpm, merge_gap_frames):
         cfg = self.cfg
+        vprob = np.nan_to_num(voiced_prob)
 
         # Snap each segment's pitch, then merge adjacent same-pitch segments
         # split only by a single-frame median-smoothing flip or a tiny gap.
@@ -199,6 +202,9 @@ class PitchedTranscriber:
             dur = end_t - start_t
             if dur < cfg.min_note_s:
                 continue
+            conf = float(np.mean(vprob[start_i : end_i + 1])) if end_i >= start_i else 0.0
+            if conf < cfg.min_confidence:
+                continue  # spurious attack/breath blip pyin isn't sure about
             seg_rms = float(np.mean(rms[start_i : end_i + 1]))
             velocity = signal.velocity_from_rms(seg_rms)
             start_q = signal.quantise(start_t, tempo_bpm, division=cfg.division)
@@ -208,6 +214,7 @@ class PitchedTranscriber:
                     midi_note=int(pitch),
                     velocity=velocity,
                     duration_s=float(dur),
+                    confidence=round(conf, 3),
                 )
             )
         notes.sort(key=lambda nt: (nt.time_s, nt.midi_note))
