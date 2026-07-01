@@ -29,6 +29,7 @@ class NoteEvent:
     midi_note: int
     velocity: int
     duration_s: float | None = None
+    confidence: float | None = None  # pitch confidence 0-1 (pyin voiced-prob); None for drums
 
 
 # Drums historically used ``DrumHit``; it's just a note event without a duration.

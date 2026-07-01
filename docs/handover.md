@@ -1,6 +1,8 @@
 # Mouthflow — session handover
 
-Last updated: 2026-06-26. Read this first when picking up work.
+Last updated: 2026-07-01. Read this first when picking up work.
+(Architecture overview for newcomers: [`ARCHITECTURE.md`](ARCHITECTURE.md);
+honest gap list: [`KNOWN-LIMITATIONS.md`](KNOWN-LIMITATIONS.md).)
 
 ## TL;DR
 Mouthflow is now an **umbrella product**: a shared "voice → MIDI → Ableton"
@@ -10,10 +12,25 @@ engine with a registry of per-voice **devices**. Four voices ship today —
 voice is captured in a `DeviceSpec`. The drum path is **byte-identical** to
 pre-refactor (guarded by `eval/run_eval.py`).
 
-## Pipeline (unchanged shape)
-`mic/WAV → capture → classify (router) → transcribe (per-device) → plan (Claude
-picks an instrument) → execute (JSON/TCP :9877 → ableton-mcp → Live)`. Only
-`plan` calls an LLM. CLI spawns, runs, exits.
+## Pipeline
+`mic/WAV → capture → classify (router) → transcribe (per-device) → refine
+(pitched-only: note correction + bar-fit) → plan (Claude picks an instrument)
+→ execute (JSON/TCP :9877 → ableton-mcp → Live)`. Only `plan` calls an LLM.
+CLI spawns, runs, exits.
+
+**`mouthflow/refine.py`** (new stage, pitched voices only; drums pass through):
+- **Note correction** — auto-detects the key (Krumhansl-Schmuckler,
+  confidence-weighted) or takes `--key`/`--scale`, then scale-snaps **only
+  notes pyin was unsure about** (`confidence < keep_confident=0.75`).
+  Confident notes are trusted as sung — basslines are chromatic, and forcing
+  one scale corrupted clearly-hummed notes (found on a real take: a
+  0.99-confidence E2 was being "corrected" to D#2). `--no-correct` bypasses.
+- **Fit-to-bars** — `--bars auto|off|4|8|16`: sizes the clip to a whole bar
+  count (auto rounds *up* so nothing is cut), clamps note overhang, and forces
+  the plan's `length_bars` so the clip loops cleanly on the project grid.
+- Pitched notes below `min_confidence=0.2` are dropped as breath/attack blips
+  (`devices/pitched.py`), and `NoteEvent.confidence` carries pyin's per-note
+  voiced-probability through the pipeline.
 
 Pick the voice with `--device drums|bass|lead|drone` (or `--device auto` to let
 the router classify by ear). Default is `drums`.
@@ -48,7 +65,11 @@ the router classify by ear). Default is `drums`.
 - **Pitched (bass/lead):** `librosa.pyin` → continuous f0 → segment by held
   semitone-change + gap (NOT onsets — they fire spuriously on sustained tones),
   merge same-pitch fragments, octave-snap. `signal.write_midi(channel=0)` with
-  real durations. Bass vs lead = a `VoiceConfig` row only.
+  real durations. Bass vs lead = a `VoiceConfig` row only. Segmentation uses
+  **hysteresis** (`min_stable_s`, default 80 ms): a pitch change must hold to
+  start a new note, so natural vibrato/glides don't shatter one note into many.
+  Known limit: pyin's analysis window (bass 4096 ≈ 93 ms) blurs notes faster
+  than ~1/8 in the bass register — inherent low-freq trade-off, not a bug.
 - **Drone:** stable-pitch regions → one dominant region = held note, several =
   a chord (notes enter in sequence, all sustain to the bar-snapped clip end and
   ring together). Clip loops in Live → continuous drone; movement comes from the
@@ -61,15 +82,24 @@ the router classify by ear). Default is `drums`.
    `list-kits --device <voice>` returns real loadable
    `query:Sounds#<folder>:FileId_NNNNN` URIs. (A `doctor` per-category probe is
    still a nice-to-have but not blocking.)
-2. **Install + verify the drone automation bridge.** The contour→automation
-   needs the forked Remote Script command `set_clip_envelope` — see `bridge/`
-   (source + install + LOM runtime-verification checklist). Without it, drone
-   still plays as a held note/chord (`apply_plan` logs "automation skipped").
-3. **Pitched eval + tonal mimic (needs recorded data).** Generalize
-   `eval/run_eval.py` with note-level P/R/F1 + octave-error via `mir_eval`
-   (dev dep), and extend `mimic/take.py` with a tonal reference + pitch scorer
-   so labeled pitched ground truth can be gathered. Infrastructure can be built
-   now; scoring needs the user to record tonal mimic takes.
+2. **Bridge fork — INSTALLED on the dev Mac (2026-06-29), half-verified.**
+   Both commands are spliced into the installed Remote Script:
+   `get_selected_clip` is **verified live** (drives `transcribe-clip` and the
+   in-device Transcribe Clip button, round-trip confirmed on a real clip);
+   `set_clip_envelope` compiles + passed adversarial review but its **LOM
+   behaviour is runtime-unverified** — first real drone-automation run should
+   follow the checklist in `bridge/README.md`. On a stock ableton-mcp install
+   both features are absent: `transcribe-clip` fails with a clear error, drone
+   degrades to a held note/chord (`apply_plan` logs "automation skipped").
+   Remote Script edits need a **full Live restart** (Control-Surface toggle
+   reuses the cached module).
+3. **Pitched eval + tonal mimic (foundation built; needs recorded data).**
+   `eval/note_eval.py` scores a take against a reference melody grid
+   (`mimic/<name>.notegrid.json`) — note P/R/F1 + octave-error, with onset
+   alignment; synthetic self-test passes (bass F1 1.0). Still TODO: place
+   hum-along reference melody clips in Live (like the drum references) so the
+   user can record bass/lead takes, then tune octave-continuity / segmentation
+   on real voice (deliberately NOT guessed in code — unsafe without real data).
 4. **Drums onset/tempo** — PR #6's octave-correct tempo + phase-aware
    quantization is **merged and integrated into the drum device**
    (`devices/drum/tempo.py`, `devices/drum/transcriber.py`); confidence-gated
@@ -81,10 +111,12 @@ the router classify by ear). Default is `drums`.
 cd ~/UhnTiss/uhntiss && source .env        # plan.py reads ANTHROPIC_API_KEY
 uv run mouthflow doctor                     # preflight: key, :9877 socket, kit discovery
 uv run mouthflow record --device bass --duration 8     # mic → Live (Ableton + AbletonMCP on)
+uv run mouthflow record-stream --device bass            # open-ended take; 'stop' on stdin ends it
+uv run mouthflow transcribe-clip --device bass          # selected Live clip → Live (needs bridge fork)
 uv run mouthflow dry-run clip.wav --device drone --json # pipeline only, prints Plan
 uv run python -m eval.run_eval              # drum oracle (class acc must stay ~0.97)
-uv run pytest -q                            # 55 tests
-python m4l/generate.py                       # regenerate bass/lead/drone M4L panels
+uv run pytest -q                            # full suite — must all pass
+python m4l/generate.py --install            # regenerate panels + sync into User Library/Devices
 ```
 
 ## The drum classifier / mimic harness (unchanged, now under devices/drum)
@@ -98,10 +130,35 @@ python m4l/generate.py                       # regenerate bass/lead/drone M4L pa
   training, still the regression oracle for the drum path.
 
 ## In-Ableton UI (Max for Live)
-- `m4l/Mouthflow.amxd` (proven drums panel) + generated
-  `Mouthflow{Bass,Lead,Drone}.amxd`. All share `m4l/mouthflow.js`, which
-  forwards `--device <id>`. `m4l/generate.py` regenerates the per-voice panels
-  (container round-trip is verified; **smoke-test generated panels in Live**).
+- `m4l/Mouthflow.amxd` (drums panel) + generated `Mouthflow{Bass,Lead,Drone}.amxd`.
+  Each panel loads a per-voice glue copy (`mouthflow_<voice>.js`) with the
+  voice **baked into the JS default** (not loadbang — that races Node-for-Max
+  startup). The glue subprocess-spawns `uv run mouthflow …`, so Python changes
+  reach the device with **no regen**.
+- `m4l/generate.py` **injects the in-device controls** into the pitched
+  panels: Transcribe Clip, record_start/record_stop (open-ended takes via
+  `record-stream`), and bars / correct (default ON) / key / scale fields.
+  `--install` syncs panels + glue + `package.json` into
+  `~/Music/Ableton/User Library/Devices` (with `.bak` backups) — required,
+  because Live loads from there and `node.script` resolves the glue **next to
+  the .amxd**.
+- **Layout gotcha (verified on-screen):** Live's device strip is fixed-height
+  (~196 px) and silently clips anything below — new controls must go in a
+  **column to the right**, never stacked underneath. A fresh browser drag loads
+  the current file; no Live restart needed for panel changes.
+
+## Proven vs unverified (honest surface for reviewers)
+| capability | offline tests | verified in Live | notes |
+|---|---|---|---|
+| drum transcribe (classify/tempo/quantize) | ✅ (regression oracle) | ✅ many sessions | most mature voice |
+| bass transcribe + refine (correct/bar-fit) | ✅ | ✅ real takes (2026-06/07) | confidence-gating validated on a real take |
+| lead transcribe | ✅ synthetic only | ⚠️ not yet on real voice | config clone of bass |
+| drone held note/chord | ✅ | ⚠️ lightly | — |
+| drone loudness→macro automation | client+serialization only | ❌ runtime-unverified | needs `set_clip_envelope` LOM check |
+| `transcribe-clip` (bridge fork) | client tested | ✅ round-trip verified | needs the fork spliced |
+| `record-stream` start/stop | ✅ (mocked stream) | ⚠️ via device buttons, lightly | — |
+| M4L panels (bass/lead/drone) | container+JS validated | ✅ render + controls verified on-screen | drums panel long-proven |
+| `--device auto` router | heuristic unit-tested | ❌ no labelled routing set | can misroute hummed chords |
 
 ## Known limits / gotchas
 - **Browser-category strings + fallback URIs** for the new voices are
@@ -128,6 +185,7 @@ python m4l/generate.py                       # regenerate bass/lead/drone M4L pa
 | `mouthflow/devices/pitched.py` | bass + lead transcriber (pyin) |
 | `mouthflow/devices/{bass,lead}/` | device specs + prompts |
 | `mouthflow/devices/drone/` | drone transcriber + contour + device + prompt |
+| `mouthflow/refine.py` | pitched post-processing: note correction (confidence-gated scale snap) + fit-to-bars/loop |
 | `mouthflow/classify.py` | intent router (`--device auto`) |
 | `mouthflow/plan.py` | Claude planner (per-device prompt + summary) |
 | `mouthflow/execute.py` | ableton-mcp socket client, `list_instruments`, `set_clip_envelope` |

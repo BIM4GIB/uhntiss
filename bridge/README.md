@@ -1,4 +1,21 @@
-# Bridge fork — `set_clip_envelope`
+# Bridge fork — extra Remote Script commands
+
+Two optional commands the stock ahujasid/ableton-mcp Remote Script lacks. Splice
+each into the installed script (see install steps below); both are reference
+sources here. `get_selected_clip` is verified at runtime in Live;
+`set_clip_envelope` compiles and passed review but is **runtime-unverified** —
+first real use should follow the checklist below.
+
+## `get_selected_clip` — transcribe the clip you've selected
+
+So `mouthflow transcribe-clip` can read the **selected** clip's audio file and
+transcribe it directly (no mic, no acoustic re-recording, no file-hunting).
+Source: [`get_selected_clip.py`](get_selected_clip.py). Returns
+`{name, file_path, is_audio}` for Live's detail-view clip. Without it,
+`transcribe-clip` exits with "is the forked bridge installed?" — and you can
+still transcribe by passing a path: `mouthflow run "<clip.aif>"`.
+
+## `set_clip_envelope` — drone contour automation
 
 The drone device renders the performance's **loudness contour** as clip
 automation on a device macro (the "contour → movement" half of the ambient

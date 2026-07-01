@@ -20,7 +20,9 @@ from mouthflow.schemas import DrumHit, Transcription
 
 
 class DrumTranscriber:
-    def transcribe(self, wav_path: Path, *, tempo: float | None = None) -> Transcription:
+    def transcribe(
+        self, wav_path: Path, *, tempo: float | None = None, bar_align: bool = False
+    ) -> Transcription:
         import librosa
 
         y, sr = librosa.load(str(wav_path), sr=signal._SR, mono=True)
@@ -30,7 +32,7 @@ class DrumTranscriber:
         kept: list[tuple[float, int, int]] = []  # (time_s, midi_note, velocity)
         for t in signal.detect_onsets(y, sr):
             features = signal.features_at(y, sr, t)
-            note = _classify(features)
+            note = _classify(y, sr, t, features)
             if note == DROP:
                 continue
             kept.append((float(t), note, signal.velocity_from_rms(features["rms"])))
@@ -51,7 +53,11 @@ class DrumTranscriber:
             if tempo is None:
                 # Sharpen the octave-correct estimate to sub-BPM.
                 tempo_bpm = drum_tempo._refine_tempo(kept_times, tempo_bpm)
-            phase = drum_tempo._grid_phase(kept_times, tempo_bpm)
+            # bar_align snaps to the project's bar grid (phase 0) for a tighter
+            # fit; otherwise the grid is phased to the performer's lead-in,
+            # which preserves feel but sits off Live's downbeat.
+            if not bar_align:
+                phase = drum_tempo._grid_phase(kept_times, tempo_bpm)
 
         hits: list[DrumHit] = []
         seen: set[tuple[int, int]] = set()

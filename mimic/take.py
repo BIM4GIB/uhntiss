@@ -97,16 +97,43 @@ def gen(name, bpm, bars, preset):
     print(f"{name}: {len(buf)/SR:.1f}s, {len(grid)} notes {dict(Counter(l for _,l in grid))} @ {bpm} BPM ({preset})")
 
 
-def rec(name):
+def list_devices():
     import sounddevice as sd
 
+    print(sd.query_devices())
+    di, do = sd.default.device
+    print(f"\ndefault input={di} output={do}")
+    print("record through your real beatbox mic with:  rec --name X --input <N>")
+
+
+def rec(name, input_dev=None, output_dev=None):
+    import numpy as np
+    import sounddevice as sd
+
+    if input_dev is not None or output_dev is not None:
+        cur_in, cur_out = sd.default.device
+        sd.default.device = (
+            input_dev if input_dev is not None else cur_in,
+            output_dev if output_dev is not None else cur_out,
+        )
     ref, sr = sf.read(HERE / f"{name}.reference.wav")
     if ref.ndim == 1:
         ref = ref.reshape(-1, 1)
     out = sd.playrec(ref, samplerate=sr, channels=1)
     sd.wait()
+    out = np.asarray(out).reshape(-1)
     sf.write(HERE / f"{name}.mimic.wav", out, sr, subtype="PCM_16")
-    print(f"OK recorded {len(out)/sr:.1f}s -> {name}.mimic.wav")
+
+    # Level check — the classifier learns the timbre AT THIS LEVEL, so record at
+    # the same gain/distance you'll actually beatbox at, and keep it healthy.
+    peak = float(np.max(np.abs(out)))
+    rms = float(np.sqrt(np.mean(out**2)))
+    warn = ""
+    if peak < 0.08:
+        warn = "   ** too quiet — raise mic gain or get closer (your Live takes were this quiet)"
+    elif peak > 0.99:
+        warn = "   ** clipping — lower the gain"
+    print(f"OK recorded {len(out)/sr:.1f}s -> {name}.mimic.wav | peak {peak:.2f} rms {rms:.3f}{warn}")
 
 
 def _match(onsets, gt, delta, tol=0.08):
@@ -151,8 +178,8 @@ def score(name, clip):
     for o, j in pairs:
         true = gl[j]
         f = feats[o]
-        labeled.append({"x": [f[k] for k in ["centroid", "sub100_ratio", "decay_s", "zcr", "flatness"]], "y": true})
-        rows.append((true, PITCH2LAB[T._classify(f)], PITCH2LAB[T._classify_heuristic(f)]))
+        labeled.append({"y": true})  # features are re-extracted from grids at train time
+        rows.append((true, PITCH2LAB[T._classify(yf, T._SR, o, f)], PITCH2LAB[T._classify_heuristic(f)]))
     n = len(rows)
     mc = sum(1 for t, m, h in rows if m == t)
     hc = sum(1 for t, m, h in rows if h == t)
@@ -184,17 +211,24 @@ def score(name, clip):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["gen", "rec", "score"])
-    ap.add_argument("--name", required=True)
+    ap.add_argument("cmd", choices=["gen", "rec", "score", "devices"])
+    ap.add_argument("--name", default=None)
     ap.add_argument("--bpm", type=int, default=90)
     ap.add_argument("--bars", type=int, default=4)
     ap.add_argument("--preset", default="boombap", choices=list(PRESETS))
     ap.add_argument("--clip", default=None)
+    ap.add_argument("--input", type=int, default=None, help="input device index (see `devices`)")
+    ap.add_argument("--output", type=int, default=None, help="output device index (headphones)")
     a = ap.parse_args()
+    if a.cmd == "devices":
+        list_devices()
+        return
+    if not a.name:
+        ap.error("--name is required")
     if a.cmd == "gen":
         gen(a.name, a.bpm, a.bars, a.preset)
     elif a.cmd == "rec":
-        rec(a.name)
+        rec(a.name, a.input, a.output)
     else:
         score(a.name, a.clip or a.name)
 

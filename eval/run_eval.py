@@ -7,7 +7,7 @@ truth and ``*.json`` metadata, runs ``transcribe_drums``, and reports:
 - Drum-class top-1 accuracy (over matched onsets)
 - Tempo within +/- 3 BPM
 
-Plan metrics require an ANTHROPIC_API_KEY and are skipped without one.
+Fully offline — no Claude calls, no API key needed.
 Taste review is interactive and lives in ``taste_review.py``.
 
 Run: ``uv run python -m eval.run_eval`` from the repo root.

@@ -45,36 +45,33 @@ def _get_model() -> dict | None:
     return _MODEL
 
 
-def _classify(f: dict[str, float]) -> int:
-    """Classify one onset to a GM pitch (or DROP).
+def _classify(audio, sr: int, t: float, f: dict[str, float]) -> int:
+    """Classify the onset at time ``t`` to a GM pitch (or DROP).
 
-    Uses the per-user trained model when present: loudness gates silence, then
-    standardised timbre features match the model (k-NN exemplar vote — handles
-    multi-modal classes like fast vs slow hats — or nearest-centroid). Falls
-    back to the hand-tuned heuristic when no model is available.
+    Uses the per-user k-NN model when present: ``f["rms"]`` gates silence, then
+    the 10-feature ``drum_features`` vector is standardised and matched to the
+    exemplars (vote of the k nearest — handles multi-modal classes like fast vs
+    slow hats). Falls back to the hand-tuned heuristic (which reads ``f``) when
+    no model is available.
     """
     model = _get_model()
     if model is None:
         return _classify_heuristic(f)
     if f["rms"] < model.get("rms_floor", 0.005):
         return DROP
-    mean, std, feats = model["mean"], model["std"], model["features"]
-    z = [(f[k] - mean[j]) / std[j] for j, k in enumerate(feats)]
-    if model.get("type") == "knn":
-        ex, labels, k = model["exemplars"], model["labels"], model.get("k", 5)
-        order = sorted(
-            range(len(ex)),
-            key=lambda i: sum((ex[i][j] - z[j]) ** 2 for j in range(len(z))),
-        )
-        label = Counter(labels[i] for i in order[:k]).most_common(1)[0][0]
-        return int(model["classes"][label])
-    # nearest-centroid
-    best_label, best_d = None, float("inf")
-    for label, c in model["centroids"].items():
-        d = sum((z[j] - c[j]) ** 2 for j in range(len(z)))
-        if d < best_d:
-            best_label, best_d = label, d
-    return int(model["classes"][best_label])
+
+    from mouthflow.devices.drum.features import drum_features
+
+    vec = drum_features(audio, sr, t)
+    mean, std = model["mean"], model["std"]
+    z = [(vec[j] - mean[j]) / std[j] for j in range(len(vec))]
+    ex, labels, k = model["exemplars"], model["labels"], model.get("k", 5)
+    order = sorted(
+        range(len(ex)),
+        key=lambda i: sum((ex[i][j] - z[j]) ** 2 for j in range(len(z))),
+    )
+    label = Counter(labels[i] for i in order[:k]).most_common(1)[0][0]
+    return int(model["classes"][label])
 
 
 def _classify_heuristic(f: dict[str, float]) -> int:

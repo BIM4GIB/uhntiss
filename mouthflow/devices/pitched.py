@@ -35,13 +35,17 @@ class VoiceConfig:
     frame_length: int = 2048    # pyin analysis window; larger for low fmin
     min_note_s: float = 0.08    # drop segments shorter than this
     merge_gap_s: float = 0.10   # bridge unvoiced gaps (breaths) up to this long
+    min_stable_s: float = 0.08  # a pitch change must hold this long to start a new
+    #                             note — absorbs vibrato wobble + glide pass-through
+    min_confidence: float = 0.2  # drop notes whose mean pyin voiced-prob is below
+    #                              this (spurious attack/breath blips)
 
 
 class PitchedTranscriber:
     def __init__(self, config: VoiceConfig) -> None:
         self.cfg = config
 
-    def transcribe(self, wav_path, *, tempo: float | None = None) -> Transcription:
+    def transcribe(self, wav_path, *, tempo: float | None = None, bar_align: bool = False) -> Transcription:
         import librosa
 
         cfg = self.cfg
@@ -68,7 +72,7 @@ class PitchedTranscriber:
         merge_gap_frames = max(1, int(cfg.merge_gap_s * sr / _HOP))
 
         segments = self._segment(stones, merge_gap_frames)
-        hits = self._segments_to_notes(segments, times, rms, tempo_bpm, merge_gap_frames)
+        hits = self._segments_to_notes(segments, times, rms, voiced_prob, tempo_bpm, merge_gap_frames)
 
         bars = len(y) / sr * (tempo_bpm / 60.0) / 4.0
 
@@ -114,43 +118,70 @@ class PitchedTranscriber:
     def _segment(self, stones, merge_gap_frames):
         """Group consecutive same-semitone voiced frames into note segments.
 
-        A segment closes on a held semitone change or a long unvoiced gap.
-        Onsets are deliberately NOT used to split: ``onset_detect`` fires
-        spuriously on a sustained tone, which would shatter one held note into
-        many fragments. Re-articulated same-pitch notes are instead separated
-        by the silence between them (the gap rule) or merged downstream.
+        A segment closes on a *held* semitone change or a long unvoiced gap.
+        The change must persist >= ``min_stable`` frames to split a note — a
+        momentary excursion (a vibrato peak, or a glide passing through a
+        semitone on its way somewhere) is absorbed into the current note
+        instead of spawning a spurious fragment. Onsets are deliberately NOT
+        used to split: ``onset_detect`` fires on a sustained tone, which would
+        shatter one held note. Re-articulated same-pitch notes are separated by
+        the silence between them (the gap rule) or merged downstream.
         """
+        min_stable = max(2, int(self.cfg.min_stable_s * (signal._SR / _HOP)))
         segments: list[dict] = []
         cur: dict | None = None
         gap = 0
+        pend_pitch: int | None = None  # a candidate new pitch, not yet committed
+        pend_start = 0
+        pend_count = 0
 
         def close(seg):
             if seg is not None:
                 segments.append(seg)
 
         for i, stone in enumerate(stones):
-            if stone is not None:
-                if cur is None:
-                    cur = {"start": i, "end": i, "pitches": [stone]}
-                elif stone != _mode(cur["pitches"]):
-                    close(cur)
-                    cur = {"start": i, "end": i, "pitches": [stone]}
-                else:
-                    cur["end"] = i
-                    cur["pitches"].append(stone)
-                gap = 0
-            else:
+            if stone is None:
                 if cur is not None:
                     gap += 1
                     if gap > merge_gap_frames:
                         close(cur)
                         cur = None
                         gap = 0
+                        pend_pitch = None
+                        pend_count = 0
+                continue
+            gap = 0
+            if cur is None:
+                cur = {"start": i, "end": i, "pitches": [stone]}
+                pend_pitch = None
+                pend_count = 0
+            elif stone == _mode(cur["pitches"]):
+                cur["end"] = i
+                cur["pitches"].append(stone)
+                pend_pitch = None
+                pend_count = 0
+            else:
+                # different semitone: count how long it persists before trusting it
+                if stone == pend_pitch:
+                    pend_count += 1
+                else:
+                    pend_pitch = stone
+                    pend_start = i
+                    pend_count = 1
+                if pend_count >= min_stable:
+                    cur["end"] = pend_start - 1  # the new note owns its run
+                    close(cur)
+                    cur = {"start": pend_start, "end": i, "pitches": [stone] * pend_count}
+                    pend_pitch = None
+                    pend_count = 0
+                else:
+                    cur["end"] = i  # absorb the excursion; mode stays put
         close(cur)
         return segments
 
-    def _segments_to_notes(self, segments, times, rms, tempo_bpm, merge_gap_frames):
+    def _segments_to_notes(self, segments, times, rms, voiced_prob, tempo_bpm, merge_gap_frames):
         cfg = self.cfg
+        vprob = np.nan_to_num(voiced_prob)
 
         # Snap each segment's pitch, then merge adjacent same-pitch segments
         # split only by a single-frame median-smoothing flip or a tiny gap.
@@ -171,6 +202,9 @@ class PitchedTranscriber:
             dur = end_t - start_t
             if dur < cfg.min_note_s:
                 continue
+            conf = float(np.mean(vprob[start_i : end_i + 1])) if end_i >= start_i else 0.0
+            if conf < cfg.min_confidence:
+                continue  # spurious attack/breath blip pyin isn't sure about
             seg_rms = float(np.mean(rms[start_i : end_i + 1]))
             velocity = signal.velocity_from_rms(seg_rms)
             start_q = signal.quantise(start_t, tempo_bpm, division=cfg.division)
@@ -180,6 +214,7 @@ class PitchedTranscriber:
                     midi_note=int(pitch),
                     velocity=velocity,
                     duration_s=float(dur),
+                    confidence=round(conf, 3),
                 )
             )
         notes.sort(key=lambda nt: (nt.time_s, nt.midi_note))

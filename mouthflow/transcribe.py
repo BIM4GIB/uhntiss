@@ -56,10 +56,13 @@ def _write_midi(path: Path, hits: list[DrumHit], tempo_bpm: float) -> None:
     signal.write_midi(path, hits, tempo_bpm, channel=9)
 
 
-def transcribe_drums(wav_path: Path, tempo: float | None = None) -> Transcription:
+def transcribe_drums(
+    wav_path: Path, tempo: float | None = None, bar_align: bool = False
+) -> Transcription:
     """Beatbox WAV -> GM drum ``Transcription`` (the drums device).
 
     ``tempo`` forces the BPM (skips detection); otherwise the drum device's
-    octave-correct estimator runs.
+    octave-correct estimator runs. ``bar_align`` snaps to the bar grid (phase 0)
+    for a tighter project fit instead of the performer's lead-in phase.
     """
-    return DrumTranscriber().transcribe(wav_path, tempo=tempo)
+    return DrumTranscriber().transcribe(wav_path, tempo=tempo, bar_align=bar_align)

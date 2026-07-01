@@ -40,7 +40,9 @@ class Transcriber(Protocol):
     honours it; pitched/drone voices accept it for interface uniformity.
     """
 
-    def transcribe(self, wav: Path, *, tempo: float | None = None) -> Transcription: ...
+    def transcribe(
+        self, wav: Path, *, tempo: float | None = None, bar_align: bool = False
+    ) -> Transcription: ...
 
 
 @dataclass(frozen=True)
