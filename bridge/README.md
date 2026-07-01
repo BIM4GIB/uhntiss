@@ -2,7 +2,9 @@
 
 Two optional commands the stock ahujasid/ableton-mcp Remote Script lacks. Splice
 each into the installed script (see install steps below); both are reference
-sources here, verified at runtime in Live.
+sources here. `get_selected_clip` is verified at runtime in Live;
+`set_clip_envelope` compiles and passed review but is **runtime-unverified** —
+first real use should follow the checklist below.
 
 ## `get_selected_clip` — transcribe the clip you've selected
 

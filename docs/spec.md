@@ -1,9 +1,19 @@
 # Mouthflow
 
+> **HISTORICAL DOCUMENT — v0 drums-era vision spec.** This was written before
+> any code existed and is kept for the thesis and design rationale. The project
+> has since shipped as a **4-voice umbrella** (drums / bass / lead / drone)
+> with a device registry, a note-correction/bar-fit stage, a forked Ableton
+> bridge, and Max-for-Live device panels — none of which this spec describes.
+> Component descriptions, the repository layout, CLI surface, and the N=20
+> eval tables below are **out of date**. For the current state see
+> [`ARCHITECTURE.md`](ARCHITECTURE.md), [`handover.md`](handover.md), and
+> [`../eval/README.md`](../eval/README.md).
+
 **A voice-driven arrangement agent for Ableton Live.**
 Beatbox a rhythm, get a drum pattern in your session. That's it.
 
-- **Status:** v0 spec, pre-code
+- **Status:** historical v0 spec (project has since shipped; see banner above)
 - **License:** MIT
 - **Language:** Python 3.11
 - **Platform:** macOS / Linux / Windows
@@ -310,6 +320,11 @@ Taste review is interactive: `eval/taste_review.py` plays both clips back-to-bac
 ---
 
 ## Getting started (first PR)
+
+> **Completed.** This bootstrap sequence was executed long ago (the suite is
+> now 75 tests across every module below). Kept only as a record of the
+> original build order. Do not follow it — see
+> [`handover.md`](handover.md) for how to pick up work today.
 
 For the coding agent picking this up:
 

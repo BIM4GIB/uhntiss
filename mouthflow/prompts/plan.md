@@ -25,8 +25,10 @@ Hard rules:
 
 ## Few-shot examples
 
-> **These are placeholders.** Replace each with a real input/output pair
-> drawn from the 20-clip corpus once it's labelled. The point of a
+> **These are placeholders — a tracked known limitation, not an oversight**
+> (see `docs/KNOWN-LIMITATIONS.md`: the taste layer is unvalidated until real
+> rated examples exist). Replace each with a real input/output pair
+> drawn from the labelled corpus. The point of a
 > few-shot is to show the model your taste — generic examples teach
 > generic taste.
 

@@ -2,7 +2,7 @@
 
 MIT. No CLA.
 
-- Run `uv sync && pytest` before opening a PR.
+- Run `uv sync && uv run pytest` before opening a PR (CI runs the same suite).
 - New corpus clips welcome; see [`docs/corpus.md`](docs/corpus.md).
 - Prompt changes go in `mouthflow/prompts/`, not code.
 

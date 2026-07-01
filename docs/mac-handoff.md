@@ -25,7 +25,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 uv sync
 ```
 
-Sanity check — should be 21 passed:
+Sanity check — the full suite must pass (all offline, no Live or mic needed):
 
 ```bash
 uv run pytest
@@ -72,6 +72,18 @@ Verify from another shell:
 python -c "import socket; s=socket.socket(); s.connect(('127.0.0.1',9877)); print('ok'); s.close()"
 ```
 
+### 3b. (Optional but recommended) Splice in the bridge fork
+
+Two features need Remote Script commands that stock ableton-mcp lacks:
+`transcribe-clip` (transcribe the clip selected in Live — the main clip-based
+workflow) needs `get_selected_clip`, and drone macro automation needs
+`set_clip_envelope`. Splice both into the installed
+`~/Music/Ableton/User Library/Remote Scripts/AbletonMCP/__init__.py` following
+[`bridge/README.md`](../bridge/README.md) (back up first), then **fully restart
+Live** — toggling the Control Surface reuses the cached module and will NOT
+pick up the edit. Without the fork everything else still works; the two
+features fail gracefully with clear messages.
+
 ## 4. Environment
 
 ```bash
@@ -81,37 +93,25 @@ export ANTHROPIC_API_KEY=sk-ant-...
 Put it in your shell profile or a `.env` file you source — just don't
 commit it (`.gitignore` already excludes `.env`).
 
-## 5. Build the corpus (spec step 4)
+## 5. Ground truth: fixtures, mimic takes, and the per-user classifier
 
-This is the blocking dependency for the eval ship gate. Spec wants 20
-clips across tempos 70–160 BPM and styles boom-bap / trap / dnb /
-breakbeat, both clean and sloppy.
-
-For each clip produce the trio:
-
-```
-tests/fixtures/clips/01_basic_4to4.wav
-tests/fixtures/clips/01_basic_4to4.mid
-tests/fixtures/clips/01_basic_4to4.json
-```
-
-- `.wav` — beatbox it, any DAW. Mouthflow normalises to 44.1 kHz /
-  16-bit / mono, so format doesn't matter at input.
-- `.mid` — hand-place the drums you **meant** in Ableton against the
-  audio, export as MIDI. This is your taste made explicit.
-- `.json` — `{"tempo": 92, "style": "boom-bap", "notes": "..."}`. See
-  [`corpus.md`](corpus.md) for the full convention.
-
-Two or three evenings, no shortcuts — this is the ground truth the
-transcriber gets tuned against.
+The tracked corpus is currently **two fixture trios** —
+`tests/fixtures/clips/01_boombap_mimic.*` and `02_bb100.*` (`.wav` + intended
+`.mid` + `.json` metadata; convention in [`corpus.md`](corpus.md)). The
+historical spec's 20-clip plan was superseded: drum quality in practice comes
+from the **per-user k-NN classifier**, trained from mimic takes recorded
+against reference grids (see [`../mimic/README.md`](../mimic/README.md)) via
+`uv run python -m eval.train_classifier` → `mouthflow/drum_model.json`.
+Pitched (bass/lead) ground truth uses `mimic/<name>.notegrid.json` scored by
+`eval/note_eval.py` — recording real tonal takes is a pending next step.
+Expanding both corpora is welcome; N is small and that is a known limitation.
 
 ## 6. Smoke test: dry-run
 
-With one clip in `tests/fixtures/clips/`, verify the pipeline without
-touching Live:
+Verify the pipeline without touching Live:
 
 ```bash
-uv run mouthflow dry-run tests/fixtures/clips/01_basic_4to4.wav \
+uv run mouthflow dry-run tests/fixtures/clips/01_boombap_mimic.wav \
     --instruments "query:Drums#Kit-Core%20808,query:Drums#Kit-Core%20Jazz" \
     --hint "loose and sloppy"
 ```
@@ -135,7 +135,7 @@ uv run mouthflow doctor
 4. Run:
 
 ```bash
-uv run mouthflow run tests/fixtures/clips/01_basic_4to4.wav \
+uv run mouthflow run tests/fixtures/clips/01_boombap_mimic.wav \
     --instruments "query:Drums#Kit-Core%20808"
 ```
 
@@ -158,26 +158,26 @@ The manual test protocol also lives at
 ## 8. Record your own
 
 ```bash
-uv run mouthflow record --duration 10 \
-    --instruments "query:Drums#Kit-Core%20808"
+uv run mouthflow record --duration 10 --device drums   # or bass | lead | drone | auto
+uv run mouthflow record-stream --device bass            # open-ended; type 'stop' to finish
+uv run mouthflow transcribe-clip --device bass          # selected Live clip (needs §3b fork)
 ```
 
-Counts in silently, records for `--duration` seconds, runs the full
-pipeline. The spec success gate: *"tweak this or start from scratch?"*
-answer must be **tweak**.
+Records (or reads the selected clip), runs the full pipeline. Pitched voices
+take `--bars auto|4|8|16`, `--correct/--no-correct`, `--key`, `--scale`. The
+success gate: *"tweak this or start from scratch?"* answer must be **tweak**.
 
 ## 9. Run the eval
-
-Once all 20 corpus clips are in place:
 
 ```bash
 uv run python -m eval.run_eval
 ```
 
-This scores transcription: onset F1, drum-class accuracy, tempo error.
-Ship gate targets are in the printed report. Iterate on
-`mouthflow/transcribe.py` thresholds and `mouthflow/prompts/plan.md`
-until the gate hits.
+This scores transcription on the tracked fixtures: onset F1, drum-class
+accuracy, tempo error (see [`../eval/README.md`](../eval/README.md) for all
+eval tools + current numbers). Drum thresholds live in
+`mouthflow/devices/drum/` (`mouthflow/transcribe.py` is only a back-compat
+facade); the planner prompt is `mouthflow/prompts/plan.md`.
 
 For taste review (A/B vs Ableton's native "Convert Drums to MIDI"):
 
@@ -202,9 +202,10 @@ uv run python -m eval.taste_review
   `_FALLBACK_INSTRUMENTS` in [`cli.py`](../mouthflow/cli.py) is only used
   for the offline `dry-run` path; those URIs do **not** load in a real
   install.
-- **Heuristic classifier** is hand-tuned, not trained. Expect
-  misclassifications on breath-heavy hats and tonal snares. Fixing
-  this is v0.2 (real classifier trained on the corpus).
+- **Drum classifier** is a per-user k-NN (`mouthflow/drum_model.json`)
+  trained on mimic takes, with the hand-tuned heuristic as fallback when no
+  model exists. Retrain after recording new takes:
+  `uv run python -m eval.train_classifier`.
 - **No realtime.** Offline only, per spec non-goals.
 - **Windows vs Mac.** The project runs on both, but all the Ableton /
   mic work happens on Mac. If you make changes on Windows, run the
@@ -213,7 +214,10 @@ uv run python -m eval.taste_review
 
 ## 11. Where to look next
 
-- [`docs/spec.md`](spec.md) — full v0 spec, roadmap, architecture
+- [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) — current architecture + per-voice maturity
+- [`docs/handover.md`](handover.md) — living status / next work
+- [`docs/KNOWN-LIMITATIONS.md`](KNOWN-LIMITATIONS.md) — honest gap list
+- [`docs/spec.md`](spec.md) — *historical* v0 vision spec (thesis + rationale)
 - [`docs/corpus.md`](corpus.md) — labelling convention
 - [`mouthflow/prompts/plan.md`](../mouthflow/prompts/plan.md) — the
   Claude planner prompt. Replace the placeholder few-shots with real
