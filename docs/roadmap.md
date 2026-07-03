@@ -183,6 +183,15 @@ ships a user-feelable improvement.
 
 ### NEXT (weeks 3–6) — "it comes back sounding like ME, fast, and I can iterate"
 
+> **Status: items 5–7 shipped 2026-07-03** on `feat/next-honest-feel-speed`
+> (fail-capable gated eval in CI + timing/swing/velocity metrics + label
+> sanity gate; swing-aware quantise + translate-not-shear bar-align + octave
+> fix + per-take velocities; kit cache warmed during capture + cached planner
+> prefix on `claude-sonnet-5` + router window + stage timings). Item 8
+> (installer + iterate-in-place) is the next batch. Real held-out recordings
+> (10 drum takes + first notegrids) remain a **user-at-the-mic** task —
+> the harness is ready for them.
+
 5. **Honest eval FIRST** (gate for all feel work): ~10 genuinely held-out drum
    takes via `mimic/take.py` with the label sanity check revived (E3); first
    real bass/lead `notegrid` references; fix note_eval's wrong-pitch and

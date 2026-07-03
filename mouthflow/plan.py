@@ -27,7 +27,11 @@ from mouthflow.schemas import ClipPlan, Plan, Transcription
 if TYPE_CHECKING:
     from mouthflow.devices.base import DeviceSpec
 
-DEFAULT_MODEL = "claude-sonnet-4-6"
+# Sonnet-tier: the kit pick is a small, latency-sensitive structured call in
+# the take's hot path. NOTE (Sonnet 5 API surface): non-default sampling
+# params (temperature/top_p/top_k) are REJECTED, and thinking is adaptive-on
+# when the field is omitted — we disable it explicitly to keep the call snappy.
+DEFAULT_MODEL = "claude-sonnet-5"
 _PROMPT_PATH = Path(__file__).parent / "prompts" / "plan.md"
 
 
@@ -99,23 +103,35 @@ def _default_summary(transcription: Transcription) -> dict:
     }
 
 
+def _instruments_block(available_instruments: list[dict[str, str]]) -> str:
+    """The instrument list as a system block.
+
+    Lives in ``system`` (not the user message) so it sits BEFORE the last
+    prompt-cache breakpoint: the kit list is stable across takes in a session
+    (it comes from the kit cache), so caching it saves re-processing ~7K
+    tokens on every plan call. Compact JSON — pretty-printing burned tokens
+    for nothing.
+    """
+    return (
+        "Available instruments — each has a human `name` (use it to judge kit "
+        "character) and an opaque `uri`. Choose ONE and return its `uri` "
+        "verbatim as instrument_path:\n"
+        + json.dumps(available_instruments, separators=(",", ":"), sort_keys=True)
+    )
+
+
 def _user_message(
     transcription: Transcription,
-    available_instruments: list[dict[str, str]],
     user_hint: str | None,
     *,
     summary: dict | None = None,
 ) -> str:
+    """The per-take (volatile) part of the request: summary + hint only."""
     if summary is None:
         summary = _default_summary(transcription)
     parts = [
         "Transcription summary:",
-        json.dumps(summary, indent=2),
-        "",
-        "Available instruments — each has a human `name` (use it to judge kit",
-        "character) and an opaque `uri`. Choose ONE and return its `uri`",
-        "verbatim as instrument_path:",
-        json.dumps(available_instruments, indent=2),
+        json.dumps(summary, separators=(",", ":"), sort_keys=True),
     ]
     if user_hint:
         parts += ["", f"User hint: {user_hint}"]
@@ -160,27 +176,39 @@ def make_plan(
             raise RuntimeError("ANTHROPIC_API_KEY not set; pass client= for tests.")
         client = anthropic.Anthropic(api_key=api_key)
 
-    # Prompt caching: the system prompt + tool schema are static across
-    # every invocation, so we mark the system block ephemeral. A single
-    # cache_control breakpoint on the last prefix block caches everything
-    # up to it (system + tools), per Anthropic docs. Worth it after ~2
-    # calls when the prefix is >1024 tokens.
+    # Prompt caching (prefix-match: tools -> system -> messages). Two
+    # breakpoints: (1) after the static prompt (caches tools + prompt),
+    # (2) after the instrument list — the list is stable across takes in a
+    # session (kit cache), so repeat takes re-process ONLY the tiny per-take
+    # summary. Previously the list sat in the user message AFTER the last
+    # breakpoint and its ~7K tokens were re-billed on every single take.
+    # Thinking is disabled explicitly: on this model, omitting the field
+    # runs adaptive thinking — dead latency for a forced tool call.
     response = client.messages.create(
         model=model,
         max_tokens=1024,
+        # The pinned anthropic SDK (0.39.0, held back by the httpx pin) has no
+        # typed `thinking` kwarg — a bare thinking= is a TypeError. extra_body
+        # serialises straight into the request JSON, which is all we need.
+        extra_body={"thinking": {"type": "disabled"}},
         system=[
             {
                 "type": "text",
                 "text": _system_prompt(prompt_path),
                 "cache_control": {"type": "ephemeral"},
-            }
+            },
+            {
+                "type": "text",
+                "text": _instruments_block(available),
+                "cache_control": {"type": "ephemeral"},
+            },
         ],
         tools=[_tool_schema()],
         tool_choice={"type": "tool", "name": "emit_plan"},
         messages=[
             {
                 "role": "user",
-                "content": _user_message(transcription, available, user_hint, summary=summary),
+                "content": _user_message(transcription, user_hint, summary=summary),
             }
         ],
     )

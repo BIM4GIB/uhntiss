@@ -3,9 +3,13 @@
 An honest, ranked list of the project's weaknesses, written for an external reviewer.
 Ranked by how much each should affect your assessment, worst first. Everything below
 is verified against the code as of this commit; file pointers are given so you can
-check for yourself. Test suite status at time of writing: `uv run pytest` → 94 passed.
-(A fuller adversarially-verified defect list, including eval-integrity issues not yet
-reflected here, lives in [`roadmap.md`](roadmap.md) §3.)
+check for yourself. Test suite status at time of writing: `uv run pytest` → 121 passed.
+(A fuller adversarially-verified defect list lives in [`roadmap.md`](roadmap.md) §3;
+the eval-integrity items there are now largely addressed — `run_eval` gates fail CI,
+prints a train-contamination warning on the default corpus, and measures timing/
+swing/velocity fidelity; `note_eval` counts wrong-pitch matches against precision;
+`mimic/take.py` sanity-gates auto-labels. What remains true: the fixtures themselves
+are still the contaminated N=2 set until fresh held-out takes are recorded.)
 
 ## 1. The LLM "taste" layer is unvalidated
 

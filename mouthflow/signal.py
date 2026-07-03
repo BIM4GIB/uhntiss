@@ -111,12 +111,50 @@ def features_at(y: np.ndarray, sr: int, t: float) -> dict[str, float]:
 
 def velocity_from_rms(rms: float) -> int:
     # Map rms in [0.01, 0.3] logarithmically to [40, 120], clamp.
+    # Absolute (mic-gain-dependent) — prefer ``velocities_from_rms`` for a
+    # whole take, which normalises per-performance.
     if rms <= 0:
         return 40
     db = 20 * np.log10(max(rms, 1e-4))
     # -40 dB -> 40, -10 dB -> 120.
     vel = 40 + (db - (-40)) * (120 - 40) / 30
     return int(np.clip(vel, 1, 127))
+
+
+def velocities_from_rms(values: list[float]) -> list[int]:
+    """Per-take velocity mapping: the TAKE's dynamics set the range, not the
+    absolute mic level.
+
+    The take's median loudness lands at ~90; spread is measured in dB
+    (p10–p90) and the output range scales with it — a genuinely dynamic take
+    reaches ghost notes (~35) and accents (~126), a deliberately flat take
+    stays flat instead of having noise amplified into fake dynamics. Short
+    takes (< 4 events) fall back to the absolute map.
+    """
+    if not values:
+        return []
+    if len(values) < 4:
+        return [velocity_from_rms(v) for v in values]
+    db = np.array([20 * np.log10(max(float(v), 1e-4)) for v in values])
+    med = float(np.median(db))
+    p10, p90 = (float(x) for x in np.percentile(db, [10, 90]))
+    spread = p90 - p10
+    if spread < 1.0:
+        return [90] * len(values)  # essentially flat performance — keep it flat
+    scale = min(1.0, spread / 12.0)  # full range only for truly dynamic takes
+    # Piecewise-linear percentile anchors: p10 -> ghost (45), median -> 90,
+    # p90 -> accent (120), extrapolated beyond and clipped. Denominators are
+    # floored so a skewed take can't divide by ~0.
+    lo_den = max(med - p10, spread / 4.0)
+    hi_den = max(p90 - med, spread / 4.0)
+    out = []
+    for d in db:
+        if d <= med:
+            v = 90 + (d - med) / lo_den * 45.0 * scale
+        else:
+            v = 90 + (d - med) / hi_den * 30.0 * scale
+        out.append(int(np.clip(round(v), 20, 127)))
+    return out
 
 
 def quantise(t_s: float, tempo_bpm: float, division: int = 16) -> float:

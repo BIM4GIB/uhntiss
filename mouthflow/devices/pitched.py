@@ -193,7 +193,7 @@ class PitchedTranscriber:
             else:
                 snapped.append([pitch, seg["start"], seg["end"]])
 
-        notes: list[NoteEvent] = []
+        accepted: list[tuple[int, float, float, float, float]] = []  # pitch, t_q, dur, conf, rms
         for pitch, start_i, end_i in snapped:
             start_t = float(times[start_i])
             # Extend to the next frame's time so a 1-frame note still has a real
@@ -206,17 +206,21 @@ class PitchedTranscriber:
             if conf < cfg.min_confidence:
                 continue  # spurious attack/breath blip pyin isn't sure about
             seg_rms = float(np.mean(rms[start_i : end_i + 1]))
-            velocity = signal.velocity_from_rms(seg_rms)
             start_q = signal.quantise(start_t, tempo_bpm, division=cfg.division)
-            notes.append(
-                NoteEvent(
-                    time_s=start_q,
-                    midi_note=int(pitch),
-                    velocity=velocity,
-                    duration_s=float(dur),
-                    confidence=round(conf, 3),
-                )
+            accepted.append((int(pitch), start_q, float(dur), conf, seg_rms))
+
+        # Velocities normalised against the take's own dynamics, not mic gain.
+        velocities = signal.velocities_from_rms([a[4] for a in accepted])
+        notes = [
+            NoteEvent(
+                time_s=t_q,
+                midi_note=pitch,
+                velocity=vel,
+                duration_s=dur,
+                confidence=round(conf, 3),
             )
+            for (pitch, t_q, dur, conf, _r), vel in zip(accepted, velocities)
+        ]
         notes.sort(key=lambda nt: (nt.time_s, nt.midi_note))
         return notes
 

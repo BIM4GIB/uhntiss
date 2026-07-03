@@ -13,7 +13,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from mouthflow.plan import _hit_histogram, _normalise_instruments, _user_message, make_plan
+from mouthflow.plan import (
+    _hit_histogram,
+    _instruments_block,
+    _normalise_instruments,
+    _user_message,
+    make_plan,
+)
 from mouthflow.schemas import DrumHit, Transcription
 
 
@@ -78,20 +84,24 @@ def test_normalise_instruments_accepts_strings_and_dicts():
     ]
 
 
-def test_user_message_includes_instruments_and_hint(tmp_path):
+def test_user_message_is_summary_and_hint_only(tmp_path):
+    # The user message is the VOLATILE tail of the prompt — summary + hint.
+    # Instruments live in a cached system block (see _instruments_block).
     t = _transcription(tmp_path)
-    msg = _user_message(
-        t,
+    msg = _user_message(t, user_hint="harder")
+    assert "harder" in msg
+    assert "tempo_bpm" in msg
+
+
+def test_instruments_block_shows_names_and_uris():
+    block = _instruments_block(
         [
             {"name": "808 Kit", "uri": "query:Drums#FileId_1"},
             {"name": "Jazz", "uri": "query:Drums#FileId_2"},
-        ],
-        user_hint="harder",
+        ]
     )
-    assert "808 Kit" in msg  # name shown so the planner can judge character
-    assert "query:Drums#FileId_1" in msg  # uri shown so it can return it
-    assert "harder" in msg
-    assert "tempo_bpm" in msg
+    assert "808 Kit" in block  # name shown so the planner can judge character
+    assert "query:Drums#FileId_1" in block  # uri shown so it can return it
 
 
 def test_make_plan_round_trips_valid_tool_output(tmp_path):
@@ -122,12 +132,27 @@ def test_make_plan_round_trips_valid_tool_output(tmp_path):
 
     # Verify the request shape the client saw.
     req = client.messages.last_request
-    assert req["model"].startswith("claude-sonnet-4")
+    assert req["model"].startswith("claude-sonnet-5")
     assert req["tool_choice"] == {"type": "tool", "name": "emit_plan"}
     assert req["tools"][0]["name"] == "emit_plan"
-    # System prompt is a content block list with ephemeral cache_control.
-    assert isinstance(req["system"], list)
+    # Thinking is disabled explicitly (adaptive-on-by-omission would add
+    # latency to a forced tool call) — via extra_body: the pinned SDK has no
+    # typed `thinking` kwarg.
+    assert req["extra_body"] == {"thinking": {"type": "disabled"}}
+    # Every kwarg we pass must exist in the PINNED SDK's create() signature —
+    # an unknown kwarg is a TypeError on the first real (non-test) call.
+    import inspect
+
+    import anthropic as _anthropic
+
+    allowed = set(inspect.signature(_anthropic.resources.messages.Messages.create).parameters)
+    assert set(req) <= allowed - {"self"}, set(req) - allowed
+    # System is [static prompt, instrument list], BOTH cache-marked, so a
+    # repeat take re-processes only the tiny per-take user message.
+    assert isinstance(req["system"], list) and len(req["system"]) == 2
     assert req["system"][0]["cache_control"] == {"type": "ephemeral"}
+    assert req["system"][1]["cache_control"] == {"type": "ephemeral"}
+    assert "Kit-Core%20808" in req["system"][1]["text"]
 
 
 def test_make_plan_accepts_dict_instruments_and_returns_uri(tmp_path):
@@ -156,8 +181,9 @@ def test_make_plan_accepts_dict_instruments_and_returns_uri(tmp_path):
     )
     assert plan.clips[0].instrument_path == "query:Drums#FileId_5012"
     assert "fallback" not in plan.rationale.lower()
-    # The user message exposed kit names so the planner could choose by character.
-    sent = client.messages.last_request["messages"][0]["content"]
+    # The (cached) instruments system block exposed kit names so the planner
+    # could choose by character.
+    sent = client.messages.last_request["system"][1]["text"]
     assert "Dusty Breaks" in sent
 
 

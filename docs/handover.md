@@ -5,6 +5,36 @@ Last updated: 2026-07-03. Read this first when picking up work.
 honest gap list: [`KNOWN-LIMITATIONS.md`](KNOWN-LIMITATIONS.md); audit findings
 + the forward plan: [`roadmap.md`](roadmap.md).)
 
+**2026-07-03 (later) — the "feel batch" (`feat/next-honest-feel-speed`) landed
+the roadmap's NEXT items 5–7.** Know about:
+
+- **The eval can fail now.** `uv run python -m eval.run_eval` exits non-zero
+  below its gates (onset F1 ≥0.75, class acc ≥0.65, tempo ≥80%, timing MAE
+  ≤45ms) and CI runs it. It prints an honesty warning on the default corpus
+  (fixtures are train-contaminated; held-out ≈0.73 via `classifier_cv`).
+  Swing-preservation + velocity rank-correlation are reported (n/a until real
+  labelled takes exist). `note_eval` counts wrong-pitch matches against
+  precision; `mimic/take.py` refuses to emit corpus clips from misaligned
+  takes (`--force` overrides).
+- **Groove:** drums quantise to a **swing-aware grid** — classic off-8th
+  shuffle and off-16th swing measured separately, each gated by floors
+  calibrated against real articulation drag plus a consistency test; a
+  shuffled performance keeps its shuffle, straight takes are unchanged.
+  `bar_align` translates the performer grid onto the downbeat instead of
+  shearing per-hit. Tempo octave errors fixed in both directions: sub-76-BPM
+  doubling (70 detects correctly) and sparse-take halving (kick/snare modal
+  IOI anchors the octave — hats mark subdivisions and are ignored for this).
+  Velocities are normalised **per take**
+  (ghosts ~45, median 90, accents ~120, scaled by the take's dynamic spread) —
+  mic gain no longer decides dynamics.
+- **Speed:** kit lists cache to `~/.mouthflow/kits-<category>.json` (24h TTL)
+  and are refreshed on a second connection *while the mic records*; the
+  planner prompt caches the instrument list (system-block breakpoints), so
+  repeat takes re-process only the take summary. Planner model is now
+  `claude-sonnet-5` (thinking disabled for the forced tool call — note that
+  model rejects non-default temperature). `--device auto` routes on a 6s
+  window. Stage timings are logged (`heard … (1.2s)`, `plan: … (3.1s)`).
+
 **2026-07-03 — the "trust batch" (`feat/now-trust-batch`) landed the roadmap's
 NOW items.** Behaviour changes to know about:
 
@@ -145,7 +175,7 @@ uv run mouthflow record --device bass --duration 8     # mic → Live (Ableton +
 uv run mouthflow record-stream --device bass            # open-ended take; 'stop' on stdin ends it
 uv run mouthflow transcribe-clip --device bass          # selected Live clip → Live (needs bridge fork)
 uv run mouthflow dry-run clip.wav --device drone --json # pipeline only, prints Plan
-uv run python -m eval.run_eval              # drum oracle (class acc must stay ~0.97)
+uv run python -m eval.run_eval              # drum oracle — gated, exits non-zero on regression
 uv run pytest -q                            # full suite — must all pass
 python m4l/generate.py --install            # regenerate panels + sync into User Library/Devices
 ```
@@ -205,7 +235,8 @@ python m4l/generate.py --install            # regenerate panels + sync into User
 - Branch off `main` → PR → **squash-merge**. End commit messages with
   `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 - Every change keeps `uv run pytest` and `uv run python -m eval.run_eval` green
-  (drum class acc ~0.97 is the oracle).
+  (the eval is gated and CI-enforced; its class-acc number is a train-set upper
+  bound — the honest held-out figure is `classifier_cv`'s ≈0.73).
 
 ## Key files
 | path | what |

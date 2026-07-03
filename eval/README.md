@@ -30,7 +30,11 @@ All commands run from the repo root. `uv run pytest` (75 passed as of
 or a single honest headline number:
 
 - `run_eval` — the pipeline gate. Targets baked in: onset F1 ≥ 0.75, class
-  accuracy ≥ 0.65, tempo within ±3 BPM on ≥ 80% of clips.
+  accuracy ≥ 0.65, tempo within ±3 BPM on ≥ 80% of clips, timing MAE ≤ 45 ms.
+  **Gated for real:** exits non-zero below target (CI runs it;
+  `--report-only` disables). Also reports swing-preservation error and
+  velocity rank-correlation (n/a until labelled takes with real dynamics
+  exist), and prints a train-contamination warning on the default corpus.
 - `classifier_cv` — the classifier gate. Held-out-take CV is the honest
   number; LOO flatters slightly.
 - `onset_sanity` — the detector gate, tempo-independent. Use when changing

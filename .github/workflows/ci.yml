@@ -24,3 +24,6 @@ jobs:
 
       - name: Run tests
         run: uv run pytest -q
+
+      - name: Run the eval oracle (gated — fails below targets)
+        run: uv run python -m eval.run_eval

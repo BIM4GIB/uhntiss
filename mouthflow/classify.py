@@ -23,6 +23,15 @@ from mouthflow.schemas import Intent
 # Register boundary between bass and lead (E3 = MIDI 52).
 _BASS_CEILING = 52
 
+# Routing needs the CHARACTER of the take, not all of it: voiced-fraction and
+# pitch stability are established within a few seconds, and pyin over a full
+# take costs seconds that the device transcriber then re-spends. Analyse the
+# LOUDEST window (skipping is fine — the router's verdict picks which
+# transcriber runs on the FULL audio). Anchoring to t=0 — or to a dB trim —
+# fails on audible-but-quiet lead-ins (breath at ~-22dB relative survives a
+# 30dB trim and fills the window with unvoiced content -> drums).
+_ROUTER_WINDOW_S = 6.0
+
 
 def classify(wav_path: Path) -> tuple[Intent, float]:
     import librosa
@@ -30,6 +39,16 @@ def classify(wav_path: Path) -> tuple[Intent, float]:
     y, sr = librosa.load(str(wav_path), sr=signal._SR, mono=True)
     if y.size == 0:
         return (Intent.UNKNOWN, 0.0)
+    win = int(_ROUTER_WINDOW_S * sr)
+    if y.size > win:
+        hop = 512
+        rms = librosa.feature.rms(y=y, frame_length=2048, hop_length=hop)[0]
+        win_frames = max(1, win // hop)
+        if rms.size > win_frames:
+            energy = np.convolve(rms, np.ones(win_frames, dtype=float), mode="valid")
+            y = y[int(np.argmax(energy)) * hop :][:win]
+        else:
+            y = y[:win]
 
     f0, voiced_flag, voiced_prob = librosa.pyin(
         y, fmin=65.0, fmax=1000.0, sr=sr, frame_length=2048, hop_length=512

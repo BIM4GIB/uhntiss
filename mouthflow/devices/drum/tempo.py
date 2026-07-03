@@ -20,8 +20,37 @@ _BPM_MIN, _BPM_MAX = 60.0, 200.0  # plausible beatbox tempo octaves
 _BPM_PREF = (80.0, 150.0)  # preferred band — the octave prior nudges here
 _QUANT_CONF_MIN = 0.5  # below this we emit raw onset times (don't trust tempo)
 
+# Groove: how hard quantisation pulls a hit onto the swing-aware grid.
+# 1.0 = snap fully (default), 0.0 = raw. The market's "quantise flattens my
+# groove" complaint is about SYSTEMATIC feel — swing — which now lives in the
+# grid itself (_swing_frac shifts the off-beat lines), so full snap keeps the
+# shuffle while removing random jitter: closest to "what you meant". Lower
+# values keep a fraction of the per-hit jitter too.
+_QUANT_STRENGTH = 1.0
+_SWING_MIN_OFF = 4      # need at least this many onsets in an off bucket
+# Swing floors, in fractions of a 16th step — calibrated on the fixture takes:
+# performers systematically DRAG their off-beats by articulation (~0.17 step
+# measured on a straight-intent take), which is laziness to correct, not feel
+# to preserve. Real shuffle starts around 55% swing (0.2 step for off-8ths,
+# 0.1-0.2 for off-16ths). Below the floor -> treat as straight.
+_SWING_NOISE_8 = 0.20
+_SWING_NOISE_16 = 0.12
+# Cap at the fold-over limit: past ~0.5 step the swung off-8th is closer to
+# the NEXT 16th line and residual bucketing can't see it anyway. (Full
+# triplet shuffle = 0.67 step is a known blind spot.)
+_SWING_MAX = 0.45
 
-def _detect_tempo(y: np.ndarray, sr: int, onset_times: np.ndarray) -> tuple[float, float]:
+
+# How much worse (in octave-score) the pulse-anchored octave may fit before
+# grid evidence overrides the anchor. Calibrated on sparse quarter-IOI takes:
+# at fast tempos (150-160) the true 16th grid is jitter-washed (fit ~random,
+# gaps up to ~0.13) while the kick/snare pulse anchor is dead-on.
+_ANCHOR_OVERRIDE_MAX = 0.15
+
+
+def _detect_tempo(
+    y: np.ndarray, sr: int, onset_times: np.ndarray, pulse_times: np.ndarray | None = None
+) -> tuple[float, float]:
     """Estimate (tempo_bpm, confidence) robustly for beatbox.
 
     ``librosa.beat.beat_track`` consistently reports ~2x the true tempo on
@@ -29,6 +58,13 @@ def _detect_tempo(y: np.ndarray, sr: int, onset_times: np.ndarray) -> tuple[floa
     tempogram — robust to missing/extra hits — then disambiguate the octave
     against how tightly the onsets fall on each candidate's 16th grid, with a
     preference for the human band and the inter-onset subdivision lattice.
+
+    ``pulse_times`` (kick + snare onsets, when the caller has classes) is the
+    strongest octave cue of all: hats mark SUBDIVISIONS and mislead the modal
+    IOI, but people put kick/snare on beats and backbeats — a sparse take
+    whose kick/snare IOI is a plausible in-band tempo almost certainly has
+    its beat there, even when jitter washes out the fine grid's fit (which
+    it does above ~150 BPM, where the 16th step approaches onset jitter).
 
     Confidence ∈ [0, 1] reflects grid-fit tightness and the separation between
     the chosen octave and its runner-up; the caller gates quantisation on it.
@@ -51,11 +87,23 @@ def _detect_tempo(y: np.ndarray, sr: int, onset_times: np.ndarray) -> tuple[floa
     if not candidates:
         return float(np.clip(base, _BPM_MIN, _BPM_MAX)), 0.0
 
-    scored = sorted((_octave_score(b, onsets, ioi_bpm), b) for b in candidates)
+    scores = {b: _octave_score(b, onsets, ioi_bpm) for b in candidates}
+    scored = sorted((s, b) for b, s in scores.items())
     best_score, best = scored[0]
 
+    anchor = None
+    if pulse_times is not None:
+        p = _ioi_beat_bpm(np.asarray(pulse_times, dtype=float))
+        if p and _BPM_MIN <= p <= _BPM_MAX:
+            anchor = p
+    if anchor is not None and len(scored) > 1:
+        near = min(candidates, key=lambda b: abs(np.log2(b / anchor)))
+        if near != best and scores[near] - best_score <= _ANCHOR_OVERRIDE_MAX:
+            best, best_score = near, scores[near]
+
     tightness = float(np.clip(1.0 - 2.5 * _grid_fit(onsets, best), 0.0, 1.0))
-    margin = float(np.clip((scored[1][0] - best_score) / 0.15, 0.0, 1.0)) if len(scored) > 1 else 1.0
+    others = [s for s, b in scored if b != best]
+    margin = float(np.clip((min(others) - best_score) / 0.15, 0.0, 1.0)) if others else 1.0
     confidence = float(np.clip(0.5 * tightness + 0.5 * margin, 0.0, 1.0))
     return best, confidence
 
@@ -113,11 +161,67 @@ def _octave_score(bpm: float, onsets: np.ndarray, ioi_bpm: float | None) -> floa
     """Lower is better: grid-fit + out-of-band penalty + IOI-lattice misfit."""
     score = _grid_fit(onsets, bpm)
     if not (_BPM_PREF[0] <= bpm <= _BPM_PREF[1]):
-        score += 0.10
+        # Distance-scaled nudge with NO flat floor: a flat +0.10 (or even
+        # +0.03) rivals the real grid-evidence separation (~0.03-0.05 at
+        # human jitter) and structurally doubled true tempos just below the
+        # band (70 -> 140, where 140 sits comfortably in-band). Just outside
+        # the band the prior should be nearly silent and let the grid decide.
+        dist = min(abs(bpm - _BPM_PREF[0]), abs(bpm - _BPM_PREF[1])) / _BPM_PREF[0]
+        score += min(0.08 * dist, 0.10)
     if ioi_bpm:
         r = bpm / ioi_bpm
-        score += 0.5 * min(abs(r * k - round(r * k)) for k in (1, 0.5, 0.25, 2))
+        # k=4 lets a 16th-note modal IOI certify the true tempo (r=0.25)
+        # instead of unfairly penalising dense trap-style takes.
+        score += 0.5 * min(abs(r * k - round(r * k)) for k in (1, 0.5, 0.25, 2, 4))
+        # Density plausibility: a candidate claiming the modal event spacing
+        # is finer than 8th notes is usually the HALVED octave (the coarser
+        # grid always step-fraction-fits better, and k=4 alone would bless
+        # it). Graded, so a genuinely 16th-dense take only pays a little.
+        s = ioi_bpm / bpm
+        if s > 3.0:
+            score += 0.03 * (s - 3.0)
     return score
+
+
+def _swing_frac(onsets: np.ndarray, bpm: float, phase: float) -> tuple[float, float]:
+    """(swing8, swing16): mean lag of off-8ths / off-16ths, in 16th steps.
+
+    Swing lives at two levels and they are NOT the same thing: a classic
+    shuffle delays the off-beat EIGHTHS (16th-grid line index ≡ 2 mod 4 —
+    the "and"s), hip-hop swing delays the off-SIXTEENTHS (odd indices — the
+    "e"s and "a"s). Measuring only odd-vs-even 16ths is blind to the common
+    8th shuffle (the delayed "and"s land on EVEN indices). Each component is
+    gated independently so noise can't invent a shuffle: ``_SWING_MIN_OFF``
+    onsets in its own off bucket, a jitter floor, and a cap (a huge "swing"
+    usually means the grid itself is wrong). Beats (index ≡ 0 mod 4) anchor
+    both components.
+    """
+    onsets = np.asarray(onsets, dtype=float)
+    if onsets.size == 0 or bpm <= 0:
+        return 0.0, 0.0
+    step = 60.0 / bpm / 4.0
+    res: dict[int, list[float]] = {0: [], 1: [], 2: [], 3: []}
+    for t in onsets:
+        pos = t / step - phase
+        idx = int(round(pos))
+        res[idx % 4].append(pos - idx)  # residual in steps
+    on = float(np.mean(res[0])) if res[0] else 0.0
+
+    def lean(vals: list[float], floor: float) -> float:
+        if len(vals) < _SWING_MIN_OFF:
+            return 0.0
+        arr = np.asarray(vals, dtype=float) - on
+        s = float(arr.mean())
+        # Consistency gate: a real shuffle is SYSTEMATIC — every off-beat
+        # leans the same way. A mean assembled from scattered mixed-sign
+        # residuals (measured on a real take: +0.14/-0.02 buckets pooling to
+        # a fake +0.11 "swing") must not pass.
+        sem = float(arr.std(ddof=1) / np.sqrt(len(arr))) if len(arr) > 1 else 0.0
+        if abs(s) < floor or abs(s) <= 2.0 * sem:
+            return 0.0
+        return float(np.clip(s, -_SWING_MAX, _SWING_MAX))
+
+    return lean(res[2], _SWING_NOISE_8), lean(res[1] + res[3], _SWING_NOISE_16)
 
 
 def _grid_phase(onsets: np.ndarray, bpm: float) -> float:
@@ -130,15 +234,37 @@ def _grid_phase(onsets: np.ndarray, bpm: float) -> float:
     return float(np.angle(np.mean(np.exp(2j * np.pi * frac))) / (2 * np.pi))
 
 
-def _quantise_grid(t_s: float, tempo_bpm: float, phase: float) -> float:
-    """Snap to a 16th grid whose lines sit at ``(n + phase) * step``.
+def _quantise_grid(
+    t_s: float,
+    tempo_bpm: float,
+    phase: float,
+    swing8: float = 0.0,
+    swing16: float = 0.0,
+    strength: float = 1.0,
+    shift: float = 0.0,
+) -> float:
+    """Pull ``t_s`` toward a (possibly swung) 16th grid at ``(n + phase) * step``.
 
     ``phase`` (from :func:`_grid_phase`) aligns the grid to the performer's
     lead-in so snapping pulls hits toward the played timing rather than an
-    arbitrary phase-0 grid. ``phase=0`` reduces to a plain 16th snap.
+    arbitrary phase-0 grid. ``swing8``/``swing16`` (from :func:`_swing_frac`,
+    in fractions of a step) shift the off-8th / off-16th grid lines late, so
+    a shuffled performance snaps to its own shuffle instead of being
+    straightened. ``strength`` blends: 1.0 = hard snap (the historic
+    behaviour), 0.0 = raw performed time. ``shift`` (bar_align's whole-clip
+    translation onto the downbeat) is subtracted BEFORE the final clamp —
+    clamping first and shifting after would land a negative-phase first-cell
+    hit up to half a step late instead of on the downbeat.
 
-    Clamped at 0: a negative phase can snap the first grid cell's onset to a
-    negative time, which MIDI (and mido) cannot represent.
+    Clamped at 0: a negative time cannot be represented in MIDI (mido).
     """
     step = 60.0 / tempo_bpm / 4.0
-    return max(0.0, (round(t_s / step - phase) + phase) * step)
+    idx = round(t_s / step - phase)
+    if idx % 2:
+        swing = swing16
+    elif idx % 4 == 2:
+        swing = swing8
+    else:
+        swing = 0.0
+    target = (idx + phase + swing) * step
+    return max(0.0, t_s + strength * (target - t_s) - shift)
