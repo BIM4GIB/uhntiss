@@ -20,6 +20,17 @@ _BPM_MIN, _BPM_MAX = 60.0, 200.0  # plausible beatbox tempo octaves
 _BPM_PREF = (80.0, 150.0)  # preferred band — the octave prior nudges here
 _QUANT_CONF_MIN = 0.5  # below this we emit raw onset times (don't trust tempo)
 
+# Groove: how hard quantisation pulls a hit onto the swing-aware grid.
+# 1.0 = snap fully (default), 0.0 = raw. The market's "quantise flattens my
+# groove" complaint is about SYSTEMATIC feel — swing — which now lives in the
+# grid itself (_swing_frac shifts the off-beat lines), so full snap keeps the
+# shuffle while removing random jitter: closest to "what you meant". Lower
+# values keep a fraction of the per-hit jitter too.
+_QUANT_STRENGTH = 1.0
+_SWING_MIN_OFF = 4     # need at least this many off-beat onsets to trust a swing
+_SWING_NOISE = 0.03    # |lean| below this fraction of a step is jitter, not swing
+_SWING_MAX = 0.30      # cap: past this the "swing" is probably a misdetected grid
+
 
 def _detect_tempo(y: np.ndarray, sr: int, onset_times: np.ndarray) -> tuple[float, float]:
     """Estimate (tempo_bpm, confidence) robustly for beatbox.
@@ -113,11 +124,54 @@ def _octave_score(bpm: float, onsets: np.ndarray, ioi_bpm: float | None) -> floa
     """Lower is better: grid-fit + out-of-band penalty + IOI-lattice misfit."""
     score = _grid_fit(onsets, bpm)
     if not (_BPM_PREF[0] <= bpm <= _BPM_PREF[1]):
-        score += 0.10
+        # Distance-scaled nudge with NO flat floor: a flat +0.10 (or even
+        # +0.03) rivals the real grid-evidence separation (~0.03-0.05 at
+        # human jitter) and structurally doubled true tempos just below the
+        # band (70 -> 140, where 140 sits comfortably in-band). Just outside
+        # the band the prior should be nearly silent and let the grid decide.
+        dist = min(abs(bpm - _BPM_PREF[0]), abs(bpm - _BPM_PREF[1])) / _BPM_PREF[0]
+        score += min(0.08 * dist, 0.10)
     if ioi_bpm:
         r = bpm / ioi_bpm
-        score += 0.5 * min(abs(r * k - round(r * k)) for k in (1, 0.5, 0.25, 2))
+        # k=4 lets a 16th-note modal IOI certify the true tempo (r=0.25)
+        # instead of unfairly penalising dense trap-style takes.
+        score += 0.5 * min(abs(r * k - round(r * k)) for k in (1, 0.5, 0.25, 2, 4))
+        # Density plausibility: a candidate claiming the modal event spacing
+        # is finer than 8th notes is usually the HALVED octave (the coarser
+        # grid always step-fraction-fits better, and k=4 alone would bless
+        # it). Graded, so a genuinely 16th-dense take only pays a little.
+        s = ioi_bpm / bpm
+        if s > 3.0:
+            score += 0.03 * (s - 3.0)
     return score
+
+
+def _swing_frac(onsets: np.ndarray, bpm: float, phase: float) -> float:
+    """Mean off-beat lag as a fraction of a 16th step (0 = straight grid).
+
+    The swing signature: off-beat 16ths land late relative to on-beats in a
+    shuffled performance. Gated so noise can't invent a shuffle — needs
+    ``_SWING_MIN_OFF`` off-beat onsets and a lean above the jitter floor;
+    implausibly large leans are capped (a huge "swing" usually means the grid
+    itself is wrong).
+    """
+    onsets = np.asarray(onsets, dtype=float)
+    if onsets.size == 0 or bpm <= 0:
+        return 0.0
+    step = 60.0 / bpm / 4.0
+    lean: dict[int, list[float]] = {0: [], 1: []}
+    for t in onsets:
+        pos = t / step - phase
+        idx = int(round(pos))
+        lean[idx % 2].append(pos - idx)  # residual in steps
+    if len(lean[1]) < _SWING_MIN_OFF:
+        return 0.0
+    on = float(np.mean(lean[0])) if lean[0] else 0.0
+    off = float(np.mean(lean[1]))
+    swing = off - on
+    if abs(swing) < _SWING_NOISE:
+        return 0.0
+    return float(np.clip(swing, -_SWING_MAX, _SWING_MAX))
 
 
 def _grid_phase(onsets: np.ndarray, bpm: float) -> float:
@@ -130,15 +184,23 @@ def _grid_phase(onsets: np.ndarray, bpm: float) -> float:
     return float(np.angle(np.mean(np.exp(2j * np.pi * frac))) / (2 * np.pi))
 
 
-def _quantise_grid(t_s: float, tempo_bpm: float, phase: float) -> float:
-    """Snap to a 16th grid whose lines sit at ``(n + phase) * step``.
+def _quantise_grid(
+    t_s: float, tempo_bpm: float, phase: float, swing: float = 0.0, strength: float = 1.0
+) -> float:
+    """Pull ``t_s`` toward a (possibly swung) 16th grid at ``(n + phase) * step``.
 
     ``phase`` (from :func:`_grid_phase`) aligns the grid to the performer's
     lead-in so snapping pulls hits toward the played timing rather than an
-    arbitrary phase-0 grid. ``phase=0`` reduces to a plain 16th snap.
+    arbitrary phase-0 grid. ``swing`` (from :func:`_swing_frac`, in fractions
+    of a step) shifts the odd (off-beat) grid lines late, so a shuffled
+    performance snaps to its own shuffle instead of being straightened.
+    ``strength`` blends: 1.0 = hard snap (the historic behaviour), 0.0 = raw
+    performed time.
 
-    Clamped at 0: a negative phase can snap the first grid cell's onset to a
-    negative time, which MIDI (and mido) cannot represent.
+    Clamped at 0: a negative phase can place the first grid cell's target at
+    a negative time, which MIDI (and mido) cannot represent.
     """
     step = 60.0 / tempo_bpm / 4.0
-    return max(0.0, (round(t_s / step - phase) + phase) * step)
+    idx = round(t_s / step - phase)
+    target = (idx + phase + (swing if idx % 2 else 0.0)) * step
+    return max(0.0, t_s + strength * (target - t_s))

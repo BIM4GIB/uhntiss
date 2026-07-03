@@ -117,24 +117,126 @@ def test_quantise_grid_never_negative():
     assert _quantise_grid(0.0, 120, -0.5) >= 0.0
 
 
-def _drum_pattern(bpm: float, bars: int = 6) -> np.ndarray:
-    """A boombap-ish kick/snare/hat loop at ``bpm`` (8th-note hats)."""
+def test_quantise_grid_strength_blends_toward_raw():
+    step = 60 / 120 / 4
+    t = 0.30  # 40 ms early of the 3rd 16th line (0.375... no: line 2 at 0.25; nearest is 0.25? )
+    t = 0.28  # 30 ms late of the line at 0.25
+    hard = _quantise_grid(t, 120, 0.0, strength=1.0)
+    soft = _quantise_grid(t, 120, 0.0, strength=0.5)
+    raw = _quantise_grid(t, 120, 0.0, strength=0.0)
+    assert hard == pytest.approx(0.25)
+    assert raw == pytest.approx(t)
+    assert soft == pytest.approx((t + 0.25) / 2)  # halfway between raw and snapped
+    assert abs(soft - 0.25) < abs(raw - 0.25)
+
+
+def test_quantise_grid_swing_shifts_offbeat_lines():
+    from mouthflow.devices.drum.tempo import _swing_frac
+
+    step = 60 / 120 / 4
+    # A shuffled performance: on-beats on the grid, off-beats 25% of a step late.
+    onsets = []
+    for n in range(8):
+        onsets.append(n * 2 * step)
+        onsets.append((n * 2 + 1) * step + 0.25 * step)
+    swing = _swing_frac(np.array(onsets), 120, phase=0.0)
+    assert swing == pytest.approx(0.25, abs=0.03)
+    # An off-beat hit snaps to the SWUNG line, not the straight one.
+    late_off = 1 * step + 0.25 * step + 0.005
+    snapped = _quantise_grid(late_off, 120, 0.0, swing=swing)
+    assert snapped == pytest.approx((1 + swing) * step, abs=0.004)
+    # On-beat lines are untouched by swing.
+    assert _quantise_grid(2 * step + 0.001, 120, 0.0, swing=swing) == pytest.approx(2 * step, abs=1e-6)
+
+
+def test_swing_frac_gates_out_noise_and_sparse_data():
+    from mouthflow.devices.drum.tempo import _swing_frac
+
+    step = 60 / 120 / 4
+    # Straight 16ths with tiny jitter -> no swing invented.
+    rng = np.random.default_rng(7)
+    straight = np.array([n * step + rng.normal(0, 0.002) for n in range(16)])
+    assert _swing_frac(straight, 120, 0.0) == 0.0
+    # Too few off-beat samples -> no swing.
+    quarters = np.array([n * 4 * step for n in range(8)])
+    assert _swing_frac(quarters, 120, 0.0) == 0.0
+
+
+def test_bar_align_translates_instead_of_shearing(tmp_path, monkeypatch):
+    """bar_align lands the performer's grid on Live's downbeat by TRANSLATING
+    the clip — relative timing is preserved, not sheared hit-by-hit."""
+    from mouthflow.devices.drum.transcriber import DrumTranscriber
+
+    monkeypatch.setattr(drum_classify, "_MODEL", None)
+    bpm = 100.0
+    lead_in = 0.03  # performer starts 30 ms after t=0
+    y = np.concatenate([np.zeros(int(lead_in * SR), dtype=np.float32), _drum_pattern(bpm)])
+    wav = tmp_path / "offset.wav"
+    sf.write(wav, y, SR, subtype="PCM_16")
+
+    feel = DrumTranscriber().transcribe(wav, tempo=bpm, bar_align=False)
+    grid = DrumTranscriber().transcribe(wav, tempo=bpm, bar_align=True)
+    assert len(feel.hits) == len(grid.hits)
+    # Same hits, shifted by one (near-)constant amount, not sheared per-hit.
+    # (The first hit may clamp at 0, so allow a couple of ms of spread.)
+    deltas = [f.time_s - g.time_s for f, g in zip(feel.hits, grid.hits)]
+    assert max(deltas) - min(deltas) < 0.003
+    assert deltas[-1] == pytest.approx(lead_in, abs=0.012)
+    # And the aligned clip starts on the downbeat.
+    assert grid.hits[0].time_s == pytest.approx(0.0, abs=0.012)
+
+
+def test_velocities_from_rms_normalises_per_take():
+    from mouthflow import signal
+
+    # A flat take stays flat — no fake dynamics amplified out of noise.
+    assert signal.velocities_from_rms([0.1] * 8 ) == [90] * 8
+
+    # A dynamic take: quiet hits land as ghosts, loud ones as accents,
+    # ordering follows loudness.
+    rms = [0.02, 0.02, 0.3, 0.3, 0.02, 0.3, 0.05, 0.1]
+    vels = signal.velocities_from_rms(rms)
+    assert max(vels) >= 110 and min(vels) <= 60
+    for a, b in [(0, 2), (6, 7), (7, 3)]:  # quieter index -> lower velocity
+        assert vels[a] < vels[b]
+
+    # Short takes fall back to the absolute map.
+    assert signal.velocities_from_rms([0.1, 0.2]) == [
+        signal.velocity_from_rms(0.1), signal.velocity_from_rms(0.2)
+    ]
+
+
+def _drum_pattern(bpm: float, bars: int = 6, jitter_ms: float = 0.0, seed: int = 11) -> np.ndarray:
+    """A boombap-ish kick/snare/hat loop at ``bpm`` (8th-note hats).
+
+    ``jitter_ms`` adds human-like timing noise. A mathematically exact
+    pattern with 8th-note granularity is genuinely octave-ambiguous (both the
+    true and the doubled grid fit perfectly); real performances aren't — the
+    jitter spreads over a smaller step on the doubled grid, which is exactly
+    the evidence the octave scorer uses.
+    """
+    rng = np.random.default_rng(seed)
     beat = 60.0 / bpm
     events: list[tuple[float, np.ndarray]] = []
+
+    def j() -> float:
+        return float(rng.normal(0.0, jitter_ms / 1000.0)) if jitter_ms else 0.0
+
     for b in range(bars):
         base = b * 4 * beat
-        events += [(base + s * beat, _kick_sample()) for s in (0, 2)]
-        events += [(base + s * beat, _snare_sample()) for s in (1, 3)]
-        events += [(base + s * beat, _hat_sample()) for s in (0.5, 1.5, 2.5, 3.5)]
+        events += [(base + s * beat + j(), _kick_sample()) for s in (0, 2)]
+        events += [(base + s * beat + j(), _snare_sample()) for s in (1, 3)]
+        events += [(base + s * beat + j(), _hat_sample()) for s in (0.5, 1.5, 2.5, 3.5)]
     return _place(events, bars * 4 * beat + 0.3)
 
 
-@pytest.mark.parametrize("bpm", [84, 100, 120])
+@pytest.mark.parametrize("bpm", [70, 84, 100, 120])
 def test_detect_tempo_no_octave_error(tmp_path, monkeypatch, bpm):
     # beat_track reports ~2x on beatbox; the estimator must land on the right
-    # octave and refine to within the +-3 BPM eval tolerance.
+    # octave and refine to within the +-3 BPM eval tolerance. 8 ms of human
+    # jitter makes the octave decidable from grid evidence (see _drum_pattern).
     monkeypatch.setattr(drum_classify, "_MODEL", None)
-    y = _drum_pattern(bpm)
+    y = _drum_pattern(bpm, jitter_ms=8.0)
     onsets = _detect_onsets(y, SR)
     coarse, conf = _detect_tempo(y, SR, onsets)
     assert conf > 0.0
