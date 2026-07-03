@@ -27,9 +27,18 @@ _QUANT_CONF_MIN = 0.5  # below this we emit raw onset times (don't trust tempo)
 # shuffle while removing random jitter: closest to "what you meant". Lower
 # values keep a fraction of the per-hit jitter too.
 _QUANT_STRENGTH = 1.0
-_SWING_MIN_OFF = 4     # need at least this many off-beat onsets to trust a swing
-_SWING_NOISE = 0.03    # |lean| below this fraction of a step is jitter, not swing
-_SWING_MAX = 0.30      # cap: past this the "swing" is probably a misdetected grid
+_SWING_MIN_OFF = 4      # need at least this many onsets in an off bucket
+# Swing floors, in fractions of a 16th step — calibrated on the fixture takes:
+# performers systematically DRAG their off-beats by articulation (~0.17 step
+# measured on a straight-intent take), which is laziness to correct, not feel
+# to preserve. Real shuffle starts around 55% swing (0.2 step for off-8ths,
+# 0.1-0.2 for off-16ths). Below the floor -> treat as straight.
+_SWING_NOISE_8 = 0.20
+_SWING_NOISE_16 = 0.12
+# Cap at the fold-over limit: past ~0.5 step the swung off-8th is closer to
+# the NEXT 16th line and residual bucketing can't see it anyway. (Full
+# triplet shuffle = 0.67 step is a known blind spot.)
+_SWING_MAX = 0.45
 
 
 def _detect_tempo(y: np.ndarray, sr: int, onset_times: np.ndarray) -> tuple[float, float]:
@@ -146,32 +155,45 @@ def _octave_score(bpm: float, onsets: np.ndarray, ioi_bpm: float | None) -> floa
     return score
 
 
-def _swing_frac(onsets: np.ndarray, bpm: float, phase: float) -> float:
-    """Mean off-beat lag as a fraction of a 16th step (0 = straight grid).
+def _swing_frac(onsets: np.ndarray, bpm: float, phase: float) -> tuple[float, float]:
+    """(swing8, swing16): mean lag of off-8ths / off-16ths, in 16th steps.
 
-    The swing signature: off-beat 16ths land late relative to on-beats in a
-    shuffled performance. Gated so noise can't invent a shuffle — needs
-    ``_SWING_MIN_OFF`` off-beat onsets and a lean above the jitter floor;
-    implausibly large leans are capped (a huge "swing" usually means the grid
-    itself is wrong).
+    Swing lives at two levels and they are NOT the same thing: a classic
+    shuffle delays the off-beat EIGHTHS (16th-grid line index ≡ 2 mod 4 —
+    the "and"s), hip-hop swing delays the off-SIXTEENTHS (odd indices — the
+    "e"s and "a"s). Measuring only odd-vs-even 16ths is blind to the common
+    8th shuffle (the delayed "and"s land on EVEN indices). Each component is
+    gated independently so noise can't invent a shuffle: ``_SWING_MIN_OFF``
+    onsets in its own off bucket, a jitter floor, and a cap (a huge "swing"
+    usually means the grid itself is wrong). Beats (index ≡ 0 mod 4) anchor
+    both components.
     """
     onsets = np.asarray(onsets, dtype=float)
     if onsets.size == 0 or bpm <= 0:
-        return 0.0
+        return 0.0, 0.0
     step = 60.0 / bpm / 4.0
-    lean: dict[int, list[float]] = {0: [], 1: []}
+    res: dict[int, list[float]] = {0: [], 1: [], 2: [], 3: []}
     for t in onsets:
         pos = t / step - phase
         idx = int(round(pos))
-        lean[idx % 2].append(pos - idx)  # residual in steps
-    if len(lean[1]) < _SWING_MIN_OFF:
-        return 0.0
-    on = float(np.mean(lean[0])) if lean[0] else 0.0
-    off = float(np.mean(lean[1]))
-    swing = off - on
-    if abs(swing) < _SWING_NOISE:
-        return 0.0
-    return float(np.clip(swing, -_SWING_MAX, _SWING_MAX))
+        res[idx % 4].append(pos - idx)  # residual in steps
+    on = float(np.mean(res[0])) if res[0] else 0.0
+
+    def lean(vals: list[float], floor: float) -> float:
+        if len(vals) < _SWING_MIN_OFF:
+            return 0.0
+        arr = np.asarray(vals, dtype=float) - on
+        s = float(arr.mean())
+        # Consistency gate: a real shuffle is SYSTEMATIC — every off-beat
+        # leans the same way. A mean assembled from scattered mixed-sign
+        # residuals (measured on a real take: +0.14/-0.02 buckets pooling to
+        # a fake +0.11 "swing") must not pass.
+        sem = float(arr.std(ddof=1) / np.sqrt(len(arr))) if len(arr) > 1 else 0.0
+        if abs(s) < floor or abs(s) <= 2.0 * sem:
+            return 0.0
+        return float(np.clip(s, -_SWING_MAX, _SWING_MAX))
+
+    return lean(res[2], _SWING_NOISE_8), lean(res[1] + res[3], _SWING_NOISE_16)
 
 
 def _grid_phase(onsets: np.ndarray, bpm: float) -> float:
@@ -185,22 +207,33 @@ def _grid_phase(onsets: np.ndarray, bpm: float) -> float:
 
 
 def _quantise_grid(
-    t_s: float, tempo_bpm: float, phase: float, swing: float = 0.0, strength: float = 1.0
+    t_s: float,
+    tempo_bpm: float,
+    phase: float,
+    swing8: float = 0.0,
+    swing16: float = 0.0,
+    strength: float = 1.0,
 ) -> float:
     """Pull ``t_s`` toward a (possibly swung) 16th grid at ``(n + phase) * step``.
 
     ``phase`` (from :func:`_grid_phase`) aligns the grid to the performer's
     lead-in so snapping pulls hits toward the played timing rather than an
-    arbitrary phase-0 grid. ``swing`` (from :func:`_swing_frac`, in fractions
-    of a step) shifts the odd (off-beat) grid lines late, so a shuffled
-    performance snaps to its own shuffle instead of being straightened.
-    ``strength`` blends: 1.0 = hard snap (the historic behaviour), 0.0 = raw
-    performed time.
+    arbitrary phase-0 grid. ``swing8``/``swing16`` (from :func:`_swing_frac`,
+    in fractions of a step) shift the off-8th / off-16th grid lines late, so
+    a shuffled performance snaps to its own shuffle instead of being
+    straightened. ``strength`` blends: 1.0 = hard snap (the historic
+    behaviour), 0.0 = raw performed time.
 
     Clamped at 0: a negative phase can place the first grid cell's target at
     a negative time, which MIDI (and mido) cannot represent.
     """
     step = 60.0 / tempo_bpm / 4.0
     idx = round(t_s / step - phase)
-    target = (idx + phase + (swing if idx % 2 else 0.0)) * step
+    if idx % 2:
+        shift = swing16
+    elif idx % 4 == 2:
+        shift = swing8
+    else:
+        shift = 0.0
+    target = (idx + phase + shift) * step
     return max(0.0, t_s + strength * (target - t_s))

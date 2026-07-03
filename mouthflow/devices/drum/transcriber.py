@@ -52,7 +52,7 @@ class DrumTranscriber:
         # tempo (or wrong grid phase) shears every hit off the played timing and
         # tanks onset F1; raw onsets are the safe fallback.
         trust_tempo = confidence >= drum_tempo._QUANT_CONF_MIN
-        phase = swing = shift = 0.0
+        phase = shift = swing8 = swing16 = 0.0
         if trust_tempo:
             if tempo is None:
                 # Sharpen the octave-correct estimate to sub-BPM.
@@ -63,7 +63,7 @@ class DrumTranscriber:
             # grid lands on Live's downbeat — relative timing preserved, loop
             # still tight on the project grid.
             phase = drum_tempo._grid_phase(kept_times, tempo_bpm)
-            swing = drum_tempo._swing_frac(kept_times, tempo_bpm, phase)
+            swing8, swing16 = drum_tempo._swing_frac(kept_times, tempo_bpm, phase)
             if bar_align:
                 shift = phase * (60.0 / tempo_bpm / 4.0)
 
@@ -73,13 +73,16 @@ class DrumTranscriber:
             if trust_tempo:
                 # Dedup on the hard-snapped slot; emit the strength-blended
                 # time (feel preserved, grid respected).
-                t_slot = drum_tempo._quantise_grid(t, tempo_bpm, phase, swing=swing)
+                t_slot = drum_tempo._quantise_grid(
+                    t, tempo_bpm, phase, swing8=swing8, swing16=swing16
+                )
                 key = (round((t_slot - shift) * 1000), note)
                 if key in seen:
                     continue
                 seen.add(key)
                 t_out = drum_tempo._quantise_grid(
-                    t, tempo_bpm, phase, swing=swing, strength=drum_tempo._QUANT_STRENGTH
+                    t, tempo_bpm, phase, swing8=swing8, swing16=swing16,
+                    strength=drum_tempo._QUANT_STRENGTH,
                 )
                 t_out = max(0.0, t_out - shift)
             else:

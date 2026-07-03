@@ -63,18 +63,30 @@ def test_spearman_detects_monotone_agreement():
     assert rho == pytest.approx(-1.0)
 
 
-def test_swing_lean_measures_late_offbeats():
-    # 16ths at 120 BPM (step 125 ms), off-beats 30 ms late = swung feel.
+def test_swing_lean_measures_late_off16ths():
+    # 16ths at 120 BPM (step 125 ms), off-16ths 30 ms late = hip-hop swing.
     step = 60.0 / 120.0 / 4.0
     times = []
     for n in range(8):
-        times.append(n * 2 * step)                 # on-beats on the grid
-        times.append((n * 2 + 1) * step + 0.030)   # off-beats late
+        times.append(n * 2 * step)                 # even slots on the grid
+        times.append((n * 2 + 1) * step + 0.030)   # odd (off-16th) slots late
     lean = _swing_lean(times, 120.0)
-    assert lean is not None
-    on, off, n_off = lean
-    assert n_off == 8
-    assert off - on == pytest.approx(30.0, abs=3.0)
+    assert lean is not None and "off16" in lean
+    assert lean["off16"] == pytest.approx(30.0, abs=3.0)
+
+
+def test_swing_lean_sees_classic_8th_shuffle():
+    # 8th-note hats at 120 BPM, the off-beat "and"s 30 ms late — the classic
+    # shuffle. These land on EVEN 16th indices (2 mod 4): a 16th-parity-only
+    # metric is structurally blind to it.
+    step = 60.0 / 120.0 / 4.0
+    times = []
+    for n in range(8):
+        times.append(n * 4 * step)                 # beats on the grid
+        times.append((n * 4 + 2) * step + 0.030)   # off-8ths late
+    lean = _swing_lean(times, 120.0)
+    assert lean is not None and "off8" in lean
+    assert lean["off8"] == pytest.approx(30.0, abs=3.0)
 
 
 # --- note_eval: wrong-pitch matches are precision failures --------------------

@@ -187,7 +187,10 @@ def make_plan(
     response = client.messages.create(
         model=model,
         max_tokens=1024,
-        thinking={"type": "disabled"},
+        # The pinned anthropic SDK (0.39.0, held back by the httpx pin) has no
+        # typed `thinking` kwarg — a bare thinking= is a TypeError. extra_body
+        # serialises straight into the request JSON, which is all we need.
+        extra_body={"thinking": {"type": "disabled"}},
         system=[
             {
                 "type": "text",

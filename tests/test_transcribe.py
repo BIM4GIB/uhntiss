@@ -130,23 +130,49 @@ def test_quantise_grid_strength_blends_toward_raw():
     assert abs(soft - 0.25) < abs(raw - 0.25)
 
 
-def test_quantise_grid_swing_shifts_offbeat_lines():
+def test_quantise_grid_swing_shifts_off16th_lines():
     from mouthflow.devices.drum.tempo import _swing_frac
 
     step = 60 / 120 / 4
-    # A shuffled performance: on-beats on the grid, off-beats 25% of a step late.
+    # Hip-hop swing: even 16th slots on the grid, odd slots 25% of a step late.
     onsets = []
     for n in range(8):
         onsets.append(n * 2 * step)
         onsets.append((n * 2 + 1) * step + 0.25 * step)
-    swing = _swing_frac(np.array(onsets), 120, phase=0.0)
-    assert swing == pytest.approx(0.25, abs=0.03)
-    # An off-beat hit snaps to the SWUNG line, not the straight one.
+    swing8, swing16 = _swing_frac(np.array(onsets), 120, phase=0.0)
+    assert swing16 == pytest.approx(0.25, abs=0.03)
+    # An off-16th hit snaps to the SWUNG line, not the straight one.
     late_off = 1 * step + 0.25 * step + 0.005
-    snapped = _quantise_grid(late_off, 120, 0.0, swing=swing)
-    assert snapped == pytest.approx((1 + swing) * step, abs=0.004)
+    snapped = _quantise_grid(late_off, 120, 0.0, swing16=swing16)
+    assert snapped == pytest.approx((1 + swing16) * step, abs=0.004)
     # On-beat lines are untouched by swing.
-    assert _quantise_grid(2 * step + 0.001, 120, 0.0, swing=swing) == pytest.approx(2 * step, abs=1e-6)
+    assert _quantise_grid(4 * step + 0.001, 120, 0.0, swing16=swing16) == pytest.approx(
+        4 * step, abs=1e-6
+    )
+
+
+def test_quantise_grid_sees_classic_8th_shuffle():
+    from mouthflow.devices.drum.tempo import _swing_frac
+
+    step = 60 / 120 / 4
+    # Classic shuffle: beats on the grid, the off-beat "and"s 25% of a step
+    # late. Those land on EVEN 16th indices (2 mod 4) — parity-only swing
+    # detection was structurally blind to this and straightened the shuffle.
+    onsets = []
+    for n in range(8):
+        onsets.append(n * 4 * step)
+        onsets.append((n * 4 + 2) * step + 0.25 * step)
+    swing8, swing16 = _swing_frac(np.array(onsets), 120, phase=0.0)
+    assert swing8 == pytest.approx(0.25, abs=0.03)
+    assert swing16 == 0.0  # no off-16th onsets -> gated
+    # The off-8th hit snaps to its swung line; beats stay put.
+    late_and = 2 * step + 0.25 * step + 0.005
+    assert _quantise_grid(late_and, 120, 0.0, swing8=swing8) == pytest.approx(
+        (2 + swing8) * step, abs=0.004
+    )
+    assert _quantise_grid(4 * step + 0.001, 120, 0.0, swing8=swing8) == pytest.approx(
+        4 * step, abs=1e-6
+    )
 
 
 def test_swing_frac_gates_out_noise_and_sparse_data():
@@ -156,10 +182,10 @@ def test_swing_frac_gates_out_noise_and_sparse_data():
     # Straight 16ths with tiny jitter -> no swing invented.
     rng = np.random.default_rng(7)
     straight = np.array([n * step + rng.normal(0, 0.002) for n in range(16)])
-    assert _swing_frac(straight, 120, 0.0) == 0.0
+    assert _swing_frac(straight, 120, 0.0) == (0.0, 0.0)
     # Too few off-beat samples -> no swing.
     quarters = np.array([n * 4 * step for n in range(8)])
-    assert _swing_frac(quarters, 120, 0.0) == 0.0
+    assert _swing_frac(quarters, 120, 0.0) == (0.0, 0.0)
 
 
 def test_bar_align_translates_instead_of_shearing(tmp_path, monkeypatch):

@@ -53,13 +53,20 @@ def _kit_cache_path(category: str) -> Path:
 
 
 def _read_kit_cache(category: str) -> list[dict] | None:
-    """Fresh cached kit list for ``category``, or None."""
-    import time
+    """Fresh cached kit list for ``category``, or None.
 
+    Defensive about shape: a hand-edited or corrupt file must degrade to a
+    live walk, never crash a take after the performance.
+    """
     try:
         data = json.loads(_kit_cache_path(category).read_text())
+        if not isinstance(data, dict):
+            return None
         kits = data.get("kits")
-        if kits and time.time() - float(data.get("ts", 0)) <= _KIT_CACHE_TTL_S:
+        if (
+            isinstance(kits, list) and kits
+            and time.time() - float(data.get("ts", 0)) <= _KIT_CACHE_TTL_S
+        ):
             return kits
     except (OSError, ValueError, TypeError):
         pass
@@ -67,13 +74,34 @@ def _read_kit_cache(category: str) -> list[dict] | None:
 
 
 def _write_kit_cache(category: str, kits: list[dict]) -> None:
-    import time
+    import os
+    import tempfile
 
     try:
         _STATE_DIR.mkdir(parents=True, exist_ok=True)
-        _kit_cache_path(category).write_text(json.dumps({"ts": time.time(), "kits": kits}))
+        # Atomic replace: the warm thread and a concurrent CLI must never
+        # leave a half-written file for a reader to trip over.
+        fd, tmp = tempfile.mkstemp(dir=_STATE_DIR, prefix=".kits-")
+        with os.fdopen(fd, "w") as f:
+            f.write(json.dumps({"ts": time.time(), "kits": kits}))
+        os.replace(tmp, _kit_cache_path(category))
     except OSError:
         pass  # cache is an optimisation; never let it kill a take
+
+
+def _maybe_warm(instruments_override: str | None, device: str, host: str, port: int):
+    """Kick off a background kit-cache refresh when the take will need one.
+
+    Skipped for an explicit --instruments override and for --device auto
+    (the voice isn't known yet). A bad --device id surfaces later with the
+    proper error, so it's silently skipped here.
+    """
+    if instruments_override or device == "auto":
+        return None
+    try:
+        return _warm_kit_cache(get_device_by_id(device), host, port)
+    except KeyError:
+        return None
 
 
 def _warm_kit_cache(spec: DeviceSpec, host: str, port: int):
@@ -93,6 +121,7 @@ def _warm_kit_cache(spec: DeviceSpec, host: str, port: int):
                 kits = c.list_instruments(spec.browser_category, name_filter=spec.instrument_filter)
             if kits:
                 _write_kit_cache(spec.browser_category, kits)
+                _log(f"kit cache refreshed ({len(kits)} {spec.id} instruments)")
         except Exception:
             pass
 
@@ -187,7 +216,7 @@ def _resolve_instruments(
     cached = _read_kit_cache(spec.browser_category)
     if cached:
         sampled = _sample_kits(cached, _PLANNER_KIT_BUDGET)
-        _log(f"using cached kit list ({len(cached)} {spec.id} instruments; refreshed in background)")
+        _log(f"using cached kit list ({len(cached)} {spec.id} instruments)")
         return sampled
     if client is not None:
         try:
@@ -291,9 +320,10 @@ def _run_pipeline(
     if refine_meta["bars"]:
         _log(f"  fit to {refine_meta['bars']} bars (loops on the grid)")
 
-    # Give the capture-time cache warmer a moment to land its file, so the
-    # first take of a session also skips the serialized browser walk.
-    if warm_thread is not None:
+    # Give the capture-time cache warmer a moment to land its file — but only
+    # when there's no usable cache yet (the first take of a session). Later
+    # takes proceed immediately on the previous list while the refresh lands.
+    if warm_thread is not None and _read_kit_cache(spec.browser_category) is None:
         warm_thread.join(timeout=10.0)
     instruments = _resolve_instruments(instruments_override, client, spec)
 
@@ -402,9 +432,7 @@ def record(
                 _log(f"using project tempo {tempo:.1f} BPM")
         # Refresh the kit cache WHILE we record — the planner then reads a
         # file instead of waiting seconds for a serialized browser walk.
-        warm = None
-        if not instruments and device != "auto":
-            warm = _warm_kit_cache(get_device_by_id(device), host, port)
+        warm = _maybe_warm(instruments, device, host, port)
         if countin > 0:
             _count_in(countin)
         _log(f"recording {duration}s")
@@ -479,9 +507,7 @@ def record_stream(
             stop.set()  # explicit stop, or stdin closed
 
         threading.Thread(target=_watch_stdin, daemon=True).start()
-        warm = None
-        if not instruments and device != "auto":
-            warm = _warm_kit_cache(get_device_by_id(device), host, port)
+        warm = _maybe_warm(instruments, device, host, port)
         _log("recording — send 'stop' to finish (or close stdin)")
         wav = capture.record_until_stop(
             stop.is_set, input_device=input,
@@ -539,6 +565,7 @@ def run(
             key=key,
             scale=scale,
             bars=bars,
+            warm_thread=_maybe_warm(instruments, device, host, port),
         )
         _emit_or_apply(plan, json_out=json_out, client=client, set_tempo=set_tempo)
 
@@ -755,6 +782,7 @@ def transcribe_clip(
             key=key,
             scale=scale,
             bars=bars,
+            warm_thread=_maybe_warm(instruments, device, host, port),
         )
         _emit_or_apply(plan, json_out=json_out, client=client, set_tempo=set_tempo)
 
@@ -797,6 +825,7 @@ def retry_last(
             hint=state.get("hint"),
             instruments_override=_parse_instruments(saved_instruments),
             device_id=device_id,
+            warm_thread=_maybe_warm(saved_instruments, device_id, host, port),
             tempo=state.get("tempo"),
             bar_align=state.get("bar_align", True),
             correct=state.get("correct", True),

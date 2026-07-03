@@ -27,16 +27,23 @@ _BASS_CEILING = 52
 # pitch stability are established within a few seconds, and pyin over a full
 # take costs seconds that the device transcriber then re-spends. Analyse a
 # window (skipping is fine — the router's verdict picks which transcriber
-# runs on the FULL audio).
+# runs on the FULL audio). The window is anchored to the first audible
+# energy, NOT t=0: a performer who breathes for a few seconds before humming
+# would otherwise fill the window with unvoiced lead-in and route to drums.
 _ROUTER_WINDOW_S = 6.0
+_ROUTER_TRIM_DB = 30.0  # leading/trailing quiet below (max - 30dB) is lead-in
 
 
 def classify(wav_path: Path) -> tuple[Intent, float]:
     import librosa
 
-    y, sr = librosa.load(str(wav_path), sr=signal._SR, mono=True, duration=_ROUTER_WINDOW_S)
+    y, sr = librosa.load(str(wav_path), sr=signal._SR, mono=True)
     if y.size == 0:
         return (Intent.UNKNOWN, 0.0)
+    y_trim, _ = librosa.effects.trim(y, top_db=_ROUTER_TRIM_DB)
+    if y_trim.size:
+        y = y_trim
+    y = y[: int(_ROUTER_WINDOW_S * sr)]
 
     f0, voiced_flag, voiced_prob = librosa.pyin(
         y, fmin=65.0, fmax=1000.0, sr=sr, frame_length=2048, hop_length=512

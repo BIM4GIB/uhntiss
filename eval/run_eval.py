@@ -144,10 +144,15 @@ def _spearman(a: list[float], b: list[float]) -> float | None:
     return float(((ra - ra.mean()) * (rb - rb.mean())).mean() / denom)
 
 
-def _swing_lean(times: list[float], bpm: float) -> tuple[float, float, int] | None:
-    """(on_beat_ms, off_beat_ms, n_off): mean pre-snap residual per 16th-slot
-    parity — the swing signature ``eval/timing_probe.py`` measures. None when
-    there's too little signal (< 3 off-beat samples)."""
+def _swing_lean(times: list[float], bpm: float) -> dict[str, float] | None:
+    """Swing leans in ms, per level: ``{"off8": ..., "off16": ...}``.
+
+    ``off8`` is the mean lag of off-beat 8ths (16th-grid index ≡ 2 mod 4 —
+    the classic shuffle), ``off16`` the lag of off-16ths (odd indices —
+    hip-hop swing), each relative to the beats. A component is present only
+    with ≥ 3 onsets in its bucket; None when neither has enough signal.
+    Mirrors ``devices/drum/tempo._swing_frac``.
+    """
     import numpy as np
 
     if not times or bpm <= 0:
@@ -156,16 +161,17 @@ def _swing_lean(times: list[float], bpm: float) -> tuple[float, float, int] | No
     step = 60.0 / bpm / 4.0
     frac = (t / step) % 1.0
     phase = float(np.angle(np.mean(np.exp(2j * np.pi * frac))) / (2 * np.pi))
-    lean = {0: [], 1: []}
+    res: dict[int, list[float]] = {0: [], 1: [], 2: [], 3: []}
     for x in t:
         idx = int(round(x / step - phase))
-        resid = (x - (idx + phase) * step) * 1000.0
-        lean[idx % 2].append(resid)
-    if len(lean[1]) < 3:
-        return None
-    on = float(np.mean(lean[0])) if lean[0] else 0.0
-    off = float(np.mean(lean[1]))
-    return on, off, len(lean[1])
+        res[idx % 4].append((x - (idx + phase) * step) * 1000.0)
+    on = float(np.mean(res[0])) if res[0] else 0.0
+    comps: dict[str, float] = {}
+    if len(res[2]) >= 3:
+        comps["off8"] = float(np.mean(res[2])) - on
+    if len(res[1]) + len(res[3]) >= 3:
+        comps["off16"] = float(np.mean(res[1] + res[3])) - on
+    return comps or None
 
 
 def _evaluate_clip(wav: Path) -> ClipResult | None:
@@ -206,7 +212,9 @@ def _evaluate_clip(wav: Path) -> ClipResult | None:
             gt_lean = _swing_lean([gt_notes[j][0] for _, j in matches], gt_tempo)
             pred_lean = _swing_lean([pred_notes[i][0] for i, _ in matches], gt_tempo)
             if gt_lean and pred_lean:
-                swing_err = abs((pred_lean[1] - pred_lean[0]) - (gt_lean[1] - gt_lean[0]))
+                shared = set(gt_lean) & set(pred_lean)
+                if shared:
+                    swing_err = max(abs(pred_lean[k] - gt_lean[k]) for k in shared)
 
     return ClipResult(
         name=wav.stem,

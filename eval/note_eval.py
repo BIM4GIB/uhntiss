@@ -32,11 +32,14 @@ from mouthflow.devices.pitched import PitchedTranscriber
 MIMIC = Path(__file__).resolve().parent.parent / "mimic"
 ONSET_TOL = 0.12  # seconds; a predicted note must land this close to the reference
 
-# The offset compensates reaction time + audio latency, which are small. A
-# ±0.5s free search could slide a whole note slot (at 100 BPM 8ths, slots are
-# 0.3s apart) and lock onto an off-by-one alignment with equal match count —
-# the slot-aliasing failure the drum harness (mimic/take.py) guards against.
-OFFSET_MAX = 0.15
+# The offset compensates reaction time + audio latency. On this rig the drum
+# harness measures 0.12-0.30s (mimic/take.py searches exactly that window), so
+# the search must reach past 0.30s — but stay one-sided and bounded: latency
+# is never meaningfully negative, and a symmetric ±0.5s free search could
+# slide a whole note slot (at 100 BPM 8ths, slots are 0.3s apart) and lock
+# onto an off-by-one alignment with equal match count.
+OFFSET_MIN = -0.05
+OFFSET_MAX = 0.35
 
 
 def _align_offset(pred_t: np.ndarray, ref_t: np.ndarray) -> float:
@@ -48,7 +51,7 @@ def _align_offset(pred_t: np.ndarray, ref_t: np.ndarray) -> float:
     if pred_t.size == 0 or ref_t.size == 0:
         return 0.0
     best, best_key = 0.0, (-1, 0.0)
-    for d in np.arange(-OFFSET_MAX, OFFSET_MAX + 1e-9, 0.005):
+    for d in np.arange(OFFSET_MIN, OFFSET_MAX + 1e-9, 0.005):
         n = sum(np.any(np.abs(pred_t - (tg + d)) <= ONSET_TOL) for tg in ref_t)
         key = (n, -abs(d))
         if key > best_key:

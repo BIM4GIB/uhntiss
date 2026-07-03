@@ -203,12 +203,22 @@ def score(name, clip, force=False):
     n = len(rows)
     mc = sum(1 for t, m, h in rows if m == t)
     hc = sum(1 for t, m, h in rows if h == t)
-    print(f"{name}: matched {n}/{len(grid)} (offset {best*1000:.0f}ms) | "
-          f"model {mc}/{n}={mc/n:.2f}  heuristic {hc}/{n}={hc/n:.2f}")
+    if n == 0:
+        # Zero matches is the most extreme misalignment — report it instead
+        # of crashing on the accuracy division below.
+        print(f"{name}: matched 0/{len(grid)} — no onset landed near any grid note")
+        ok, why = _labels_look_sane(0, len(grid), 0)
+    else:
+        print(f"{name}: matched {n}/{len(grid)} (offset {best*1000:.0f}ms) | "
+              f"model {mc}/{n}={mc/n:.2f}  heuristic {hc}/{n}={hc/n:.2f}")
 
     # Sanity-gate before anything is persisted: a misaligned take must not
-    # bake mislabels into the training data or the regression corpus.
-    ok, why = _labels_look_sane(n, len(grid), hc)
+    # bake mislabels into the training data or the regression corpus. (Note:
+    # this gate is calibrated for playrec takes; a take captured some other
+    # way can sit outside the 0.12-0.30s offset search and fail here even
+    # when a wider alignment would fit — that's what --force is for.)
+    if n > 0:
+        ok, why = _labels_look_sane(n, len(grid), hc)
     if not ok and not force:
         print(f"  ** {why} (pass --force to override)")
         return

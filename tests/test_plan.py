@@ -136,8 +136,17 @@ def test_make_plan_round_trips_valid_tool_output(tmp_path):
     assert req["tool_choice"] == {"type": "tool", "name": "emit_plan"}
     assert req["tools"][0]["name"] == "emit_plan"
     # Thinking is disabled explicitly (adaptive-on-by-omission would add
-    # latency to a forced tool call).
-    assert req["thinking"] == {"type": "disabled"}
+    # latency to a forced tool call) — via extra_body: the pinned SDK has no
+    # typed `thinking` kwarg.
+    assert req["extra_body"] == {"thinking": {"type": "disabled"}}
+    # Every kwarg we pass must exist in the PINNED SDK's create() signature —
+    # an unknown kwarg is a TypeError on the first real (non-test) call.
+    import inspect
+
+    import anthropic as _anthropic
+
+    allowed = set(inspect.signature(_anthropic.resources.messages.Messages.create).parameters)
+    assert set(req) <= allowed - {"self"}, set(req) - allowed
     # System is [static prompt, instrument list], BOTH cache-marked, so a
     # repeat take re-processes only the tiny per-take user message.
     assert isinstance(req["system"], list) and len(req["system"]) == 2
