@@ -407,4 +407,4 @@ Max.addHandler("cancel", () => {
   }
 });
 
-status("mouthflow device ready");
+status("mouthflow drone ready · 56d9e19");
