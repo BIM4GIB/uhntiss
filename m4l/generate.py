@@ -112,14 +112,19 @@ def make_panel(maxpat: dict, js_filename: str, title: str) -> dict:
 _NODE_INLET = "obj-4"  # node.script object; all controls feed its inlet 0
 
 
-def _inject_controls(maxpat: dict) -> None:
-    """Append the pitched-voice controls and wire them to the node.script inlet.
+def _inject_controls(maxpat: dict, pitched: bool = True) -> None:
+    """Append the in-device controls and wire them to the node.script inlet.
 
     All are clones of the template's proven UI pattern (a UI object -> an
     optional ``prepend <handler>`` -> the node.script inlet), so the glue's
     existing message handlers (transcribe_clip / record_start / record_stop /
     bars / correct / key / scale) receive them. New ids start at obj-200 to
     avoid colliding with the template (max id 153).
+
+    ``pitched=False`` (the drums panel) keeps the voice-neutral controls —
+    Transcribe Clip, record start/stop, the level meter — and skips the
+    note-correction / bar-fit fields, which only the pitched refine stage
+    reads.
     """
     boxes = maxpat["patcher"]["boxes"]
     lines = maxpat["patcher"].setdefault("lines", [])
@@ -166,32 +171,33 @@ def _inject_controls(maxpat: dict) -> None:
     for b in ("obj-200", "obj-201", "obj-202"):
         wire(b, _NODE_INLET)
 
-    # bars: textedit -> prepend bars -> node
-    comment("obj-212", "bars(1-16)", [860, 170, 150, 18], [330, 96, 60, 16])
-    textedit("obj-210", [720, 170, 120, 22], [392, 94, 44, 22])
-    newobj("obj-211", "prepend bars", [720, 200, 110, 22])
-    wire("obj-210", "obj-211"); wire("obj-211", _NODE_INLET)
+    if pitched:
+        # bars: textedit -> prepend bars -> node
+        comment("obj-212", "bars(1-16)", [860, 170, 150, 18], [330, 96, 60, 16])
+        textedit("obj-210", [720, 170, 120, 22], [392, 94, 44, 22])
+        newobj("obj-211", "prepend bars", [720, 200, 110, 22])
+        wire("obj-210", "obj-211"); wire("obj-211", _NODE_INLET)
 
-    # correct: toggle (defaulted ON via loadbang) -> prepend correct -> node
-    comment("obj-222", "correct", [880, 240, 80, 18], [444, 96, 46, 16])
-    toggle("obj-220", [720, 240, 24, 24], [492, 94, 20, 20])
-    newobj("obj-221", "prepend correct", [760, 240, 120, 22])
-    newobj("obj-223", "loadbang", [920, 240, 60, 22])
-    msg("obj-224", "1", [920, 272, 32, 20])
-    wire("obj-220", "obj-221"); wire("obj-221", _NODE_INLET)
-    wire("obj-223", "obj-224"); wire("obj-224", "obj-220")
+        # correct: toggle (defaulted ON via loadbang) -> prepend correct -> node
+        comment("obj-222", "correct", [880, 240, 80, 18], [444, 96, 46, 16])
+        toggle("obj-220", [720, 240, 24, 24], [492, 94, 20, 20])
+        newobj("obj-221", "prepend correct", [760, 240, 120, 22])
+        newobj("obj-223", "loadbang", [920, 240, 60, 22])
+        msg("obj-224", "1", [920, 272, 32, 20])
+        wire("obj-220", "obj-221"); wire("obj-221", _NODE_INLET)
+        wire("obj-223", "obj-224"); wire("obj-224", "obj-220")
 
-    # key: textedit -> prepend key -> node
-    comment("obj-232", "key", [860, 290, 60, 18], [330, 124, 24, 16])
-    textedit("obj-230", [720, 290, 120, 22], [356, 122, 46, 22])
-    newobj("obj-231", "prepend key", [720, 320, 100, 22])
-    wire("obj-230", "obj-231"); wire("obj-231", _NODE_INLET)
+        # key: textedit -> prepend key -> node
+        comment("obj-232", "key", [860, 290, 60, 18], [330, 124, 24, 16])
+        textedit("obj-230", [720, 290, 120, 22], [356, 122, 46, 22])
+        newobj("obj-231", "prepend key", [720, 320, 100, 22])
+        wire("obj-230", "obj-231"); wire("obj-231", _NODE_INLET)
 
-    # scale: textedit -> prepend scale -> node
-    comment("obj-242", "scale", [860, 350, 60, 18], [410, 124, 34, 16])
-    textedit("obj-240", [720, 350, 120, 22], [446, 122, 90, 22])
-    newobj("obj-241", "prepend scale", [720, 380, 100, 22])
-    wire("obj-240", "obj-241"); wire("obj-241", _NODE_INLET)
+        # scale: textedit -> prepend scale -> node
+        comment("obj-242", "scale", [860, 350, 60, 18], [410, 124, 34, 16])
+        textedit("obj-240", [720, 350, 120, 22], [446, 122, 90, 22])
+        newobj("obj-241", "prepend scale", [720, 380, 100, 22])
+        wire("obj-240", "obj-241"); wire("obj-241", _NODE_INLET)
 
     # input level meter: node.script outlet 0 -> route level -> flonum (dBFS
     # while record-streaming). Parallel to the template's own
@@ -235,12 +241,12 @@ def _validate(maxpat: dict) -> None:
                 raise RuntimeError(f"patchline {end} references missing box {ref}")
 
 
-def generate_panel(voice: str, out_name: str, title: str) -> tuple[Path, str]:
+def generate_panel(voice: str, out_name: str, title: str, pitched: bool = True) -> tuple[Path, str]:
     js_name = write_voice_glue(voice)
     prefix, maxpat = read_maxpat(_TEMPLATE)
     make_panel(maxpat, js_name, title)
-    _inject_controls(maxpat)  # the pitched voices share one control set
-    _grow_device(maxpat)  # make room for the taller control stack
+    _inject_controls(maxpat, pitched=pitched)
+    _grow_device(maxpat)  # make room for the second control column
     _validate(maxpat)
     out = _HERE / out_name
     write_amxd(out, prefix, maxpat)
@@ -254,10 +260,15 @@ def _self_check() -> None:
     print("ok   container round-trip is byte-identical")
 
 
+# (voice, output panel, header title, pitched controls?)
+# MouthflowDrums supersedes the bare template Mouthflow.amxd (still installed
+# for compatibility): same drums voice, plus Transcribe Clip, the start/stop
+# record buttons, and the input level meter.
 _PANELS = [
-    ("bass", "MouthflowBass.amxd", "MOUTHFLOW · BASS"),
-    ("lead", "MouthflowLead.amxd", "MOUTHFLOW · LEAD"),
-    ("drone", "MouthflowDrone.amxd", "MOUTHFLOW · DRONE"),
+    ("drums", "MouthflowDrums.amxd", "MOUTHFLOW · DRUMS", False),
+    ("bass", "MouthflowBass.amxd", "MOUTHFLOW · BASS", True),
+    ("lead", "MouthflowLead.amxd", "MOUTHFLOW · LEAD", True),
+    ("drone", "MouthflowDrone.amxd", "MOUTHFLOW · DRONE", True),
 ]
 
 
@@ -271,8 +282,8 @@ def install_to_user_library(dest: Path = _USER_DEVICES) -> None:
     if not dest.is_dir():
         raise SystemExit(f"User Library devices folder not found: {dest}")
     names = ["Mouthflow.amxd", "mouthflow.js", "package.json"]
-    names += [out for _, out, _ in _PANELS]
-    names += [f"mouthflow_{voice}.js" for voice, _, _ in _PANELS]
+    names += [out for _, out, _, _ in _PANELS]
+    names += [f"mouthflow_{voice}.js" for voice, _, _, _ in _PANELS]
     for name in names:
         src = _HERE / name
         if not src.exists():
@@ -293,8 +304,8 @@ def main() -> None:
     args = parser.parse_args()
 
     _self_check()
-    for voice, out_name, title in _PANELS:
-        out, js_name = generate_panel(voice, out_name, title)
+    for voice, out_name, title, pitched in _PANELS:
+        out, js_name = generate_panel(voice, out_name, title, pitched=pitched)
         print(f"ok   wrote {out.name}  ->  node.script {js_name}  (device {voice})")
     if args.install:
         install_to_user_library()
