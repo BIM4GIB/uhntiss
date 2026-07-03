@@ -136,6 +136,9 @@ def _quantise_grid(t_s: float, tempo_bpm: float, phase: float) -> float:
     ``phase`` (from :func:`_grid_phase`) aligns the grid to the performer's
     lead-in so snapping pulls hits toward the played timing rather than an
     arbitrary phase-0 grid. ``phase=0`` reduces to a plain 16th snap.
+
+    Clamped at 0: a negative phase can snap the first grid cell's onset to a
+    negative time, which MIDI (and mido) cannot represent.
     """
     step = 60.0 / tempo_bpm / 4.0
-    return (round(t_s / step - phase) + phase) * step
+    return max(0.0, (round(t_s / step - phase) + phase) * step)

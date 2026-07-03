@@ -78,17 +78,24 @@ class DroneTranscriber:
         clip_bars = max(1, math.ceil(total_dur / bar_s)) if bar_s > 0 else 1
         clip_end = clip_bars * bar_s
 
+        vprob = np.nan_to_num(voiced_prob)
         hits: list[NoteEvent] = []
         for reg in regions:
             start_t = float(times[reg["start"]])
             dur = max(clip_end - start_t, cfg.min_region_s)
             seg_rms = float(np.mean(rms[reg["start"] : reg["end"] + 1]))
+            # Record pyin's voiced-probability for diagnostics and future
+            # gating (e.g. dropping phantom chord tones). Note SUSTAINED clips
+            # are never scale-snapped, so refine's keep-confident rule does
+            # not consume this today.
+            conf = float(np.mean(vprob[reg["start"] : reg["end"] + 1]))
             hits.append(
                 NoteEvent(
                     time_s=start_t,
                     midi_note=int(reg["pitch"]),
                     velocity=signal.velocity_from_rms(seg_rms),
                     duration_s=dur,
+                    confidence=round(conf, 3),
                 )
             )
         hits.sort(key=lambda nt: (nt.time_s, nt.midi_note))

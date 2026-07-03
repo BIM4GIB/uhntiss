@@ -48,7 +48,7 @@ SCALES = {
     "minor_pentatonic": [0, 3, 5, 7, 10],
     "chromatic": list(range(12)),
 }
-_ALLOWED_BARS = (4, 8, 16)
+_ALLOWED_BARS = (1, 2, 4, 8, 16)
 
 
 def _parse_key(s: str) -> int:
@@ -125,13 +125,40 @@ def correct_notes(notes, *, key: str | None = None, scale: str | None = None, ke
 
 # --- bar fit / loop sizing --------------------------------------------------
 
-def fit_to_bars(notes, tempo_bpm: float, spec, beats_per_bar: int = 4):
+def trim_lead_bars(notes, tempo_bpm: float, beats_per_bar: int = 4):
+    """Trim whole empty lead-in bars (a performer breathing before starting).
+
+    Shifts by whole bars only, so every note keeps its position within the
+    bar. Returns ``(notes, lead_bars)`` — the shift is reported so callers can
+    move anything else living on the same timeline (the drone's automation
+    envelope) by the same amount.
+    """
+    sec_per_bar = beats_per_bar * 60.0 / tempo_bpm if tempo_bpm > 0 else 0.0
+    first_s = min((n.time_s for n in notes), default=0.0)
+    if sec_per_bar <= 0 or first_s <= 0:
+        return notes, 0
+    lead_bars = int((first_s + 1e-6) / sec_per_bar)
+    if lead_bars <= 0:
+        return notes, 0
+    shift = lead_bars * sec_per_bar
+    return [replace(n, time_s=n.time_s - shift) for n in notes], lead_bars
+
+
+def fit_to_bars(notes, tempo_bpm: float, spec, beats_per_bar: int = 4, *, sustain: bool = False):
     """Size the clip to a whole bar count and clamp note overhang.
 
     ``spec``: ``"off"`` -> ``(notes, None)`` (keep whatever bars the caller had);
-    ``"auto"`` -> round the take UP to the nearest of 4/8/16 (multiple of 8 past
-    16) so nothing is cut; an int -> force that many bars (notes past the end are
-    dropped, a note straddling the end is clamped). Returns ``(notes, n_bars)``.
+    ``"auto"`` -> round the take UP to the nearest of 1/2/4/8/16 (multiple of 8
+    past 16) so nothing is cut; an int -> force that many bars (notes past the
+    end are dropped, a note straddling the end is clamped).
+
+    Whole empty *lead-in* bars (dead air before the first note) are trimmed
+    first, so a performer who breathes for a bar before starting doesn't loop
+    that silence. ``sustain=True`` (the drone) extends every kept note to the
+    loop end instead of clamping, so a forced bar count never leaves silent
+    bars in a clip whose whole point is to ring continuously.
+
+    Returns ``(notes, n_bars)``.
     """
     if spec == "off":
         return notes, None
@@ -145,6 +172,8 @@ def fit_to_bars(notes, tempo_bpm: float, spec, beats_per_bar: int = 4):
         except (TypeError, ValueError):
             spec = "auto"
     sec_per_bar = beats_per_bar * 60.0 / tempo_bpm if tempo_bpm > 0 else 0.0
+    notes, _ = trim_lead_bars(notes, tempo_bpm, beats_per_bar)
+
     end_s = max((n.time_s + (n.duration_s or 0.0) for n in notes), default=0.0)
     content_bars = end_s / sec_per_bar if sec_per_bar > 0 else 0.0
 
@@ -160,7 +189,9 @@ def fit_to_bars(notes, tempo_bpm: float, spec, beats_per_bar: int = 4):
     for n in notes:
         if n.time_s >= limit_s - 1e-6:
             continue  # starts past the loop end
-        if n.duration_s is not None and n.time_s + n.duration_s > limit_s:
+        if sustain:
+            n = replace(n, duration_s=max(0.05, limit_s - n.time_s))  # ring to the loop end
+        elif n.duration_s is not None and n.time_s + n.duration_s > limit_s:
             n = replace(n, duration_s=max(0.05, limit_s - n.time_s))  # clamp overhang
         kept.append(n)
     return kept, n_bars
@@ -183,14 +214,54 @@ def refine_transcription(
     pitched = clip_mode in (ClipMode.MONOPHONIC, ClipMode.SUSTAINED)
     if not pitched:
         return t, {"key": None, "bars": None}
+    sustained = clip_mode is ClipMode.SUSTAINED
 
     hits = t.hits
     key_label = None
+    key_skipped = None
+    # Scale-snap is for melodic lines. A drone is one or a few *held* pitches —
+    # too little pitch-class signal for key detection (a single-pitch drone
+    # always trips the C-major fallback and gets silently transposed), and the
+    # held pitch IS the performance. Never snap sustained clips.
     if correct and hits:
-        hits, key_label = correct_notes(hits, key=key, scale=scale)
+        if sustained:
+            if key or scale:
+                key_skipped = "sustained clip — held pitch kept verbatim"
+        else:
+            hits, key_label = correct_notes(hits, key=key, scale=scale)
 
-    hits, n_bars = fit_to_bars(hits, t.tempo_bpm, bars)
+    # Trim before fitting so the lead-bar shift is known here — the automation
+    # envelope lives on the same timeline and must move with the notes.
+    lead_bars = 0
+    if bars != "off":
+        hits, lead_bars = trim_lead_bars(hits, t.tempo_bpm)
+    hits, n_bars = fit_to_bars(hits, t.tempo_bpm, bars, sustain=sustained)
+
+    automation = _refit_automation(t.automation, lead_bars, n_bars)
 
     signal.write_midi(t.midi_path, hits, t.tempo_bpm, channel=0)
     new_bars = float(n_bars) if n_bars else t.bars
-    return replace(t, hits=hits, bars=new_bars), {"key": key_label, "bars": n_bars}
+    return (
+        replace(t, hits=hits, bars=new_bars, automation=automation),
+        {"key": key_label, "bars": n_bars, "key_skipped": key_skipped},
+    )
+
+
+def _refit_automation(envelopes, lead_bars: int, n_bars, beats_per_bar: int = 4):
+    """Shift envelopes left by the trimmed lead-in and clamp to the loop end.
+
+    Steps are ``(time_in_beats, value)`` on the clip's timeline; steps past
+    the loop end are dropped (Live holds an envelope's last value anyway).
+    """
+    if not envelopes or (lead_bars <= 0 and not n_bars):
+        return envelopes
+    shift = lead_bars * float(beats_per_bar)
+    limit = n_bars * float(beats_per_bar) if n_bars else None
+    out = []
+    for env in envelopes:
+        steps = [(t_b - shift, v) for t_b, v in env.steps if t_b - shift >= -1e-9]
+        if limit is not None:
+            steps = [(t_b, v) for t_b, v in steps if t_b <= limit + 1e-9]
+        if steps:
+            out.append(env.model_copy(update={"steps": [(max(0.0, t_b), v) for t_b, v in steps]}))
+    return out

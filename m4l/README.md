@@ -136,12 +136,14 @@ The prebuilt panel wires Generate / duration / count-in / hint / **kit dropdown
 `repo <path>` · `uv <path>` · `device <id>` · `duration <s>` · `countin <s>` ·
 `tempo <bpm>` · `hint <text…>` · `list_kits` · `kit_index <i>` · `kit_uri <uri>` ·
 `list_inputs` · `input_index <i>` · `input <i>` · `file <path>` ·
-`transcribe_clip` · `generate` · `bars <auto|off|4|8|16>` · `correct <0|1>` ·
+`transcribe_clip` · `generate` · `bars <auto|off|1|2|4|8|16>` · `correct <0|1>` ·
 `key <C|F#|…>` · `scale <major|minor|…>` · `record_start` · `record_stop` ·
 `record <0|1>` · `cancel`
 
 ## Outlet reference (script → patch)
-`status <text>` · `busy <0|1>` · `tempo <bpm>` · `rationale <text>` ·
+`status <text>` · `level <dBFS>` (live input meter while record-streaming;
+the pitched panels show it in a number box next to the record buttons) ·
+`busy <0|1>` · `tempo <bpm>` · `rationale <text>` ·
 `done <0|1>` · `error <text>` · `kitmenu clear|append <name>` ·
 `inputmenu clear|append <name>`
 

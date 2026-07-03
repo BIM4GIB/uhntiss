@@ -13,7 +13,8 @@
  *   duration <seconds>     recording length for the next take
  *   hint <text...>         free-text planner hint (joined into one string)
  *   tempo <bpm>            force tempo in BPM (0 = auto-detect)
- *   countin <seconds>      silent count-in before recording (0 = off)
+ *   countin <seconds>      count-in before recording, run CLI-side so the
+ *                          "go" tick matches the moment capture opens (0 = off)
  *   list_kits              query Live, populate the kit menu
  *   kit_index <i>          choose kit by menu index (resolved to its URI)
  *   kit_uri <uri>          choose kit by explicit URI ("" = let planner pick)
@@ -23,7 +24,7 @@
  *   file <path>            transcribe an existing audio file (explicit path)
  *   transcribe_clip        transcribe the SELECTED Live clip (path via bridge)
  *   generate               run a full take (record -> apply to Live)
- *   bars <auto|off|4|8|16> fit the clip to a whole bar count (loops on grid)
+ *   bars <auto|off|1|2|4|8|16> fit the clip to a whole bar count (loops on grid)
  *   correct <0|1>          note correction (scale snap) off/on
  *   key <C|F#|Bb|...>      force the key for correction ("" = auto-detect)
  *   scale <major|minor|..> force the scale for correction ("" = auto)
@@ -34,6 +35,8 @@
  *
  * Outlet messages ([node.script] -> patch):
  *   status <text>          human-readable progress line (route to a comment)
+ *   level <dB>             live input level in dBFS while record-streaming
+ *                          (route to a meter / number box)
  *   busy <0|1>             1 while a run is in flight (gate the button)
  *   tempo <bpm>            detected tempo from the last take
  *   rationale <text>       the planner's one-line reasoning
@@ -78,13 +81,32 @@ function correctionFlags() {
 let kits = []; // cached [{name, uri}] from list_kits
 let inputs = []; // cached [{index, name}] from list_inputs
 let child = null; // in-flight process
-let inFlight = false; // a run is initiated (covers the count-in window before child exists)
+let inFlight = false; // a run is initiated
 let recording = false; // an open-ended record-stream is actively capturing (pre-stop)
-let countinTimer = null; // pending count-in setTimeout, so cancel can clear it
+let cancelled = false; // the user killed the run; suppress the failure report
 
 function status(msg) {
   Max.outlet("status", String(msg));
   Max.post(`[mouthflow] ${msg}`);
+}
+
+// uv's install location varies (curl installer vs Homebrew vs pipx). Resolve
+// the configured path first, then the usual suspects, then bare "uv" (PATH).
+function resolveUv() {
+  const candidates = [
+    state.uv,
+    path.join(os.homedir(), ".local", "bin", "uv"),
+    "/opt/homebrew/bin/uv",
+    "/usr/local/bin/uv",
+  ];
+  for (let i = 0; i < candidates.length; i++) {
+    try {
+      if (candidates[i] && fs.existsSync(candidates[i])) return candidates[i];
+    } catch (_) {
+      /* keep looking */
+    }
+  }
+  return "uv";
 }
 
 // Pull ANTHROPIC_API_KEY out of the repo's gitignored .env without needing a
@@ -107,7 +129,7 @@ function runCli(args, { onStdout, onLine, onDone }) {
 
   let proc;
   try {
-    proc = spawn(state.uv, ["run", "mouthflow", ...args], {
+    proc = spawn(resolveUv(), ["run", "mouthflow", ...args], {
       cwd: state.repo,
       env,
     });
@@ -141,6 +163,12 @@ function onPipelineDone(code, stdout, errTail) {
   inFlight = false;
   recording = false;
   Max.outlet("busy", 0);
+  if (cancelled) {
+    // The user killed it; "cancelled" was already shown — a SIGTERM exit
+    // (code null) must not masquerade as a failure.
+    cancelled = false;
+    return;
+  }
   if (code === 0) {
     try {
       const plan = JSON.parse(stdout.slice(stdout.indexOf("{")));
@@ -164,38 +192,23 @@ function generate() {
     status("a take is already running — cancel it first");
     return;
   }
-  inFlight = true; // gate other starts immediately, including during the count-in
+  inFlight = true;
   const args = ["record", "--duration", String(state.duration), "--device", state.device, "--json"];
   if (state.input != null) args.push("--input", String(state.input));
   if (state.hint) args.push("--hint", state.hint);
   if (state.tempo) args.push("--tempo", String(state.tempo));
   if (state.kitUri) args.push("--instruments", state.kitUri);
+  // The count-in runs CLI-side (--countin): its ticks are emitted right
+  // before capture actually opens, so "REC — go!" means the mic is live. A
+  // JS setTimeout count-in fired ~0.5s early (uv + import cost) and the
+  // take's first hit got clipped.
+  const n = Math.max(0, Math.floor(state.countin));
+  if (n > 0) args.push("--countin", String(n));
   args.push(...correctionFlags());
 
   Max.outlet("busy", 1);
-
-  const launch = () => {
-    countinTimer = null;
-    status(`recording ${state.duration}s — beatbox now!`);
-    child = runCli(args, { onLine: (line) => status(line), onDone: onPipelineDone });
-  };
-
-  // Silent count-in so the user knows when to start (the CLI records
-  // immediately with no cue of its own).
-  const n = Math.max(0, Math.floor(state.countin));
-  if (n <= 0) return launch();
-  let i = n;
-  const tick = () => {
-    if (!inFlight) return; // cancelled during the count-in
-    if (i > 0) {
-      status(`get ready… ${i}`);
-      i -= 1;
-      countinTimer = setTimeout(tick, 1000);
-    } else {
-      launch();
-    }
-  };
-  tick();
+  status(n > 0 ? "get ready…" : "starting…");
+  child = runCli(args, { onLine: (line) => status(line), onDone: onPipelineDone });
 }
 
 // Transcribe an existing audio FILE (the selected Live clip's sample) instead
@@ -254,7 +267,19 @@ function recordStart() {
   args.push(...correctionFlags());
   Max.outlet("busy", 1);
   status("● recording — hit Stop when done");
-  child = runCli(args, { onLine: (line) => status(line), onDone: onPipelineDone });
+  child = runCli(args, {
+    onLine: (line) => {
+      // "level -23.4" lines are the live input meter — route them to their
+      // own outlet so they don't overwrite the status comment.
+      if (line.indexOf("level ") === 0) {
+        const db = parseFloat(line.slice(6));
+        if (!isNaN(db)) Max.outlet("level", db);
+        return;
+      }
+      status(line);
+    },
+    onDone: onPipelineDone,
+  });
 }
 
 // Stop is only meaningful while actively recording. Once stopped we're in the
@@ -358,7 +383,7 @@ Max.addHandler("generate", generate);
 Max.addHandler("bars", (...a) => {
   // clamp the free-text field so a typo can't reach the CLI / raise downstream
   const v = a.join(" ").trim().toLowerCase();
-  state.bars = ["auto", "off", "4", "8", "16"].includes(v) ? v : "auto";
+  state.bars = ["auto", "off", "1", "2", "4", "8", "16"].includes(v) ? v : "auto";
 });
 Max.addHandler("correct", (v) => (state.correct = Number(v) ? 1 : 0));
 Max.addHandler("key", (...a) => (state.key = a.join(" ").trim()));
@@ -369,11 +394,8 @@ Max.addHandler("record_stop", recordStop);
 // a single toggle: 1 -> start, 0 -> stop
 Max.addHandler("record", (v) => (Number(v) ? recordStart() : recordStop()));
 Max.addHandler("cancel", () => {
-  if (countinTimer) {
-    clearTimeout(countinTimer); // a count-in was pending; never let it launch
-    countinTimer = null;
-  }
   if (child) {
+    cancelled = true; // onPipelineDone must not report the kill as a failure
     child.kill();
     child = null;
   }

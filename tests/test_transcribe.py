@@ -110,6 +110,13 @@ def test_quantise_grid_phase():
     assert _grid_phase(onsets, 120) == pytest.approx(0.25, abs=0.02)
 
 
+def test_quantise_grid_never_negative():
+    # A negative phase + a first-cell onset used to snap to a negative time,
+    # which mido cannot serialize (the whole take crashed).
+    assert _quantise_grid(0.01, 120, -0.4) == 0.0
+    assert _quantise_grid(0.0, 120, -0.5) >= 0.0
+
+
 def _drum_pattern(bpm: float, bars: int = 6) -> np.ndarray:
     """A boombap-ish kick/snare/hat loop at ``bpm`` (8th-note hats)."""
     beat = 60.0 / bpm

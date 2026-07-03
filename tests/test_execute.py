@@ -9,12 +9,20 @@ from __future__ import annotations
 import json
 import socket
 import threading
+import time
 from pathlib import Path
 
 import mido
 import pytest
 
-from mouthflow.execute import AbletonClient, AbletonError, _midi_to_notes, apply_plan
+from mouthflow import execute
+from mouthflow.execute import (
+    AbletonClient,
+    AbletonError,
+    AbletonTransportError,
+    _midi_to_notes,
+    apply_plan,
+)
 from mouthflow.schemas import AutomationEnvelope, ClipPlan, Plan
 
 
@@ -202,7 +210,7 @@ def test_apply_plan_sends_expected_commands(tmp_path):
     ]
     with FakeAbleton(responses) as fake:
         with AbletonClient(port=fake.port) as client:
-            apply_plan(plan, client)
+            apply_plan(plan, client, set_tempo=True)
 
     types = [r["type"] for r in fake.requests]
     assert types == [
@@ -220,6 +228,22 @@ def test_apply_plan_sends_expected_commands(tmp_path):
     assert fake.requests[4]["params"]["length"] == pytest.approx(8.0)
     # notes made it through
     assert len(fake.requests[5]["params"]["notes"]) == 2
+
+
+def test_apply_plan_leaves_project_tempo_by_default(tmp_path):
+    # set_tempo is opt-in: by default a take must never retune the user's set.
+    midi = tmp_path / "clip.mid"
+    _write_simple_midi(midi)
+    plan = Plan(
+        tempo=92.0,
+        clips=[ClipPlan(track_name="Drums", instrument_path="u", midi_file=midi, length_bars=2.0)],
+        rationale="test",
+    )
+    responses = [{"status": "ok", "result": {"index": 0}}] + [{"status": "ok", "result": {}}] * 5
+    with FakeAbleton(responses) as fake:
+        with AbletonClient(port=fake.port) as client:
+            apply_plan(plan, client)
+    assert "set_tempo" not in [r["type"] for r in fake.requests]
 
 
 def test_set_clip_envelope_serializes_steps():
@@ -256,7 +280,7 @@ def test_apply_plan_writes_automation_when_supported(tmp_path):
                  for i in range(8)]  # set_tempo, create_track, name, load, clip, notes, envelope, fire
     with FakeAbleton(responses) as fake:
         with AbletonClient(port=fake.port) as client:
-            apply_plan(_drone_plan(midi), client)
+            apply_plan(_drone_plan(midi), client, set_tempo=True)
     types = [r["type"] for r in fake.requests]
     assert types == [
         "set_tempo", "create_midi_track", "set_track_name", "load_browser_item",
@@ -281,5 +305,147 @@ def test_apply_plan_degrades_when_envelope_unsupported(tmp_path):
     ]
     with FakeAbleton(responses) as fake:
         with AbletonClient(port=fake.port) as client:
-            apply_plan(_drone_plan(midi), client)  # must not raise
+            apply_plan(_drone_plan(midi), client, set_tempo=True)  # must not raise
     assert fake.requests[-1]["type"] == "fire_clip"
+
+
+# --- transport hardening ------------------------------------------------------
+
+
+def test_midi_to_notes_keeps_overlapping_same_pitch_notes(tmp_path):
+    # The drone voice sustains every region to the clip end, so two same-pitch
+    # regions overlap. Both notes must survive (FIFO pairing), not just the
+    # later one.
+    midi = tmp_path / "overlap.mid"
+    mid = mido.MidiFile(ticks_per_beat=480)
+    track = mido.MidiTrack()
+    mid.tracks.append(track)
+    track.append(mido.Message("note_on", note=48, velocity=90, time=0, channel=0))
+    track.append(mido.Message("note_on", note=48, velocity=80, time=480, channel=0))   # overlaps
+    track.append(mido.Message("note_off", note=48, velocity=0, time=480, channel=0))   # ends FIRST-started
+    track.append(mido.Message("note_off", note=48, velocity=0, time=480, channel=0))
+    mid.save(midi)
+
+    notes = sorted(_midi_to_notes(midi), key=lambda n: n["start_time"])
+    assert len(notes) == 2
+    assert notes[0] == {"pitch": 48, "start_time": 0.0, "duration": 2.0,
+                        "velocity": 90, "mute": False}
+    assert notes[1]["start_time"] == pytest.approx(1.0)
+    assert notes[1]["duration"] == pytest.approx(2.0)
+
+
+class SilentServer:
+    """Accepts connections, reads requests, never replies (simulates a hang)."""
+
+    def __init__(self) -> None:
+        self.connections = 0
+        self._srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._srv.bind(("127.0.0.1", 0))
+        self._srv.listen(4)
+        self.port = self._srv.getsockname()[1]
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._serve, daemon=True)
+
+    def __enter__(self) -> "SilentServer":
+        self._thread.start()
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        self._stop.set()
+        try:
+            self._srv.close()
+        except OSError:
+            pass
+
+    def _serve(self) -> None:
+        conns = []
+        while not self._stop.is_set():
+            try:
+                conn, _ = self._srv.accept()
+            except OSError:
+                break
+            self.connections += 1
+            conns.append(conn)  # keep open, never reply
+        for c in conns:
+            try:
+                c.close()
+            except OSError:
+                pass
+
+
+def test_read_timeout_raises_transport_error_and_closes(monkeypatch):
+    # A hang mid-command must surface as AbletonTransportError (a distinct
+    # type: "couldn't ask" is not an answer) and must close the socket —
+    # otherwise the late reply desyncs every subsequent command.
+    monkeypatch.setattr(execute, "_TIMEOUT_READ", 0.2)
+    with SilentServer() as srv:
+        client = AbletonClient(port=srv.port)
+        with pytest.raises(AbletonTransportError, match="create_midi_track"):
+            client.send_command("create_midi_track", {"index": -1})
+        assert client._sock is None  # closed: no stale response can be consumed
+        # Mutating commands are NOT retried (they may have half-applied).
+        time.sleep(0.05)
+        assert srv.connections == 1
+
+
+def test_read_timeout_retries_idempotent_commands_once(monkeypatch):
+    monkeypatch.setattr(execute, "_TIMEOUT_READ", 0.2)
+    with SilentServer() as srv:
+        client = AbletonClient(port=srv.port)
+        with pytest.raises(AbletonTransportError, match="after reconnect"):
+            client.send_command("get_session_info")
+        time.sleep(0.05)
+        assert srv.connections == 2  # original + one retry on a fresh socket
+
+
+def test_send_command_wraps_connect_refusal_uniformly():
+    # A dead bridge must surface through send_command as AbletonTransportError
+    # (never a raw OSError) so classifying callers can't mistake it.
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()  # nothing listening
+    client = AbletonClient(port=port)
+    with pytest.raises(AbletonTransportError):
+        client.send_command("get_session_info")
+
+
+def test_list_instruments_propagates_transport_failure(monkeypatch):
+    # A hung read mid-walk must NOT be swallowed as an "unreachable subtree":
+    # a silently truncated kit list looks complete to the planner.
+    monkeypatch.setattr(execute, "_TIMEOUT_READ", 0.2)
+    with SilentServer() as srv:
+        client = AbletonClient(port=srv.port)
+        with pytest.raises(AbletonTransportError):
+            client.list_instruments("Drums")
+
+
+def test_response_split_mid_multibyte_utf8():
+    # A response split inside a multi-byte character must keep accumulating,
+    # not blow up with UnicodeDecodeError.
+    payload = json.dumps(
+        {"status": "ok", "result": {"name": "Dusty Brés"}}, ensure_ascii=False
+    ).encode("utf-8")
+    cut = payload.index("é".encode("utf-8")) + 1  # split INSIDE the 2-byte char
+
+    srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(1)
+    port = srv.getsockname()[1]
+
+    def serve() -> None:
+        conn, _ = srv.accept()
+        with conn:
+            conn.recv(8192)
+            conn.sendall(payload[:cut])
+            time.sleep(0.05)
+            conn.sendall(payload[cut:])
+
+    t = threading.Thread(target=serve, daemon=True)
+    t.start()
+    try:
+        with AbletonClient(port=port) as client:
+            result = client.get_session_info()
+        assert result == {"name": "Dusty Brés"}
+    finally:
+        srv.close()

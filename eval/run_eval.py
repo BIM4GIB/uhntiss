@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from dataclasses import dataclass
 from datetime import date
@@ -181,7 +182,7 @@ def _format_report(results: list[ClipResult]) -> str:
             f"Transcription (N={n})",
             f"  onset F1:         {f1:.2f}   {tick(f1 >= 0.75)} (target 0.75)",
             f"  drum class acc:   {class_acc:.2f}   {tick(class_acc >= 0.65)} (target 0.65)",
-            f"  tempo within +-3: {tempo_hits}/{n}  {tick(tempo_hits >= max(1, int(n * 0.8)))} (target >=80%)",
+            f"  tempo within +-3: {tempo_hits}/{n}  {tick(tempo_hits >= max(1, math.ceil(n * 0.8)))} (target >=80%)",
             "",
         ]
     )

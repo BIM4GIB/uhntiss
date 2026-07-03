@@ -2,11 +2,15 @@
 
 All output is normalised to 44.1 kHz, 16-bit, mono — the format the rest of
 the pipeline assumes.
+
+Recordings land in the take vault (``~/.mouthflow/takes/``) rather than a
+tempdir: a performance must survive whatever fails after it (Ableton down,
+API error, crash), so it can be replayed with ``mouthflow retry-last``.
 """
 
 from __future__ import annotations
 
-import tempfile
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -16,6 +20,21 @@ import soundfile as sf
 SAMPLE_RATE = 44_100
 CHANNELS = 1
 SUBTYPE = "PCM_16"
+
+# The take vault. Module-level so tests (and callers) can repoint it.
+TAKES_DIR = Path.home() / ".mouthflow" / "takes"
+
+
+def _take_path() -> Path:
+    """A fresh timestamped WAV path in the take vault."""
+    TAKES_DIR.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    path = TAKES_DIR / f"take-{stamp}.wav"
+    i = 1
+    while path.exists():  # same-second collision
+        path = TAKES_DIR / f"take-{stamp}-{i}.wav"
+        i += 1
+    return path
 
 
 def record(
@@ -36,9 +55,7 @@ def record(
     )
     sd.wait()
 
-    if out_path is None:
-        out_path = Path(tempfile.mkstemp(suffix=".wav", prefix="mouthflow_")[1])
-    out_path = Path(out_path)
+    out_path = Path(out_path) if out_path is not None else _take_path()
     sf.write(out_path, audio, SAMPLE_RATE, subtype=SUBTYPE)
     return out_path
 
@@ -49,19 +66,20 @@ def record_until_stop(
     input_device: int | None = None,
     max_s: float = 600.0,
     blocksize: int | None = None,
+    on_level=None,
 ) -> Path:
     """Record from the mic until ``should_stop()`` is truthy (or ``max_s``).
 
     The open-ended counterpart to ``record`` — the device's start/stop button
     drives it (the CLI's ``record-stream`` polls stdin for ``should_stop``).
     Captures via a streaming callback into a queue so the duration is the
-    performer's, not a fixed timer. Returns the WAV path.
+    performer's, not a fixed timer. ``on_level`` (if given) receives the
+    running input level in dBFS a few times a second, for a live meter.
+    Returns the WAV path.
     """
     import queue
 
-    if out_path is None:
-        out_path = Path(tempfile.mkstemp(suffix=".wav", prefix="mouthflow_")[1])
-    out_path = Path(out_path)
+    out_path = Path(out_path) if out_path is not None else _take_path()
     bs = blocksize or SAMPLE_RATE // 10  # 100 ms blocks
     q: queue.Queue = queue.Queue()
 
@@ -70,6 +88,7 @@ def record_until_stop(
 
     chunks: list[np.ndarray] = []
     elapsed = 0.0
+    last_level_s = -1.0
     with sd.InputStream(
         samplerate=SAMPLE_RATE, channels=CHANNELS, dtype="int16",
         device=input_device, blocksize=bs, callback=_cb,
@@ -81,6 +100,11 @@ def record_until_stop(
                 continue
             chunks.append(chunk)
             elapsed += len(chunk) / SAMPLE_RATE
+            if on_level is not None and elapsed - last_level_s >= 0.25:
+                last_level_s = elapsed
+                x = chunk.astype(np.float64) / 32768.0
+                rms = float(np.sqrt(np.mean(x**2)))
+                on_level(20 * np.log10(max(rms, 1e-6)))
     while not q.empty():  # drain anything captured after the stop signal
         chunks.append(q.get_nowait())
 

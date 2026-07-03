@@ -45,6 +45,8 @@ def test_single_sustained_tone_is_one_held_note(tmp_path):
     # Sustained: a long note that fills most of the clip, not a 1/32 default.
     assert note.duration_s is not None and note.duration_s > 2.0
     assert t.bars >= 1
+    # pyin confidence is recorded on the note (a clean sine is a sure pitch).
+    assert note.confidence is not None and note.confidence > 0.5
 
     ons = _note_ons(t.midi_path)
     assert ons and all(m.channel == 0 for m in ons)
