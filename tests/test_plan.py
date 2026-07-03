@@ -135,6 +135,25 @@ def test_make_plan_round_trips_valid_tool_output(tmp_path):
     assert req["model"].startswith("claude-sonnet-5")
     assert req["tool_choice"] == {"type": "tool", "name": "emit_plan"}
     assert req["tools"][0]["name"] == "emit_plan"
+    # Strict tool use: guaranteed-valid input (the first real call on this
+    # model returned a STRINGIFIED clips field without it). Strict mode
+    # requires additionalProperties:false everywhere and no value-constraint
+    # keywords in the wire schema.
+    assert req["tools"][0]["strict"] is True
+
+    def walk(s):
+        if isinstance(s, dict):
+            if s.get("type") == "object":
+                assert s.get("additionalProperties") is False
+            for k in ("minLength", "minItems", "exclusiveMinimum", "minimum"):
+                assert k not in s
+            for v in s.values():
+                walk(v)
+        elif isinstance(s, list):
+            for v in s:
+                walk(v)
+
+    walk(req["tools"][0]["input_schema"])
     # Thinking is disabled explicitly (adaptive-on-by-omission would add
     # latency to a forced tool call) — via extra_body: the pinned SDK has no
     # typed `thinking` kwarg.
@@ -185,6 +204,26 @@ def test_make_plan_accepts_dict_instruments_and_returns_uri(tmp_path):
     # could choose by character.
     sent = client.messages.last_request["system"][1]["text"]
     assert "Dusty Breaks" in sent
+
+
+def test_make_plan_unstringifies_json_in_json_clips(tmp_path):
+    # Observed live on a non-strict call: the model returned `clips` as a
+    # stringified single OBJECT. The coercion must parse and wrap it.
+    t = _transcription(tmp_path)
+    client = _FakeClient(
+        {
+            "tempo": 96.0,
+            "clips": '{"track_name": "Drums", "instrument_path": "query:Drums#Kit-A", "length_bars": 4.0}',
+            "rationale": "stringified",
+        }
+    )
+    plan = make_plan(
+        t,
+        session_state={"available_instruments": ["query:Drums#Kit-A"]},
+        client=client,  # type: ignore[arg-type]
+    )
+    assert plan.clips[0].instrument_path == "query:Drums#Kit-A"
+    assert plan.clips[0].length_bars == 4.0
 
 
 def test_make_plan_falls_back_when_instrument_hallucinated(tmp_path):

@@ -56,12 +56,37 @@ def _system_prompt(path: Path = _PROMPT_PATH) -> str:
     return Path(path).read_text(encoding="utf-8")
 
 
+def _strictable(schema: Any) -> Any:
+    """Make a pydantic JSON schema acceptable to strict tool use.
+
+    Strict mode requires ``additionalProperties: false`` on every object and
+    rejects value-constraint keywords (min/max lengths and bounds). Those
+    constraints still hold — ``_LLMPlan.model_validate`` re-checks them after
+    the call; the wire schema only needs the SHAPE.
+    """
+    if isinstance(schema, dict):
+        if schema.get("type") == "object":
+            schema["additionalProperties"] = False
+        for k in ("minLength", "maxLength", "minItems", "maxItems",
+                  "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum"):
+            schema.pop(k, None)
+        for v in schema.values():
+            _strictable(v)
+    elif isinstance(schema, list):
+        for v in schema:
+            _strictable(v)
+    return schema
+
+
 def _tool_schema() -> dict[str, Any]:
-    schema = _LLMPlan.model_json_schema()
+    # strict=True makes the API guarantee schema-valid tool input. Without it
+    # the first real call on this model returned `clips` as a STRINGIFIED
+    # object (verified live) — a failure mode the mocked tests can't see.
     return {
         "name": "emit_plan",
         "description": "Return the arrangement plan for the transcribed pattern.",
-        "input_schema": schema,
+        "strict": True,
+        "input_schema": _strictable(_LLMPlan.model_json_schema()),
     }
 
 
@@ -217,8 +242,24 @@ def make_plan(
     if tool_block is None:
         raise RuntimeError(f"Claude returned no tool_use block: {response.content}")
 
+    # Belt-and-braces for models/paths without strict guarantees: un-stringify
+    # JSON-in-JSON fields before validation (a single clip object also gets
+    # wrapped into the expected list).
+    raw = tool_block.input
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except ValueError:
+            pass
+    if isinstance(raw, dict) and isinstance(raw.get("clips"), str):
+        try:
+            parsed = json.loads(raw["clips"])
+            raw = {**raw, "clips": parsed if isinstance(parsed, list) else [parsed]}
+        except ValueError:
+            pass
+
     try:
-        llm_plan = _LLMPlan.model_validate(tool_block.input)
+        llm_plan = _LLMPlan.model_validate(raw)
     except ValidationError as exc:
         raise RuntimeError(f"Plan failed schema validation: {exc}") from exc
 
