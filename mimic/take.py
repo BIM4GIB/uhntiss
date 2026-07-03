@@ -136,6 +136,28 @@ def rec(name, input_dev=None, output_dev=None):
     print(f"OK recorded {len(out)/sr:.1f}s -> {name}.mimic.wav | peak {peak:.2f} rms {rms:.3f}{warn}")
 
 
+def _labels_look_sane(matched: int, total: int, heuristic_correct: int) -> tuple[bool, str]:
+    """Gate on auto-label quality before a take becomes a corpus fixture.
+
+    If even the hand-tuned heuristic scores near-zero on the aligned labels,
+    the alignment (not the classifier) is almost certainly wrong — emitting
+    the clip would bake mislabels into the regression corpus. Same if most of
+    the grid never matched an onset (the performance didn't follow the
+    reference).
+    """
+    if total > 0 and matched / total < 0.5:
+        return False, (
+            f"only {matched}/{total} grid notes matched an onset — the take "
+            "doesn't follow the reference; not emitting a corpus clip"
+        )
+    if matched > 0 and heuristic_correct / matched < 0.35:
+        return False, (
+            f"heuristic agrees with only {heuristic_correct}/{matched} labels — "
+            "alignment looks wrong (off-by-a-slot?); not emitting a corpus clip"
+        )
+    return True, ""
+
+
 def _match(onsets, gt, delta, tol=0.08):
     used, pairs = set(), []
     for o in onsets:
@@ -152,7 +174,7 @@ def _match(onsets, gt, delta, tol=0.08):
     return pairs
 
 
-def score(name, clip):
+def score(name, clip, force=False):
     g = json.load(open(HERE / f"{name}.grid.json"))
     grid = g["grid"]
     yf, _ = librosa.load(str(HERE / f"{name}.mimic.wav"), sr=T._SR, mono=True)
@@ -171,8 +193,6 @@ def score(name, clip):
     # true alignment falls inside.
     best = max(np.arange(0.12, 0.30, 0.005), key=lambda d: len(_match(onsets, gt, d)))
     pairs = _match(onsets, gt, best)
-    # sanity: if even the heuristic scores near-zero the labels are likely
-    # misaligned, not the classifier — flag it rather than emit a bad clip.
 
     rows, labeled = [], []
     for o, j in pairs:
@@ -185,6 +205,13 @@ def score(name, clip):
     hc = sum(1 for t, m, h in rows if h == t)
     print(f"{name}: matched {n}/{len(grid)} (offset {best*1000:.0f}ms) | "
           f"model {mc}/{n}={mc/n:.2f}  heuristic {hc}/{n}={hc/n:.2f}")
+
+    # Sanity-gate before anything is persisted: a misaligned take must not
+    # bake mislabels into the training data or the regression corpus.
+    ok, why = _labels_look_sane(n, len(grid), hc)
+    if not ok and not force:
+        print(f"  ** {why} (pass --force to override)")
+        return
     json.dump(labeled, open(HERE / f"{name}.labeled.json", "w"))
 
     # emit corpus clip (GT = intended grid at performed timing)
@@ -219,6 +246,7 @@ def main():
     ap.add_argument("--clip", default=None)
     ap.add_argument("--input", type=int, default=None, help="input device index (see `devices`)")
     ap.add_argument("--output", type=int, default=None, help="output device index (headphones)")
+    ap.add_argument("--force", action="store_true", help="emit labels/clip even if the sanity gate fails")
     a = ap.parse_args()
     if a.cmd == "devices":
         list_devices()
@@ -230,7 +258,7 @@ def main():
     elif a.cmd == "rec":
         rec(a.name, a.input, a.output)
     else:
-        score(a.name, a.clip or a.name)
+        score(a.name, a.clip or a.name, force=a.force)
 
 
 if __name__ == "__main__":
