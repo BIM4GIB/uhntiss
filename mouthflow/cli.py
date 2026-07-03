@@ -782,6 +782,13 @@ def transcribe_clip(
         if not (isinstance(info, dict) and info.get("is_audio") and path):
             raise typer.BadParameter("select an AUDIO clip in Live's detail view first")
         _log(f"selected clip: {info.get('name')} -> {path}")
+        # Bookkeep like record does, so retry-last (and post-hoc diagnosis of
+        # "that sounded wrong") works for clip transcriptions too.
+        _save_last_take(
+            Path(path), device=device, hint=hint, tempo=tempo, bar_align=bar_align,
+            correct=correct, key=key, scale=scale, bars=bars,
+            instruments=instruments, set_tempo=set_tempo,
+        )
         # Default to the project tempo so the transcription lands exactly on the
         # set's grid (the clip was recorded at it). --tempo still overrides.
         if tempo is None:
