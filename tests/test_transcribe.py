@@ -188,6 +188,35 @@ def test_swing_frac_gates_out_noise_and_sparse_data():
     assert _swing_frac(quarters, 120, 0.0) == (0.0, 0.0)
 
 
+def _sparse_pattern(bpm: float, bars: int = 8, jitter_ms: float = 8.0, seed: int = 11) -> np.ndarray:
+    """Kick/snare only, on the beats — modal IOI is a QUARTER note.
+
+    The octave-halving trap: every event also lies on the half-tempo grid,
+    which step-fraction-fits better; above ~150 BPM jitter washes out the
+    true 16th grid entirely. Only the kick/snare pulse anchor decides this.
+    """
+    rng = np.random.default_rng(seed)
+    beat = 60.0 / bpm
+    events: list[tuple[float, np.ndarray]] = []
+
+    def j() -> float:
+        return float(rng.normal(0.0, jitter_ms / 1000.0))
+
+    for b in range(bars):
+        base = b * 4 * beat
+        events += [(base + s * beat + j(), _kick_sample()) for s in (0, 2)]
+        events += [(base + s * beat + j(), _snare_sample()) for s in (1, 3)]
+    return _place(events, bars * 4 * beat + 0.3)
+
+
+@pytest.mark.parametrize("bpm", [120, 150, 160])
+def test_sparse_takes_do_not_halve_tempo(tmp_path, monkeypatch, bpm):
+    monkeypatch.setattr(drum_classify, "_MODEL", None)
+    wav = tmp_path / "sparse.wav"
+    sf.write(wav, _sparse_pattern(bpm), SR, subtype="PCM_16")
+    assert transcribe_drums(wav).tempo_bpm == pytest.approx(bpm, abs=3.0)
+
+
 def test_bar_align_translates_instead_of_shearing(tmp_path, monkeypatch):
     """bar_align lands the performer's grid on Live's downbeat by TRANSLATING
     the clip — relative timing is preserved, not sheared hit-by-hit."""

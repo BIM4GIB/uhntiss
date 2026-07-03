@@ -77,6 +77,7 @@ def _write_kit_cache(category: str, kits: list[dict]) -> None:
     import os
     import tempfile
 
+    tmp = None
     try:
         _STATE_DIR.mkdir(parents=True, exist_ok=True)
         # Atomic replace: the warm thread and a concurrent CLI must never
@@ -85,8 +86,15 @@ def _write_kit_cache(category: str, kits: list[dict]) -> None:
         with os.fdopen(fd, "w") as f:
             f.write(json.dumps({"ts": time.time(), "kits": kits}))
         os.replace(tmp, _kit_cache_path(category))
+        tmp = None
     except OSError:
         pass  # cache is an optimisation; never let it kill a take
+    finally:
+        if tmp is not None:
+            try:
+                os.unlink(tmp)  # don't orphan the temp file on a failed write
+            except OSError:
+                pass
 
 
 def _maybe_warm(instruments_override: str | None, device: str, host: str, port: int):
@@ -120,8 +128,9 @@ def _warm_kit_cache(spec: DeviceSpec, host: str, port: int):
             with AbletonClient(host, port) as c:
                 kits = c.list_instruments(spec.browser_category, name_filter=spec.instrument_filter)
             if kits:
+                # Silent on purpose: a log line from this thread lands mid-take
+                # and hijacks the M4L device's single status comment.
                 _write_kit_cache(spec.browser_category, kits)
-                _log(f"kit cache refreshed ({len(kits)} {spec.id} instruments)")
         except Exception:
             pass
 
@@ -320,11 +329,13 @@ def _run_pipeline(
     if refine_meta["bars"]:
         _log(f"  fit to {refine_meta['bars']} bars (loops on the grid)")
 
-    # Give the capture-time cache warmer a moment to land its file — but only
+    # Give the capture-time cache warmer time to land its file — but only
     # when there's no usable cache yet (the first take of a session). Later
     # takes proceed immediately on the previous list while the refresh lands.
+    # The wait is generous: bailing early would just start an IDENTICAL walk
+    # on the main client, contending with the warmer for the Remote Script.
     if warm_thread is not None and _read_kit_cache(spec.browser_category) is None:
-        warm_thread.join(timeout=10.0)
+        warm_thread.join(timeout=30.0)
     instruments = _resolve_instruments(instruments_override, client, spec)
 
     t0 = time.perf_counter()
@@ -356,7 +367,19 @@ def _emit_or_apply(
     if client is not None:
         _log("applying to Ableton")
         t0 = time.perf_counter()
-        apply_plan(plan, client, set_tempo=set_tempo)
+        try:
+            apply_plan(plan, client, set_tempo=set_tempo)
+        except AbletonError as exc:
+            # A cached kit URI can outlive the kit (pack removed/renamed) and
+            # only fails HERE, after the performance and the LLM call.
+            # Invalidate the caches so the retry resolves a fresh list.
+            for stale in _STATE_DIR.glob("kits-*.json"):
+                try:
+                    stale.unlink()
+                except OSError:
+                    pass
+            _log(f"apply failed ({exc}); kit caches invalidated — `mouthflow retry-last` will re-resolve")
+            raise typer.Exit(code=1)
         _log(f"done ({time.perf_counter() - t0:.1f}s)")
 
 

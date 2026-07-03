@@ -46,7 +46,14 @@ class DrumTranscriber:
         if tempo is not None and tempo > 0:
             tempo_bpm, confidence = float(tempo), 1.0  # explicit tempo trusted as-is
         else:
-            tempo_bpm, confidence = drum_tempo._detect_tempo(y, sr, kept_times)
+            # Kick/snare onsets anchor the octave: hats mark subdivisions,
+            # but people put kick and snare on beats and backbeats.
+            pulse_times = np.array(
+                [t for t, note, _ in kept if note in (36, 38)], dtype=float
+            )
+            tempo_bpm, confidence = drum_tempo._detect_tempo(
+                y, sr, kept_times, pulse_times=pulse_times
+            )
 
         # Quantise only when the tempo is trustworthy. Snapping to a *wrong*
         # tempo (or wrong grid phase) shears every hit off the played timing and
@@ -72,19 +79,19 @@ class DrumTranscriber:
         for (t, note, _rms), velocity in zip(kept, velocities):
             if trust_tempo:
                 # Dedup on the hard-snapped slot; emit the strength-blended
-                # time (feel preserved, grid respected).
+                # time (feel preserved, grid respected). The bar_align shift
+                # is applied inside _quantise_grid, before its clamp.
                 t_slot = drum_tempo._quantise_grid(
-                    t, tempo_bpm, phase, swing8=swing8, swing16=swing16
+                    t, tempo_bpm, phase, swing8=swing8, swing16=swing16, shift=shift
                 )
-                key = (round((t_slot - shift) * 1000), note)
+                key = (round(t_slot * 1000), note)
                 if key in seen:
                     continue
                 seen.add(key)
                 t_out = drum_tempo._quantise_grid(
                     t, tempo_bpm, phase, swing8=swing8, swing16=swing16,
-                    strength=drum_tempo._QUANT_STRENGTH,
+                    strength=drum_tempo._QUANT_STRENGTH, shift=shift,
                 )
-                t_out = max(0.0, t_out - shift)
             else:
                 t_out = t
             hits.append(DrumHit(time_s=t_out, midi_note=note, velocity=velocity))

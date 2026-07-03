@@ -25,6 +25,11 @@ Hard rules:
 
 ## Few-shot examples
 
+> Note on layout: at runtime the *available instruments* list arrives as
+> separate system context (just above this take), and the per-take message
+> carries only the transcription summary + user hint. The examples below show
+> both parts of the input together for readability.
+
 > **These are placeholders — a tracked known limitation, not an oversight**
 > (see `docs/KNOWN-LIMITATIONS.md`: the taste layer is unvalidated until real
 > rated examples exist). Replace each with a real input/output pair

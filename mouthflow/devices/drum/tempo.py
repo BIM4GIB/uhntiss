@@ -41,7 +41,16 @@ _SWING_NOISE_16 = 0.12
 _SWING_MAX = 0.45
 
 
-def _detect_tempo(y: np.ndarray, sr: int, onset_times: np.ndarray) -> tuple[float, float]:
+# How much worse (in octave-score) the pulse-anchored octave may fit before
+# grid evidence overrides the anchor. Calibrated on sparse quarter-IOI takes:
+# at fast tempos (150-160) the true 16th grid is jitter-washed (fit ~random,
+# gaps up to ~0.13) while the kick/snare pulse anchor is dead-on.
+_ANCHOR_OVERRIDE_MAX = 0.15
+
+
+def _detect_tempo(
+    y: np.ndarray, sr: int, onset_times: np.ndarray, pulse_times: np.ndarray | None = None
+) -> tuple[float, float]:
     """Estimate (tempo_bpm, confidence) robustly for beatbox.
 
     ``librosa.beat.beat_track`` consistently reports ~2x the true tempo on
@@ -49,6 +58,13 @@ def _detect_tempo(y: np.ndarray, sr: int, onset_times: np.ndarray) -> tuple[floa
     tempogram — robust to missing/extra hits — then disambiguate the octave
     against how tightly the onsets fall on each candidate's 16th grid, with a
     preference for the human band and the inter-onset subdivision lattice.
+
+    ``pulse_times`` (kick + snare onsets, when the caller has classes) is the
+    strongest octave cue of all: hats mark SUBDIVISIONS and mislead the modal
+    IOI, but people put kick/snare on beats and backbeats — a sparse take
+    whose kick/snare IOI is a plausible in-band tempo almost certainly has
+    its beat there, even when jitter washes out the fine grid's fit (which
+    it does above ~150 BPM, where the 16th step approaches onset jitter).
 
     Confidence ∈ [0, 1] reflects grid-fit tightness and the separation between
     the chosen octave and its runner-up; the caller gates quantisation on it.
@@ -71,11 +87,23 @@ def _detect_tempo(y: np.ndarray, sr: int, onset_times: np.ndarray) -> tuple[floa
     if not candidates:
         return float(np.clip(base, _BPM_MIN, _BPM_MAX)), 0.0
 
-    scored = sorted((_octave_score(b, onsets, ioi_bpm), b) for b in candidates)
+    scores = {b: _octave_score(b, onsets, ioi_bpm) for b in candidates}
+    scored = sorted((s, b) for b, s in scores.items())
     best_score, best = scored[0]
 
+    anchor = None
+    if pulse_times is not None:
+        p = _ioi_beat_bpm(np.asarray(pulse_times, dtype=float))
+        if p and _BPM_MIN <= p <= _BPM_MAX:
+            anchor = p
+    if anchor is not None and len(scored) > 1:
+        near = min(candidates, key=lambda b: abs(np.log2(b / anchor)))
+        if near != best and scores[near] - best_score <= _ANCHOR_OVERRIDE_MAX:
+            best, best_score = near, scores[near]
+
     tightness = float(np.clip(1.0 - 2.5 * _grid_fit(onsets, best), 0.0, 1.0))
-    margin = float(np.clip((scored[1][0] - best_score) / 0.15, 0.0, 1.0)) if len(scored) > 1 else 1.0
+    others = [s for s, b in scored if b != best]
+    margin = float(np.clip((min(others) - best_score) / 0.15, 0.0, 1.0)) if others else 1.0
     confidence = float(np.clip(0.5 * tightness + 0.5 * margin, 0.0, 1.0))
     return best, confidence
 
@@ -213,6 +241,7 @@ def _quantise_grid(
     swing8: float = 0.0,
     swing16: float = 0.0,
     strength: float = 1.0,
+    shift: float = 0.0,
 ) -> float:
     """Pull ``t_s`` toward a (possibly swung) 16th grid at ``(n + phase) * step``.
 
@@ -222,18 +251,20 @@ def _quantise_grid(
     in fractions of a step) shift the off-8th / off-16th grid lines late, so
     a shuffled performance snaps to its own shuffle instead of being
     straightened. ``strength`` blends: 1.0 = hard snap (the historic
-    behaviour), 0.0 = raw performed time.
+    behaviour), 0.0 = raw performed time. ``shift`` (bar_align's whole-clip
+    translation onto the downbeat) is subtracted BEFORE the final clamp —
+    clamping first and shifting after would land a negative-phase first-cell
+    hit up to half a step late instead of on the downbeat.
 
-    Clamped at 0: a negative phase can place the first grid cell's target at
-    a negative time, which MIDI (and mido) cannot represent.
+    Clamped at 0: a negative time cannot be represented in MIDI (mido).
     """
     step = 60.0 / tempo_bpm / 4.0
     idx = round(t_s / step - phase)
     if idx % 2:
-        shift = swing16
+        swing = swing16
     elif idx % 4 == 2:
-        shift = swing8
+        swing = swing8
     else:
-        shift = 0.0
-    target = (idx + phase + shift) * step
-    return max(0.0, t_s + strength * (target - t_s))
+        swing = 0.0
+    target = (idx + phase + swing) * step
+    return max(0.0, t_s + strength * (target - t_s) - shift)

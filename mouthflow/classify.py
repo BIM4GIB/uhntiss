@@ -25,13 +25,12 @@ _BASS_CEILING = 52
 
 # Routing needs the CHARACTER of the take, not all of it: voiced-fraction and
 # pitch stability are established within a few seconds, and pyin over a full
-# take costs seconds that the device transcriber then re-spends. Analyse a
-# window (skipping is fine — the router's verdict picks which transcriber
-# runs on the FULL audio). The window is anchored to the first audible
-# energy, NOT t=0: a performer who breathes for a few seconds before humming
-# would otherwise fill the window with unvoiced lead-in and route to drums.
+# take costs seconds that the device transcriber then re-spends. Analyse the
+# LOUDEST window (skipping is fine — the router's verdict picks which
+# transcriber runs on the FULL audio). Anchoring to t=0 — or to a dB trim —
+# fails on audible-but-quiet lead-ins (breath at ~-22dB relative survives a
+# 30dB trim and fills the window with unvoiced content -> drums).
 _ROUTER_WINDOW_S = 6.0
-_ROUTER_TRIM_DB = 30.0  # leading/trailing quiet below (max - 30dB) is lead-in
 
 
 def classify(wav_path: Path) -> tuple[Intent, float]:
@@ -40,10 +39,16 @@ def classify(wav_path: Path) -> tuple[Intent, float]:
     y, sr = librosa.load(str(wav_path), sr=signal._SR, mono=True)
     if y.size == 0:
         return (Intent.UNKNOWN, 0.0)
-    y_trim, _ = librosa.effects.trim(y, top_db=_ROUTER_TRIM_DB)
-    if y_trim.size:
-        y = y_trim
-    y = y[: int(_ROUTER_WINDOW_S * sr)]
+    win = int(_ROUTER_WINDOW_S * sr)
+    if y.size > win:
+        hop = 512
+        rms = librosa.feature.rms(y=y, frame_length=2048, hop_length=hop)[0]
+        win_frames = max(1, win // hop)
+        if rms.size > win_frames:
+            energy = np.convolve(rms, np.ones(win_frames, dtype=float), mode="valid")
+            y = y[int(np.argmax(energy)) * hop :][:win]
+        else:
+            y = y[:win]
 
     f0, voiced_flag, voiced_prob = librosa.pyin(
         y, fmin=65.0, fmax=1000.0, sr=sr, frame_length=2048, hop_length=512

@@ -16,11 +16,15 @@ the roadmap's NEXT items 5–7.** Know about:
   labelled takes exist). `note_eval` counts wrong-pitch matches against
   precision; `mimic/take.py` refuses to emit corpus clips from misaligned
   takes (`--force` overrides).
-- **Groove:** drums quantise to a **swing-aware grid** (off-beat lean measured
-  from the take, gated) — a shuffled performance keeps its shuffle, straight
-  takes are unchanged; `bar_align` translates the performer grid onto the
-  downbeat instead of shearing per-hit; the sub-76-BPM tempo-doubling is fixed
-  (70 BPM detects correctly now). Velocities are normalised **per take**
+- **Groove:** drums quantise to a **swing-aware grid** — classic off-8th
+  shuffle and off-16th swing measured separately, each gated by floors
+  calibrated against real articulation drag plus a consistency test; a
+  shuffled performance keeps its shuffle, straight takes are unchanged.
+  `bar_align` translates the performer grid onto the downbeat instead of
+  shearing per-hit. Tempo octave errors fixed in both directions: sub-76-BPM
+  doubling (70 detects correctly) and sparse-take halving (kick/snare modal
+  IOI anchors the octave — hats mark subdivisions and are ignored for this).
+  Velocities are normalised **per take**
   (ghosts ~45, median 90, accents ~120, scaled by the take's dynamic spread) —
   mic gain no longer decides dynamics.
 - **Speed:** kit lists cache to `~/.mouthflow/kits-<category>.json` (24h TTL)
