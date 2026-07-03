@@ -146,3 +146,48 @@ def test_retry_last_without_saved_take_fails_cleanly(tmp_path, monkeypatch):
     result = runner.invoke(cli_module.app, ["retry-last", "--port", str(_free_port())])
     assert result.exit_code == 1
     assert "no saved take" in result.output
+
+
+# --- kit cache: the planner must not pay a browser walk per take ---------------
+
+
+def test_kit_cache_round_trip_and_ttl(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli_module, "_STATE_DIR", tmp_path)
+    kits = [{"name": "808 Core Kit", "uri": "query:Drums#FileId_5006"}]
+    cli_module._write_kit_cache("Drums", kits)
+    assert cli_module._read_kit_cache("Drums") == kits
+    # Expired entries are ignored.
+    monkeypatch.setattr(cli_module, "_KIT_CACHE_TTL_S", -1.0)
+    assert cli_module._read_kit_cache("Drums") is None
+
+
+def test_resolve_instruments_prefers_fresh_cache_over_walk(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli_module, "_STATE_DIR", tmp_path)
+    from mouthflow.devices import get_device_by_id
+
+    spec = get_device_by_id("drums")
+    kits = [{"name": f"Kit {i}", "uri": f"u{i}"} for i in range(3)]
+    cli_module._write_kit_cache(spec.browser_category, kits)
+
+    class MustNotWalk:
+        def list_instruments(self, *a, **k):
+            raise AssertionError("cache hit must not trigger a browser walk")
+
+    resolved = cli_module._resolve_instruments(None, MustNotWalk(), spec)
+    assert resolved == kits
+
+
+def test_resolve_instruments_live_walk_writes_cache(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli_module, "_STATE_DIR", tmp_path)
+    from mouthflow.devices import get_device_by_id
+
+    spec = get_device_by_id("drums")
+    kits = [{"name": "Dusty Breaks", "uri": "query:Drums#FileId_5012"}]
+
+    class FakeClient:
+        def list_instruments(self, *a, **k):
+            return list(kits)
+
+    resolved = cli_module._resolve_instruments(None, FakeClient(), spec)
+    assert resolved == kits
+    assert cli_module._read_kit_cache(spec.browser_category) == kits

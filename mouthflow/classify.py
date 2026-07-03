@@ -23,11 +23,18 @@ from mouthflow.schemas import Intent
 # Register boundary between bass and lead (E3 = MIDI 52).
 _BASS_CEILING = 52
 
+# Routing needs the CHARACTER of the take, not all of it: voiced-fraction and
+# pitch stability are established within a few seconds, and pyin over a full
+# take costs seconds that the device transcriber then re-spends. Analyse a
+# window (skipping is fine — the router's verdict picks which transcriber
+# runs on the FULL audio).
+_ROUTER_WINDOW_S = 6.0
+
 
 def classify(wav_path: Path) -> tuple[Intent, float]:
     import librosa
 
-    y, sr = librosa.load(str(wav_path), sr=signal._SR, mono=True)
+    y, sr = librosa.load(str(wav_path), sr=signal._SR, mono=True, duration=_ROUTER_WINDOW_S)
     if y.size == 0:
         return (Intent.UNKNOWN, 0.0)
 

@@ -9,6 +9,7 @@ import json
 import os
 import re
 import sys
+import time
 from pathlib import Path
 
 import typer
@@ -37,6 +38,67 @@ def _log(msg: str) -> None:
 
 _STATE_DIR = Path.home() / ".mouthflow"
 _LAST_TAKE = _STATE_DIR / "last_take.json"
+
+# Kit-list cache. The browser walk costs seconds per take (measured 7.0s for
+# Drums) and libraries change rarely; cache per category with a TTL and warm
+# the cache on a separate connection WHILE the take is being recorded.
+_KIT_CACHE_TTL_S = 24 * 3600.0
+
+
+def _kit_cache_path(category: str) -> Path:
+    # Keyed by browser category; the stored list is post-instrument_filter.
+    # Today every device has a distinct category, so no filter collisions.
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", category)
+    return _STATE_DIR / f"kits-{safe}.json"
+
+
+def _read_kit_cache(category: str) -> list[dict] | None:
+    """Fresh cached kit list for ``category``, or None."""
+    import time
+
+    try:
+        data = json.loads(_kit_cache_path(category).read_text())
+        kits = data.get("kits")
+        if kits and time.time() - float(data.get("ts", 0)) <= _KIT_CACHE_TTL_S:
+            return kits
+    except (OSError, ValueError, TypeError):
+        pass
+    return None
+
+
+def _write_kit_cache(category: str, kits: list[dict]) -> None:
+    import time
+
+    try:
+        _STATE_DIR.mkdir(parents=True, exist_ok=True)
+        _kit_cache_path(category).write_text(json.dumps({"ts": time.time(), "kits": kits}))
+    except OSError:
+        pass  # cache is an optimisation; never let it kill a take
+
+
+def _warm_kit_cache(spec: DeviceSpec, host: str, port: int):
+    """Refresh the kit cache in the background, on its OWN connection.
+
+    Kicked off before/while the mic records, so by the time the planner needs
+    the list it's a file read instead of a multi-second browser walk. Uses a
+    separate socket — the main client is mid-conversation and the protocol is
+    strictly request/response. Best-effort: any failure just means the
+    resolve step does its own live walk.
+    """
+    import threading
+
+    def work() -> None:
+        try:
+            with AbletonClient(host, port) as c:
+                kits = c.list_instruments(spec.browser_category, name_filter=spec.instrument_filter)
+            if kits:
+                _write_kit_cache(spec.browser_category, kits)
+        except Exception:
+            pass
+
+    t = threading.Thread(target=work, daemon=True)
+    t.start()
+    return t
 
 
 def _save_last_take(wav: Path, **params) -> None:
@@ -89,8 +151,6 @@ def _count_in(seconds: int) -> None:
     M4L glue — the "go" line lands when recording is actually about to start
     instead of ~0.5s before it (which clipped the take's first hit).
     """
-    import time
-
     for i in range(int(seconds), 0, -1):
         _log(f"count-in {i}")
         time.sleep(1.0)
@@ -117,19 +177,25 @@ def _resolve_instruments(
 ) -> list[str | dict[str, str]]:
     """Resolve the instrument set handed to the planner for ``spec``.
 
-    Priority: explicit ``--instruments`` (bare URIs) > a live browser walk
-    of the device's ``browser_category`` ({name, uri} dicts with real,
-    loadable URIs) > the device's fallback, used only when Live is
-    unreachable or empty.
+    Priority: explicit ``--instruments`` (bare URIs) > a fresh kit cache
+    (written by a previous walk or the capture-time warm thread) > a live
+    browser walk of the device's ``browser_category`` > the device's
+    fallback, used only when Live is unreachable or empty.
     """
     if override:
         return list(override)
+    cached = _read_kit_cache(spec.browser_category)
+    if cached:
+        sampled = _sample_kits(cached, _PLANNER_KIT_BUDGET)
+        _log(f"using cached kit list ({len(cached)} {spec.id} instruments; refreshed in background)")
+        return sampled
     if client is not None:
         try:
             kits = client.list_instruments(
                 spec.browser_category, name_filter=spec.instrument_filter
             )
             if kits:
+                _write_kit_cache(spec.browser_category, kits)
                 sampled = _sample_kits(kits, _PLANNER_KIT_BUDGET)
                 if len(sampled) < len(kits):
                     _log(
@@ -167,6 +233,7 @@ def _run_pipeline(
     key: str | None = None,
     scale: str | None = None,
     bars="auto",
+    warm_thread=None,
 ) -> Plan:
     _log(f"normalising {wav}")
     normalised = capture.from_file(wav)
@@ -193,10 +260,14 @@ def _run_pipeline(
     forced_tempo = tempo if tempo and tempo > 0 else _tempo_from_hint(hint)
 
     _log(f"transcribing ({spec.id})")
+    t0 = time.perf_counter()
     transcription = spec.transcriber.transcribe(normalised, tempo=forced_tempo, bar_align=bar_align)
     forced = " (forced)" if forced_tempo else ""
     unit = "hits" if spec.clip_mode.value == "percussive" else "notes"
-    _log(f"heard {len(transcription.hits)} {unit} @ {transcription.tempo_bpm:.1f} BPM{forced}")
+    _log(
+        f"heard {len(transcription.hits)} {unit} @ {transcription.tempo_bpm:.1f} BPM{forced}"
+        f" ({time.perf_counter() - t0:.1f}s)"
+    )
 
     # Zero-notes guard: a silent/breath-only take (or a dead mic) must not
     # burn an LLM call and land an empty clip on a junk track. The take WAV is
@@ -220,13 +291,20 @@ def _run_pipeline(
     if refine_meta["bars"]:
         _log(f"  fit to {refine_meta['bars']} bars (loops on the grid)")
 
+    # Give the capture-time cache warmer a moment to land its file, so the
+    # first take of a session also skips the serialized browser walk.
+    if warm_thread is not None:
+        warm_thread.join(timeout=10.0)
     instruments = _resolve_instruments(instruments_override, client, spec)
+
+    t0 = time.perf_counter()
     plan = make_plan(
         transcription,
         session_state={"available_instruments": instruments},
         user_hint=hint,
         device=spec,
     )
+    plan_s = time.perf_counter() - t0
     # The chosen bar count wins over the planner's length guess so the clip loops.
     if refine_meta["bars"]:
         for clip in plan.clips:
@@ -236,7 +314,7 @@ def _run_pipeline(
     if transcription.automation:
         for clip in plan.clips:
             clip.automation = transcription.automation
-    _log(f"plan: {plan.rationale}")
+    _log(f"plan: {plan.rationale} ({plan_s:.1f}s)")
     return plan
 
 
@@ -247,8 +325,9 @@ def _emit_or_apply(
         print(plan.model_dump_json(indent=2))
     if client is not None:
         _log("applying to Ableton")
+        t0 = time.perf_counter()
         apply_plan(plan, client, set_tempo=set_tempo)
-        _log("done")
+        _log(f"done ({time.perf_counter() - t0:.1f}s)")
 
 
 def _parse_instruments(value: str | None) -> list[str] | None:
@@ -321,6 +400,11 @@ def record(
             if proj:
                 tempo = proj
                 _log(f"using project tempo {tempo:.1f} BPM")
+        # Refresh the kit cache WHILE we record — the planner then reads a
+        # file instead of waiting seconds for a serialized browser walk.
+        warm = None
+        if not instruments and device != "auto":
+            warm = _warm_kit_cache(get_device_by_id(device), host, port)
         if countin > 0:
             _count_in(countin)
         _log(f"recording {duration}s")
@@ -342,6 +426,7 @@ def record(
             key=key,
             scale=scale,
             bars=bars,
+            warm_thread=warm,
         )
         _emit_or_apply(plan, json_out=json_out, client=client, set_tempo=set_tempo)
 
@@ -394,6 +479,9 @@ def record_stream(
             stop.set()  # explicit stop, or stdin closed
 
         threading.Thread(target=_watch_stdin, daemon=True).start()
+        warm = None
+        if not instruments and device != "auto":
+            warm = _warm_kit_cache(get_device_by_id(device), host, port)
         _log("recording — send 'stop' to finish (or close stdin)")
         wav = capture.record_until_stop(
             stop.is_set, input_device=input,
@@ -417,6 +505,7 @@ def record_stream(
             key=key,
             scale=scale,
             bars=bars,
+            warm_thread=warm,
         )
         _emit_or_apply(plan, json_out=json_out, client=client, set_tempo=set_tempo)
 
@@ -744,6 +833,8 @@ def list_kits(
     except (AbletonError, OSError) as exc:
         _log(f"FAIL AbletonMCP not reachable at {host}:{port}: {exc}")
         raise typer.Exit(code=1)
+    if kits:
+        _write_kit_cache(spec.browser_category, kits)  # freshen the planner's cache too
     if limit and limit > 0:
         kits = _sample_kits(kits, limit)
     print(json.dumps(kits))
