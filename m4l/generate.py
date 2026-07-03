@@ -167,7 +167,7 @@ def _inject_controls(maxpat: dict) -> None:
         wire(b, _NODE_INLET)
 
     # bars: textedit -> prepend bars -> node
-    comment("obj-212", "bars(4/8/16)", [860, 170, 150, 18], [330, 96, 60, 16])
+    comment("obj-212", "bars(1-16)", [860, 170, 150, 18], [330, 96, 60, 16])
     textedit("obj-210", [720, 170, 120, 22], [392, 94, 44, 22])
     newobj("obj-211", "prepend bars", [720, 200, 110, 22])
     wire("obj-210", "obj-211"); wire("obj-211", _NODE_INLET)
@@ -192,6 +192,17 @@ def _inject_controls(maxpat: dict) -> None:
     textedit("obj-240", [720, 350, 120, 22], [446, 122, 90, 22])
     newobj("obj-241", "prepend scale", [720, 380, 100, 22])
     wire("obj-240", "obj-241"); wire("obj-241", _NODE_INLET)
+
+    # input level meter: node.script outlet 0 -> route level -> flonum (dBFS
+    # while record-streaming). Parallel to the template's own
+    # `route status kitmenu` off the same outlet.
+    newobj("obj-250", "route level", [720, 420, 100, 22])
+    box(id="obj-251", maxclass="flonum", numinlets=1, numoutlets=2,
+        outlettype=["", "bang"], parameter_enable=0,
+        patching_rect=[720, 450, 50, 22], presentation=1,
+        presentation_rect=[488, 36, 48, 22])
+    wire(_NODE_INLET, "obj-250")  # from node.script outlet 0
+    wire("obj-250", "obj-251")
 
     boxes.extend(add_b)
     lines.extend(add_l)

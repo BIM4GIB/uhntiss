@@ -56,10 +56,77 @@ def test_doctor_passes_when_key_and_live_ok(monkeypatch):
 
 def test_doctor_fails_without_api_key(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    # The dev repo has a real .env; simulate a machine without one.
+    monkeypatch.setattr(cli_module, "_api_key_from_env_file", lambda: None)
     with FakeAbleton([_SESSION, _DRUMS_ONE_KIT]) as fake:
         result = runner.invoke(cli_module.app, ["doctor", "--port", str(fake.port)])
     assert result.exit_code == 1
     assert "FAIL ANTHROPIC_API_KEY not set" in result.output
+
+
+def test_doctor_accepts_key_from_env_file(monkeypatch):
+    # The M4L glue reads .env directly; doctor must agree with the device
+    # instead of failing in an unsourced shell.
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setattr(cli_module, "_api_key_from_env_file", lambda: "sk-from-file")
+    with FakeAbleton([_SESSION, _DRUMS_ONE_KIT]) as fake:
+        result = runner.invoke(cli_module.app, ["doctor", "--port", str(fake.port)])
+    assert result.exit_code == 0, result.output
+    assert "found in .env" in result.output
+
+
+def test_doctor_bridge_probe_flags_missing_fork_commands(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    responses = [
+        _SESSION,
+        _DRUMS_ONE_KIT,
+        {"status": "ok", "result": {"name": "clip", "is_audio": True}},  # get_selected_clip
+        {"status": "error", "message": "Unknown command type: set_clip_envelope"},
+    ]
+    with FakeAbleton(responses) as fake:
+        result = runner.invoke(cli_module.app, ["doctor", "--port", str(fake.port), "--bridge"])
+    assert result.exit_code == 1
+    assert "ok   bridge command get_selected_clip present" in result.output
+    assert "bridge command set_clip_envelope missing" in result.output
+
+
+def test_probe_bridge_classifies_replies_correctly():
+    """Transport failure = FAIL (couldn't ask); 'unknown command' = missing;
+    any genuine bridge reply (ok or param error) = present."""
+    from mouthflow.execute import AbletonError, AbletonTransportError
+
+    class StubClient:
+        def __init__(self, outcomes):
+            self.outcomes = outcomes  # cmd -> result | Exception
+
+        def send_command(self, cmd, params=None):
+            out = self.outcomes[cmd]
+            if isinstance(out, Exception):
+                raise out
+            return out
+
+    # A hung/refused socket must be a failure, never "present".
+    failures: list[str] = []
+    cli_module._probe_bridge(
+        StubClient({
+            "get_selected_clip": AbletonTransportError("get_selected_clip failed after reconnect"),
+            "set_clip_envelope": AbletonTransportError("set_clip_envelope failed mid-flight"),
+        }),
+        failures,
+    )
+    assert len(failures) == 2
+    assert all("probe" in f and "failed" in f for f in failures)
+
+    # A param complaint proves the handler exists; unknown command = missing.
+    failures = []
+    cli_module._probe_bridge(
+        StubClient({
+            "get_selected_clip": {"name": "clip"},
+            "set_clip_envelope": AbletonError("Invalid track_index -1"),
+        }),
+        failures,
+    )
+    assert failures == []
 
 
 def test_doctor_fails_cleanly_when_unreachable(monkeypatch):

@@ -3,7 +3,9 @@
 An honest, ranked list of the project's weaknesses, written for an external reviewer.
 Ranked by how much each should affect your assessment, worst first. Everything below
 is verified against the code as of this commit; file pointers are given so you can
-check for yourself. Test suite status at time of writing: `uv run pytest` → 75 passed.
+check for yourself. Test suite status at time of writing: `uv run pytest` → 94 passed.
+(A fuller adversarially-verified defect list, including eval-integrity issues not yet
+reflected here, lives in [`roadmap.md`](roadmap.md) §3.)
 
 ## 1. The LLM "taste" layer is unvalidated
 
@@ -79,13 +81,15 @@ trade-off, not a bug, but it caps how busy a bassline you can hum in.
 
 ## 8. `refine.py` bakes in judgment calls
 
-[`mouthflow/refine.py`](../mouthflow/refine.py): bar fitting supports 4/8/16 bars only
+[`mouthflow/refine.py`](../mouthflow/refine.py): bar fitting supports 1/2/4/8/16 bars
 (auto rounds **up**, then to multiples of 8), assumes 4/4 throughout, and clamps
 overhang. Key detection is Krumhansl-Schmuckler with a confidence-weighted histogram
 that **falls back to C major** when the pitch signal is thin — a wrong key silently
 snaps notes. Mitigations: `--key`/`--scale` override; `correct_notes` only snaps notes
 with confidence < 0.75 (confident notes are trusted — forcing one scale corrupted a
-real chromatic bassline); `--no-correct` and `--bars off` disable both.
+real chromatic bassline); `--no-correct` and `--bars off` disable both; sustained
+(drone) clips are never scale-snapped at all — the held pitch is kept verbatim, and
+`--key`/`--scale` are ignored with a logged notice.
 
 ## 9. Fallback instrument URIs are guesses
 

@@ -35,6 +35,68 @@ def _log(msg: str) -> None:
     print(f"[mouthflow] {msg}", file=sys.stderr)
 
 
+_STATE_DIR = Path.home() / ".mouthflow"
+_LAST_TAKE = _STATE_DIR / "last_take.json"
+
+
+def _save_last_take(wav: Path, **params) -> None:
+    """Remember the take + its flags so ``retry-last`` can replay it.
+
+    Bookkeeping must never kill a take, so failures are swallowed.
+    """
+    try:
+        _STATE_DIR.mkdir(parents=True, exist_ok=True)
+        _LAST_TAKE.write_text(json.dumps({"wav": str(wav), **params}, indent=2))
+    except OSError:
+        pass
+
+
+def _connect_or_fail(host: str, port: int) -> AbletonClient:
+    """Open the Ableton socket BEFORE any recording starts.
+
+    Failing fast here means a dead Live session costs zero performances —
+    the old ordering recorded first and lost the take to a raw traceback.
+    """
+    client = AbletonClient(host, port)
+    try:
+        client.connect()
+    except OSError as exc:
+        _log(f"FAIL Ableton not reachable at {host}:{port} ({exc})")
+        _log("start Live with the AbletonMCP Remote Script, or use `dry-run` to skip Live")
+        raise typer.Exit(code=1)
+    return client
+
+
+def _project_tempo(client: AbletonClient | None) -> float | None:
+    """The running Live set's tempo, or None if unavailable."""
+    if client is None:
+        return None
+    try:
+        session = client.get_session_info()
+    except (AbletonError, OSError):
+        return None
+    proj = session.get("tempo") if isinstance(session, dict) else None
+    try:
+        return float(proj) if proj else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _count_in(seconds: int) -> None:
+    """Audible-in-the-panel count-in, emitted right before capture opens.
+
+    Runs after the process is fully imported, so — unlike a count-in in the
+    M4L glue — the "go" line lands when recording is actually about to start
+    instead of ~0.5s before it (which clipped the take's first hit).
+    """
+    import time
+
+    for i in range(int(seconds), 0, -1):
+        _log(f"count-in {i}")
+        time.sleep(1.0)
+    _log("REC — go!")
+
+
 def _sample_kits(kits: list[dict[str, str]], budget: int) -> list[dict[str, str]]:
     """Even-stride sample of ``kits`` capped at ``budget``, order preserved.
 
@@ -133,7 +195,16 @@ def _run_pipeline(
     _log(f"transcribing ({spec.id})")
     transcription = spec.transcriber.transcribe(normalised, tempo=forced_tempo, bar_align=bar_align)
     forced = " (forced)" if forced_tempo else ""
-    _log(f"  tempo={transcription.tempo_bpm:.1f} BPM{forced}, notes={len(transcription.hits)}")
+    unit = "hits" if spec.clip_mode.value == "percussive" else "notes"
+    _log(f"heard {len(transcription.hits)} {unit} @ {transcription.tempo_bpm:.1f} BPM{forced}")
+
+    # Zero-notes guard: a silent/breath-only take (or a dead mic) must not
+    # burn an LLM call and land an empty clip on a junk track. The take WAV is
+    # kept, so `retry-last` can replay it after fixing the input.
+    if not transcription.hits:
+        _log("heard nothing usable — check the input device and level (see `input-devices`)")
+        _log(f"take kept at {wav}")
+        raise typer.Exit(code=3)
 
     # Pitched post-processing: scale-snap (autotune-style) + fit to a whole bar
     # count that loops cleanly on the grid. Drums pass through untouched.
@@ -144,6 +215,8 @@ def _run_pipeline(
     )
     if refine_meta["key"]:
         _log(f"  note correction -> {refine_meta['key']} ({'forced' if key else 'auto'})")
+    if refine_meta.get("key_skipped"):
+        _log(f"  --key/--scale ignored: {refine_meta['key_skipped']}")
     if refine_meta["bars"]:
         _log(f"  fit to {refine_meta['bars']} bars (loops on the grid)")
 
@@ -167,12 +240,14 @@ def _run_pipeline(
     return plan
 
 
-def _emit_or_apply(plan: Plan, *, json_out: bool, client: AbletonClient | None) -> None:
+def _emit_or_apply(
+    plan: Plan, *, json_out: bool, client: AbletonClient | None, set_tempo: bool = False
+) -> None:
     if json_out:
         print(plan.model_dump_json(indent=2))
     if client is not None:
         _log("applying to Ableton")
-        apply_plan(plan, client)
+        apply_plan(plan, client, set_tempo=set_tempo)
         _log("done")
 
 
@@ -187,7 +262,25 @@ _BAR_ALIGN_HELP = "Snap to the bar grid (tighter fit) vs the performance's timin
 _CORRECT_HELP = "Note correction (pitched voices): snap notes to a scale so wobbly takes land in tune."
 _KEY_HELP = "Force the key for note correction, e.g. C, F#, Bb (default: auto-detect from the take)."
 _SCALE_HELP = "Scale for note correction: major|minor|dorian|harmonic_minor|major_pentatonic|minor_pentatonic|chromatic (default: auto)."
-_BARS_HELP = "Fit the clip to a whole bar count so it loops on the grid: auto | off | 4 | 8 | 16."
+_BARS_HELP = "Fit the clip to a whole bar count so it loops on the grid: auto | off | 1 | 2 | 4 | 8 | 16."
+_SET_TEMPO_HELP = (
+    "Set the Live set's tempo from the take. On record/record-stream this also "
+    "enables tempo detection (otherwise the take would just echo the project tempo back)."
+)
+_DETECT_TEMPO_HELP = (
+    "Detect the tempo from the take instead of using the project tempo "
+    "(for solo takes not performed against the set's grid)."
+)
+
+
+def _validate_device(device: str) -> None:
+    """Reject a bad --device BEFORE the mic opens (a typo must not cost a take)."""
+    if device == "auto":
+        return
+    try:
+        get_device_by_id(device)
+    except KeyError as exc:
+        raise typer.BadParameter(str(exc)) from exc
 
 
 @app.command()
@@ -201,20 +294,42 @@ def record(
     tempo: float | None = typer.Option(
         None, "--tempo", help="Force tempo in BPM (skips detection). Also reads 'NN bpm' from --hint."
     ),
+    countin: int = typer.Option(
+        0, "--countin", help="Count-in seconds before recording starts (logged per second)."
+    ),
     bar_align: bool = typer.Option(True, "--bar-align/--no-bar-align", help=_BAR_ALIGN_HELP),
     correct: bool = typer.Option(True, "--correct/--no-correct", help=_CORRECT_HELP),
     key: str | None = typer.Option(None, "--key", help=_KEY_HELP),
     scale: str | None = typer.Option(None, "--scale", help=_SCALE_HELP),
     bars: str = typer.Option("auto", "--bars", help=_BARS_HELP),
+    set_tempo: bool = typer.Option(False, "--set-tempo/--no-set-tempo", help=_SET_TEMPO_HELP),
+    detect_tempo: bool = typer.Option(False, "--detect-tempo", help=_DETECT_TEMPO_HELP),
     instruments: str | None = typer.Option(
         None, "--instruments", help="Comma-separated browser URIs. Overrides session lookup."
     ),
     json_out: bool = typer.Option(False, "--json", help="Echo the Plan as JSON to stdout."),
 ) -> None:
     """Capture audio, run the pipeline, apply to Ableton."""
-    _log(f"recording {duration}s")
-    wav = capture.record(duration, input_device=input)
-    with AbletonClient(host, port) as client:
+    _validate_device(device)
+    with _connect_or_fail(host, port) as client:
+        # One clock: the Live set owns tempo. Record against the project's
+        # grid unless --tempo / an 'NN bpm' hint / --detect-tempo overrides.
+        # --set-tempo implies detection: pushing the project tempo back to
+        # the project would be a no-op.
+        if tempo is None and not detect_tempo and not set_tempo and _tempo_from_hint(hint) is None:
+            proj = _project_tempo(client)
+            if proj:
+                tempo = proj
+                _log(f"using project tempo {tempo:.1f} BPM")
+        if countin > 0:
+            _count_in(countin)
+        _log(f"recording {duration}s")
+        wav = capture.record(duration, input_device=input)
+        _save_last_take(
+            wav, device=device, hint=hint, tempo=tempo, bar_align=bar_align,
+            correct=correct, key=key, scale=scale, bars=bars,
+            instruments=instruments, set_tempo=set_tempo,
+        )
         plan = _run_pipeline(
             wav,
             client=client,
@@ -228,7 +343,7 @@ def record(
             scale=scale,
             bars=bars,
         )
-        _emit_or_apply(plan, json_out=json_out, client=client)
+        _emit_or_apply(plan, json_out=json_out, client=client, set_tempo=set_tempo)
 
 
 @app.command("record-stream")
@@ -244,6 +359,8 @@ def record_stream(
     key: str | None = typer.Option(None, "--key", help=_KEY_HELP),
     scale: str | None = typer.Option(None, "--scale", help=_SCALE_HELP),
     bars: str = typer.Option("auto", "--bars", help=_BARS_HELP),
+    set_tempo: bool = typer.Option(False, "--set-tempo/--no-set-tempo", help=_SET_TEMPO_HELP),
+    detect_tempo: bool = typer.Option(False, "--detect-tempo", help=_DETECT_TEMPO_HELP),
     instruments: str | None = typer.Option(None, "--instruments"),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
@@ -251,37 +368,43 @@ def record_stream(
 
     The device's start/stop button drives this: spawning the command starts
     recording, writing 'stop' to stdin finishes it. The take's length is the
-    performer's, not a fixed timer; the project tempo is fetched so it fits the
-    grid (like transcribe-clip).
+    performer's, not a fixed timer; the project tempo is fetched (BEFORE the
+    take, so a dead Live session costs no performance) so it fits the grid.
     """
     import sys as _sys
     import threading
 
-    stop = threading.Event()
+    _validate_device(device)
+    with _connect_or_fail(host, port) as client:
+        if tempo is None and not detect_tempo and not set_tempo and _tempo_from_hint(hint) is None:
+            proj = _project_tempo(client)
+            if proj:
+                tempo = proj
+                _log(f"using project tempo {tempo:.1f} BPM")
 
-    def _watch_stdin() -> None:
-        try:
-            for line in _sys.stdin:
-                if line.strip().lower() in ("stop", "q", "quit"):
-                    break
-        except (ValueError, OSError):
-            pass
-        stop.set()  # explicit stop, or stdin closed
+        stop = threading.Event()
 
-    threading.Thread(target=_watch_stdin, daemon=True).start()
-    _log("recording — send 'stop' to finish (or close stdin)")
-    wav = capture.record_until_stop(stop.is_set, input_device=input)
-    _log("stopped — transcribing")
-    with AbletonClient(host, port) as client:
-        if tempo is None:
+        def _watch_stdin() -> None:
             try:
-                session = client.get_session_info()
-                proj = session.get("tempo") if isinstance(session, dict) else None
-                if proj:
-                    tempo = float(proj)
-                    _log(f"using project tempo {tempo:.1f} BPM")
-            except (AbletonError, OSError):
+                for line in _sys.stdin:
+                    if line.strip().lower() in ("stop", "q", "quit"):
+                        break
+            except (ValueError, OSError):
                 pass
+            stop.set()  # explicit stop, or stdin closed
+
+        threading.Thread(target=_watch_stdin, daemon=True).start()
+        _log("recording — send 'stop' to finish (or close stdin)")
+        wav = capture.record_until_stop(
+            stop.is_set, input_device=input,
+            on_level=lambda db: _log(f"level {db:.1f}"),
+        )
+        _log("stopped — transcribing")
+        _save_last_take(
+            wav, device=device, hint=hint, tempo=tempo, bar_align=bar_align,
+            correct=correct, key=key, scale=scale, bars=bars,
+            instruments=instruments, set_tempo=set_tempo,
+        )
         plan = _run_pipeline(
             wav,
             client=client,
@@ -295,7 +418,7 @@ def record_stream(
             scale=scale,
             bars=bars,
         )
-        _emit_or_apply(plan, json_out=json_out, client=client)
+        _emit_or_apply(plan, json_out=json_out, client=client, set_tempo=set_tempo)
 
 
 @app.command()
@@ -310,11 +433,12 @@ def run(
     key: str | None = typer.Option(None, "--key", help=_KEY_HELP),
     scale: str | None = typer.Option(None, "--scale", help=_SCALE_HELP),
     bars: str = typer.Option("auto", "--bars", help=_BARS_HELP),
+    set_tempo: bool = typer.Option(False, "--set-tempo/--no-set-tempo", help=_SET_TEMPO_HELP),
     instruments: str | None = typer.Option(None, "--instruments"),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
     """Run the pipeline on an existing WAV and apply to Ableton."""
-    with AbletonClient(host, port) as client:
+    with _connect_or_fail(host, port) as client:
         plan = _run_pipeline(
             wav,
             client=client,
@@ -327,7 +451,7 @@ def run(
             scale=scale,
             bars=bars,
         )
-        _emit_or_apply(plan, json_out=json_out, client=client)
+        _emit_or_apply(plan, json_out=json_out, client=client, set_tempo=set_tempo)
 
 
 @app.command("dry-run")
@@ -366,24 +490,86 @@ def dry_run(
     _emit_or_apply(plan, json_out=json_out, client=None)
 
 
+def _api_key_from_env_file() -> str | None:
+    """Read ANTHROPIC_API_KEY from a repo/cwd ``.env``.
+
+    The M4L glue reads ``.env`` directly (it never sees a login shell), so
+    doctor must agree with what the device will actually do — an unsourced
+    shell shouldn't fail a check the device would pass.
+    """
+    for candidate in (Path.cwd() / ".env", Path(__file__).resolve().parents[1] / ".env"):
+        try:
+            text = candidate.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        m = re.search(r"ANTHROPIC_API_KEY\s*=\s*[\"']?([^\"'\r\n]+)", text)
+        if m and m.group(1).strip():
+            return m.group(1).strip()
+    return None
+
+
+# Forked bridge commands and harmless probe params. A stock bridge answers
+# "Unknown command …"; any other reply (ok or a param error) proves the
+# command is spliced in.
+_BRIDGE_PROBES: tuple[tuple[str, dict], ...] = (
+    ("get_selected_clip", {}),
+    ("set_clip_envelope", {"track_index": -1, "clip_index": 0, "device_index": 0,
+                           "parameter": "", "steps": []}),
+)
+
+
+def _probe_bridge(client: AbletonClient, failures: list[str]) -> None:
+    """Probe the forked bridge commands; append misses/errors to ``failures``.
+
+    Classification: a transport failure means we couldn't ask (FAIL, but not
+    "missing"); a status=error mentioning an unknown command means stock
+    bridge (missing); any other reply — ok or a param complaint — proves the
+    handler exists.
+    """
+    from mouthflow.execute import AbletonTransportError
+
+    for cmd, params in _BRIDGE_PROBES:
+        try:
+            client.send_command(cmd, params)
+        except AbletonTransportError as exc:
+            failures.append(f"bridge probe {cmd} failed: {exc}")
+            _log(f"FAIL bridge probe {cmd}: {exc}")
+        except AbletonError as exc:
+            if "unknown command" in str(exc).lower():
+                failures.append(f"bridge command {cmd} missing (stock ableton-mcp; see bridge/README.md)")
+                _log(f"FAIL bridge command {cmd} missing — splice the fork (bridge/README.md)")
+            else:
+                # A reply other than "unknown command" means the handler
+                # exists and rejected our probe params.
+                _log(f"ok   bridge command {cmd} present")
+        else:
+            _log(f"ok   bridge command {cmd} present")
+
+
 @app.command()
 def doctor(
     host: str = typer.Option("127.0.0.1"),
     port: int = typer.Option(9877),
+    bridge: bool = typer.Option(
+        False, "--bridge", help="Also probe the forked bridge commands (transcribe-clip / drone automation)."
+    ),
 ) -> None:
     """Preflight checks for a first end-to-end run.
 
-    Verifies ANTHROPIC_API_KEY is set, AbletonMCP is reachable on the
-    socket, and the Drums browser returns loadable kits. Exits non-zero if
-    any check fails, so it's safe to chain in scripts.
+    Verifies ANTHROPIC_API_KEY is available (env or .env), AbletonMCP is
+    reachable on the socket, and the Drums browser returns loadable kits.
+    ``--bridge`` additionally probes for the forked Remote Script commands.
+    Exits non-zero if any check fails, so it's safe to chain in scripts.
     """
     failures: list[str] = []
 
     if os.environ.get("ANTHROPIC_API_KEY"):
         _log("ok   ANTHROPIC_API_KEY is set")
+    elif _api_key_from_env_file():
+        _log("ok   ANTHROPIC_API_KEY found in .env (the device reads it from there too)")
     else:
         failures.append("ANTHROPIC_API_KEY not set")
-        _log("FAIL ANTHROPIC_API_KEY not set")
+        _log("FAIL ANTHROPIC_API_KEY not set (env or .env)")
 
     # OSError covers ConnectionRefusedError / socket timeouts when Live
     # isn't running or the Remote Script isn't loaded; AbletonError covers
@@ -407,6 +593,8 @@ def doctor(
                 else:
                     failures.append("no loadable drum kits found in browser")
                     _log("FAIL no loadable drum kits found in browser")
+            if bridge:
+                _probe_bridge(client, failures)
     except (AbletonError, OSError) as exc:
         failures.append(f"AbletonMCP not reachable at {host}:{port}: {exc}")
         _log(f"FAIL AbletonMCP not reachable at {host}:{port}: {exc}")
@@ -435,6 +623,7 @@ def transcribe_clip(
     key: str | None = typer.Option(None, "--key", help=_KEY_HELP),
     scale: str | None = typer.Option(None, "--scale", help=_SCALE_HELP),
     bars: str = typer.Option("auto", "--bars", help=_BARS_HELP),
+    set_tempo: bool = typer.Option(False, "--set-tempo/--no-set-tempo", help=_SET_TEMPO_HELP),
     instruments: str | None = typer.Option(None, "--instruments"),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
@@ -444,7 +633,7 @@ def transcribe_clip(
     pipeline on it. Requires the forked Remote Script command
     ``get_selected_clip`` (see ``bridge/``).
     """
-    with AbletonClient(host, port) as client:
+    with _connect_or_fail(host, port) as client:
         try:
             info = client.get_selected_clip()
         except (AbletonError, OSError) as exc:
@@ -478,7 +667,57 @@ def transcribe_clip(
             scale=scale,
             bars=bars,
         )
-        _emit_or_apply(plan, json_out=json_out, client=client)
+        _emit_or_apply(plan, json_out=json_out, client=client, set_tempo=set_tempo)
+
+
+@app.command("retry-last")
+def retry_last(
+    device: str | None = typer.Option(
+        None, "--device",
+        help="Override the saved voice — also handy to re-transcribe the same take as another voice.",
+    ),
+    host: str = typer.Option("127.0.0.1"),
+    port: int = typer.Option(9877),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    """Replay the most recent take through the pipeline (no re-performing).
+
+    Every `record`/`record-stream` take is kept in ``~/.mouthflow/takes/`` with
+    its flags in ``last_take.json`` — so a failure after the performance
+    (Ableton hiccup, API error) costs a retry, not a re-take.
+    """
+    try:
+        state = json.loads(_LAST_TAKE.read_text())
+    except (OSError, ValueError):
+        _log(f"no saved take found at {_LAST_TAKE} — record one first")
+        raise typer.Exit(code=1)
+    wav = Path(state.get("wav", ""))
+    if not wav.exists():
+        _log(f"saved take is gone: {wav}")
+        raise typer.Exit(code=1)
+    device_id = device or state.get("device", _DEFAULT_DEVICE)
+    _validate_device(device_id)
+    # A saved instrument list belongs to the saved voice's browser category;
+    # when the voice is overridden, let the live walk resolve fresh ones.
+    saved_instruments = state.get("instruments") if device_id == state.get("device") else None
+    _log(f"retrying take {wav.name} (device {device_id})")
+    with _connect_or_fail(host, port) as client:
+        plan = _run_pipeline(
+            wav,
+            client=client,
+            hint=state.get("hint"),
+            instruments_override=_parse_instruments(saved_instruments),
+            device_id=device_id,
+            tempo=state.get("tempo"),
+            bar_align=state.get("bar_align", True),
+            correct=state.get("correct", True),
+            key=state.get("key"),
+            scale=state.get("scale"),
+            bars=state.get("bars", "auto"),
+        )
+        _emit_or_apply(
+            plan, json_out=json_out, client=client, set_tempo=state.get("set_tempo", False)
+        )
 
 
 @app.command("list-kits")

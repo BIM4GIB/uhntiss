@@ -1,8 +1,39 @@
 # Mouthflow — session handover
 
-Last updated: 2026-07-01. Read this first when picking up work.
+Last updated: 2026-07-03. Read this first when picking up work.
 (Architecture overview for newcomers: [`ARCHITECTURE.md`](ARCHITECTURE.md);
-honest gap list: [`KNOWN-LIMITATIONS.md`](KNOWN-LIMITATIONS.md).)
+honest gap list: [`KNOWN-LIMITATIONS.md`](KNOWN-LIMITATIONS.md); audit findings
++ the forward plan: [`roadmap.md`](roadmap.md).)
+
+**2026-07-03 — the "trust batch" (`feat/now-trust-batch`) landed the roadmap's
+NOW items.** Behaviour changes to know about:
+
+- **One clock:** `record` now fetches the project tempo before capture (like
+  `record-stream`/`transcribe-clip`) and `apply_plan` **no longer sets the
+  Live set's tempo by default** — pass `--set-tempo` to restore the old
+  behaviour. Clips are inserted in beats, so they follow the project tempo.
+  For a solo take NOT performed against the set's grid (e.g. a fresh empty
+  project), `--detect-tempo` re-enables detection (add `--set-tempo` to also
+  push it to the set — the old behaviour, now explicit).
+- **Never lose a take:** the Ableton socket is opened/pinged *before* the mic;
+  takes persist to `~/.mouthflow/takes/` with flags in
+  `~/.mouthflow/last_take.json`; `mouthflow retry-last` replays the last take.
+  A silent take exits (code 3) before the LLM call instead of landing an empty
+  clip. Socket errors close the connection (no more desync) and read-only
+  commands retry once.
+- **Feedback:** `record --countin N` runs the count-in CLI-side (the M4L glue
+  no longer fires "go" ~0.5s before the mic opens); `record-stream` emits
+  `level <dBFS>` lines — the glue routes them to a new `level` outlet and the
+  pitched panels show them in a number box next to the record buttons;
+  `doctor` reads `.env` for the API key and `doctor --bridge` probes the fork
+  commands (transport failures are classified as "couldn't ask", never as an
+  answer — see `AbletonTransportError` in `execute.py`).
+- **Correctness:** drone notes carry pyin confidence and are never
+  scale-snapped (a single-pitch drone used to be silently transposed via the
+  C-major fallback); drone bar-fit extends held notes to the loop end;
+  overlapping same-pitch notes survive `_midi_to_notes` (FIFO); phase-aware
+  quantise clamps at 0 (negative times crashed mido); `fit_to_bars` allows
+  **1/2-bar loops** and trims whole empty lead-in bars.
 
 ## TL;DR
 Mouthflow is now an **umbrella product**: a shared "voice → MIDI → Ableton"

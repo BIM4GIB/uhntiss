@@ -49,6 +49,50 @@ def test_record_rejects_non_positive_duration():
         capture.record(0)
 
 
+def test_record_defaults_to_take_vault(tmp_path, monkeypatch):
+    """Without an explicit path, takes land in the vault — they must survive
+    whatever fails after the performance (that's what retry-last replays)."""
+    monkeypatch.setattr(capture.sd, "rec", lambda f, **_: np.zeros((f, 1), dtype=np.int16))
+    monkeypatch.setattr(capture.sd, "wait", lambda: None)
+    monkeypatch.setattr(capture, "TAKES_DIR", tmp_path / "takes")
+
+    out = capture.record(0.5)
+    assert out.parent == tmp_path / "takes"
+    assert out.name.startswith("take-") and out.suffix == ".wav"
+    assert out.exists()
+
+
+def test_record_until_stop_reports_input_level(tmp_path, monkeypatch):
+    bs = 4_410
+
+    class FakeStream:
+        def __init__(self, *, callback, blocksize, **_):
+            self._cb, self._bs = callback, blocksize
+
+        def __enter__(self):
+            for _ in range(3):
+                self._cb(np.full((self._bs, 1), 16_384, dtype=np.int16), self._bs, None, None)
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+    monkeypatch.setattr(capture.sd, "InputStream", FakeStream)
+    levels: list[float] = []
+    calls = {"n": 0}
+
+    def should_stop():
+        calls["n"] += 1
+        return calls["n"] > 3
+
+    capture.record_until_stop(
+        should_stop, out_path=tmp_path / "s.wav", blocksize=bs, on_level=levels.append
+    )
+    assert levels, "on_level was never called"
+    # Half-scale int16 is ~-6 dBFS.
+    assert levels[0] == pytest.approx(-6.0, abs=0.5)
+
+
 def test_record_until_stop_captures_streamed_blocks(tmp_path, monkeypatch):
     """`record_until_stop` records streamed blocks until should_stop, then
     drains the queue — the device's start/stop path."""

@@ -29,12 +29,31 @@ from mouthflow.schemas import Plan
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 9877
 _RECV_CHUNK = 8192
+_TIMEOUT_CONNECT = 5.0
 _TIMEOUT_READ = 10.0
 _TIMEOUT_WRITE = 15.0
+
+# Commands safe to resend after a reconnect: they don't mutate the Live set,
+# so a retry can't double-apply (a slow create_midi_track that timed out may
+# still have executed — retrying those would duplicate tracks/clips).
+_IDEMPOTENT_COMMANDS = frozenset(
+    {"get_session_info", "get_browser_items_at_path", "get_selected_clip"}
+)
 
 
 class AbletonError(RuntimeError):
     """Ableton returned status=error or the socket misbehaved."""
+
+
+class AbletonTransportError(AbletonError):
+    """The socket layer failed (timeout, refused, reset, EOF) — as opposed to
+    a reachable bridge that replied ``status=error``. Callers that classify
+    replies (doctor's bridge probe, the browser walk) must treat this as
+    "couldn't ask", never as an answer."""
+
+
+class _TransportError(Exception):
+    """Internal: the socket failed mid-exchange (timeout, reset, EOF)."""
 
 
 class AbletonClient:
@@ -49,7 +68,12 @@ class AbletonClient:
         if self._sock is not None:
             return
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect((self.host, self.port))
+        s.settimeout(_TIMEOUT_CONNECT)
+        try:
+            s.connect((self.host, self.port))
+        except OSError:
+            s.close()
+            raise
         self._sock = s
 
     def close(self) -> None:
@@ -69,28 +93,60 @@ class AbletonClient:
     # --- raw protocol ---
 
     def send_command(self, command_type: str, params: dict[str, Any] | None = None) -> dict:
-        self.connect()
-        assert self._sock is not None
-        payload = json.dumps({"type": command_type, "params": params or {}}).encode("utf-8")
-        self._sock.settimeout(_TIMEOUT_WRITE)
-        self._sock.sendall(payload)
+        """Send one command and read its reply.
 
-        self._sock.settimeout(_TIMEOUT_READ)
-        chunks: list[bytes] = []
-        while True:
-            chunk = self._sock.recv(_RECV_CHUNK)
-            if not chunk:
-                if not chunks:
-                    raise AbletonError("connection closed before any data")
-                break
-            chunks.append(chunk)
-            try:
-                response = json.loads(b"".join(chunks).decode("utf-8"))
-                break
-            except json.JSONDecodeError:
-                continue
-        else:  # pragma: no cover
-            raise AbletonError("no data")
+        A read timeout or transport error leaves the stream in an unknown
+        state (the reply may still arrive later and would be consumed by the
+        *next* command — a permanent desync), so the socket is always closed
+        on failure. Read-only commands are retried once on a fresh
+        connection; mutating commands are not (the timed-out command may
+        still have executed inside Live).
+        """
+        try:
+            return self._send_command_once(command_type, params)
+        except _TransportError as exc:
+            self.close()
+            if command_type not in _IDEMPOTENT_COMMANDS:
+                raise AbletonTransportError(
+                    f"{command_type} failed mid-flight ({exc}); not retrying a mutating command"
+                ) from exc
+        try:
+            return self._send_command_once(command_type, params)
+        except _TransportError as exc:
+            self.close()
+            raise AbletonTransportError(f"{command_type} failed after reconnect ({exc})") from exc
+
+    def _send_command_once(self, command_type: str, params: dict[str, Any] | None) -> dict:
+        payload = json.dumps({"type": command_type, "params": params or {}}).encode("utf-8")
+        try:
+            # connect() inside the try: a refused/timed-out connect is a
+            # transport failure too, so it follows the same wrap-and-retry
+            # contract as a mid-exchange failure (send_command never leaks a
+            # raw OSError). The CLI's fail-fast preflight uses connect()
+            # directly and still sees the raw OSError it wants.
+            self.connect()
+            assert self._sock is not None
+            self._sock.settimeout(_TIMEOUT_WRITE)
+            self._sock.sendall(payload)
+
+            self._sock.settimeout(_TIMEOUT_READ)
+            chunks: list[bytes] = []
+            while True:
+                chunk = self._sock.recv(_RECV_CHUNK)
+                if not chunk:
+                    if not chunks:
+                        raise _TransportError("connection closed before any data")
+                    raise _TransportError("connection closed mid-response")
+                chunks.append(chunk)
+                try:
+                    response = json.loads(b"".join(chunks).decode("utf-8"))
+                    break
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    # Partial frame (possibly split inside a multi-byte
+                    # character) — keep accumulating.
+                    continue
+        except (TimeoutError, OSError) as exc:
+            raise _TransportError(str(exc) or type(exc).__name__) from exc
 
         if response.get("status") == "error":
             raise AbletonError(response.get("message", "unknown Ableton error"))
@@ -144,8 +200,10 @@ class AbletonClient:
                 return
             try:
                 result = self.get_browser_items_at_path(p)
+            except AbletonTransportError:
+                raise  # the socket died — a partial list would look complete
             except AbletonError:
-                return  # unreachable subtree; skip it
+                return  # bridge replied error for this subtree; skip it
             folders: list[str] = []
             for item in result.get("items", []):
                 uri = item.get("uri")
@@ -256,16 +314,19 @@ def _midi_to_notes(midi_path: Path) -> list[dict]:
     notes: list[dict] = []
     for track in mid.tracks:
         abs_tick = 0
-        pending: dict[int, tuple[int, int]] = {}  # pitch -> (start_tick, velocity)
+        # pitch -> FIFO of (start_tick, velocity): same-pitch notes overlap in
+        # the drone voice (every region sustains to the clip end), so a plain
+        # dict would drop the earlier note when the later one starts.
+        pending: dict[int, list[tuple[int, int]]] = {}
         for msg in track:
             abs_tick += msg.time
             if msg.type == "note_on" and msg.velocity > 0:
-                pending[msg.note] = (abs_tick, msg.velocity)
+                pending.setdefault(msg.note, []).append((abs_tick, msg.velocity))
             elif msg.type in ("note_off",) or (msg.type == "note_on" and msg.velocity == 0):
-                start = pending.pop(msg.note, None)
-                if start is None:
+                starts = pending.get(msg.note)
+                if not starts:
                     continue
-                start_tick, velocity = start
+                start_tick, velocity = starts.pop(0)
                 notes.append(
                     {
                         "pitch": int(msg.note),
@@ -279,9 +340,17 @@ def _midi_to_notes(midi_path: Path) -> list[dict]:
     return notes
 
 
-def apply_plan(plan: Plan, client: AbletonClient) -> None:
-    """Apply ``plan`` to a running Live session via ``client``."""
-    client.set_tempo(plan.tempo)
+def apply_plan(plan: Plan, client: AbletonClient, *, set_tempo: bool = False) -> None:
+    """Apply ``plan`` to a running Live session via ``client``.
+
+    ``set_tempo`` is opt-in: silently retuning a session that already has
+    material to whatever tempo the take detected is destructive. The clip's
+    notes are inserted in beats, so they play at the project tempo either way
+    — and when the take was recorded against the project tempo (the default
+    flow), the two agree.
+    """
+    if set_tempo:
+        client.set_tempo(plan.tempo)
     for clip in plan.clips:
         track_idx = client.create_midi_track(clip.track_name)
         client.load_instrument(track_idx, clip.instrument_path)
@@ -289,8 +358,9 @@ def apply_plan(plan: Plan, client: AbletonClient) -> None:
         for env in clip.automation or []:
             try:
                 client.set_clip_envelope(track_idx, 0, env.device_index, env.parameter, env.steps)
-            except AbletonError as exc:
-                # Stock bridge lacks set_clip_envelope; the drone still plays as
-                # a held note/chord. Degrade gracefully rather than abort.
+            except (AbletonError, OSError) as exc:
+                # Stock bridge lacks set_clip_envelope (and a transport blip
+                # here shouldn't kill the take); the drone still plays as a
+                # held note/chord. Degrade gracefully rather than abort.
                 print(f"[mouthflow] automation skipped ({exc})", file=sys.stderr)
         client.fire_clip(track_idx, 0)
