@@ -104,6 +104,16 @@ def test_fit_off_keeps_everything():
     assert n is None and len(kept) == len(take)
 
 
+def test_fit_auto_tolerates_boundary_overshoot():
+    # A note tail or re-articulation ON the loop boundary must not double the
+    # clip (a real 4.05-bar take became an 8-bar clip, half silence). The
+    # boundary note is dropped — the loop restart covers it.
+    take = _notes([45, 47, 45, 47], step=2.0) + [NoteEvent(8.0, 45, 90, 0.1)]
+    kept, n = fit_to_bars(take, 120.0, "auto")  # content 4.05 bars at 2s/bar
+    assert n == 4
+    assert len(kept) == 4  # the beat-16 boundary note is dropped, not looped as silence
+
+
 def test_fit_auto_allows_one_and_two_bar_loops():
     # A 1-bar riff must loop as 1 bar, not 4 bars with 3 bars of dead air.
     one_bar = _notes([45, 47, 45], step=0.5)  # ends 1.45s < 2s (1 bar at 120)

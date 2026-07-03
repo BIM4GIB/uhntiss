@@ -178,9 +178,15 @@ def fit_to_bars(notes, tempo_bpm: float, spec, beats_per_bar: int = 4, *, sustai
     content_bars = end_s / sec_per_bar if sec_per_bar > 0 else 0.0
 
     if spec == "auto":
-        n_bars = next((b for b in _ALLOWED_BARS if b >= content_bars - 1e-6), None)
+        # Tolerate a small overshoot past an allowed bar count: a note tail
+        # or a re-articulation ON the loop boundary must not double the clip
+        # (verified on a real take: 4.05 bars of content became an 8-bar clip
+        # that looped with 4 bars of silence). The boundary note is clamped/
+        # dropped below — the loop restart covers it.
+        tol = 0.10  # bars
+        n_bars = next((b for b in _ALLOWED_BARS if b >= content_bars - tol), None)
         if n_bars is None:
-            n_bars = int(math.ceil(max(content_bars, 1) / 8.0) * 8)
+            n_bars = int(math.ceil(max(content_bars - tol, 1) / 8.0) * 8)
     else:
         n_bars = int(spec)
 

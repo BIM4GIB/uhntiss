@@ -147,6 +147,13 @@ the pitched panels show it in a number box next to the record buttons) ·
 `done <0|1>` · `error <text>` · `kitmenu clear|append <name>` ·
 `inputmenu clear|append <name>`
 
+## The drums panel
+
+`MouthflowDrums.amxd` is the full-featured drums device (Transcribe Clip,
+record start/stop, input level meter). The original `Mouthflow.amxd` is the
+bare June template, kept installed for compatibility with existing sets —
+new sets should use MouthflowDrums.
+
 ## Transcribe a clip (no re-recording)
 The pitched panels ship a **Transcribe Clip** button (auto-injected by
 `generate.py` — no Max editing needed). Select an **audio** clip in Live, click

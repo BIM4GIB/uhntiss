@@ -15,7 +15,7 @@ not by algorithm.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 
@@ -222,7 +222,43 @@ class PitchedTranscriber:
             for (pitch, t_q, dur, conf, _r), vel in zip(accepted, velocities)
         ]
         notes.sort(key=lambda nt: (nt.time_s, nt.midi_note))
+        return _enforce_monophony(notes)
+
+
+def _enforce_monophony(notes: list[NoteEvent]) -> list[NoteEvent]:
+    """One voice: a hummed line can never sound two notes at once.
+
+    Verified on a real take: pitch-wobble fragments (a scoop crossing 39/40)
+    survive segmentation as separate notes whose starts then quantise into
+    the SAME grid slot — the clip plays adjacent-semitone clusters, which is
+    the single most audible quality killer on the bass voice. Rules:
+
+    - Notes sharing a quantised start: keep the most confident (ties -> the
+      longer one); the cluster's duration is the survivors' max so nothing
+      audibly shortens.
+    - A note overlapping the NEXT note's start is clamped to end there
+      (legato, never overlapped).
+    """
+    if len(notes) <= 1:
         return notes
+    out: list[NoteEvent] = []
+    for n in notes:
+        if out and abs(n.time_s - out[-1].time_s) < 1e-6:
+            prev = out[-1]
+            best, other = (n, prev) if _mono_rank(n) > _mono_rank(prev) else (prev, n)
+            dur = max(best.duration_s or 0.0, other.duration_s or 0.0) or None
+            out[-1] = replace(best, duration_s=dur)
+            continue
+        out.append(n)
+    for i in range(len(out) - 1):
+        n, nxt = out[i], out[i + 1]
+        if n.duration_s is not None and n.time_s + n.duration_s > nxt.time_s:
+            out[i] = replace(n, duration_s=max(0.05, nxt.time_s - n.time_s))
+    return out
+
+
+def _mono_rank(n: NoteEvent) -> tuple[float, float]:
+    return (n.confidence or 0.0, n.duration_s or 0.0)
 
 
 _NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]

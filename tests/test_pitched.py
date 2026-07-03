@@ -17,13 +17,38 @@ from mouthflow.devices.bass.device import BASS_CONFIG
 from mouthflow.devices.lead.device import LEAD_CONFIG
 from mouthflow.devices.pitched import (
     PitchedTranscriber,
+    _enforce_monophony,
     _mode,
     _note_name,
     _snap_octave,
     pitched_plan_summary,
 )
+from mouthflow.schemas import NoteEvent
 
 SR = 44_100
+
+
+def test_enforce_monophony_collapses_same_slot_semitone_clusters():
+    # Verified on a real take: pitch-wobble fragments (39 then 40) quantised
+    # into the same slot played back as an adjacent-semitone chord.
+    notes = [
+        NoteEvent(0.5, 39, 90, 0.4, confidence=0.5),
+        NoteEvent(0.5, 40, 91, 0.9, confidence=0.8),  # more confident, longer
+        NoteEvent(1.5, 43, 100, 0.5, confidence=0.9),
+    ]
+    out = _enforce_monophony(notes)
+    assert [n.midi_note for n in out] == [40, 43]
+    assert out[0].duration_s == 0.9  # cluster keeps the longest sustain
+
+
+def test_enforce_monophony_clamps_overlaps_to_next_note():
+    notes = [
+        NoteEvent(0.0, 40, 90, 2.0, confidence=0.9),  # rings over the next
+        NoteEvent(1.0, 43, 90, 0.5, confidence=0.9),
+    ]
+    out = _enforce_monophony(notes)
+    assert out[0].duration_s == 1.0  # legato: ends where the next begins
+    assert out[1].duration_s == 0.5
 
 
 def _sine(freq: float, dur_s: float, amp: float = 0.5) -> np.ndarray:
