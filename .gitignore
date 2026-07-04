@@ -33,3 +33,8 @@ Thumbs.db
 # Audio workspace output (corpus lives under tests/fixtures and is tracked)
 /recordings/
 *.wav.tmp
+
+# recorded datasets (user voice — local only)
+datasets/
+mimic/.session_progress.json
+mimic/*.hum.wav
