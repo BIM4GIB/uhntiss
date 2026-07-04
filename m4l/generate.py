@@ -247,15 +247,17 @@ def _inject_controls(maxpat: dict, pitched: bool = True) -> None:
     wire("obj-250", "obj-251")
 
     if pitched:
-        # DATASET column (third column, x>=546): record reference-linked
-        # samples for this voice's plan without leaving Live. Wear
-        # headphones — the reference plays while the mic records.
+        # DATASET column (third column, x>=546): reference MIDI clips live in
+        # the set (data_setup once), you record audio takes next to them, and
+        # data_ingest scores + ingests the SELECTED take clip. data_next shows
+        # which reference to play; keep/skip manage the gate.
         comment("obj-262", "dataset", [720, 480, 80, 18], [546, 20, 60, 14])
-        msg("obj-260", "data_next", [720, 500, 90, 20], [546, 36, 60, 22])
-        msg("obj-261", "data_record", [820, 500, 100, 20], [610, 36, 88, 22])
-        msg("obj-263", "data_keep", [720, 530, 90, 20], [546, 64, 60, 22])
-        msg("obj-264", "data_skip", [820, 530, 90, 20], [610, 64, 60, 22])
-        for b in ("obj-260", "obj-261", "obj-263", "obj-264"):
+        msg("obj-260", "data_next", [720, 500, 90, 20], [546, 36, 66, 22])
+        msg("obj-261", "data_ingest", [820, 500, 100, 20], [616, 36, 76, 22])
+        msg("obj-263", "data_keep", [720, 530, 90, 20], [546, 64, 66, 22])
+        msg("obj-264", "data_skip", [820, 530, 90, 20], [616, 64, 66, 22])
+        msg("obj-265", "data_setup", [920, 500, 100, 20], [546, 92, 76, 22])
+        for b in ("obj-260", "obj-261", "obj-263", "obj-264", "obj-265"):
             wire(b, _NODE_INLET)
 
     boxes.extend(add_b)

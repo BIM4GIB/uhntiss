@@ -29,9 +29,10 @@
  *   key <C|F#|Bb|...>      force the key for correction ("" = auto-detect)
  *   scale <major|minor|..> force the scale for correction ("" = auto)
  *   plan <name>            dataset plan for the DATASET buttons (baked per voice)
+ *   data_setup             create the plan's reference MIDI clips in the set
+ *   data_ingest            ingest the SELECTED audio take clip for the next row
  *   data_next              show the plan's next reference take + progress
- *   data_record            play the reference (headphones!) while recording the
- *                          imitation sample-synced; auto-scores + ingests on pass
+ *   data_record            mic playrec fallback (headphones; no Live clips)
  *   data_keep              accept the last take even though the gate said retry
  *   data_skip              skip the plan's current take
  *   record_start           begin an open-ended mic recording
@@ -310,23 +311,20 @@ function recordStop() {
   }
 }
 
-// --- dataset recording (reference-linked samples; see mimic/session.py) ------
-// Spawns `uv run python -m mimic.session --plan <plan> <cmd>` and routes its
-// progress lines to the status comment. The reference plays through the
-// system output while the mic records sample-synced — wear headphones.
-function runSession(cmd) {
+// --- dataset recording (reference-linked samples) ----------------------------
+// Live-native flow (mimic/live_ingest.py): reference MIDI clips sit in the
+// set; you record audio takes next to them and ingest the SELECTED take
+// clip. The mic playrec flow (mimic/session.py) remains available for
+// data_record. All progress lines land in the status comment.
+function runTool(moduleArgs) {
   if (child || inFlight) {
     status("busy — cancel or finish the current run first");
     return;
   }
   inFlight = true;
   Max.outlet("busy", 1);
-  const args = ["run", "python", "-m", "mimic.session", "--plan", state.plan, cmd];
-  if (cmd === "record" && state.input != null) args.push("--input", String(state.input));
-
-  const key = loadApiKey(state.repo); // not needed here, but harmless parity
+  const args = ["run", "python", "-m"].concat(moduleArgs);
   const env = Object.assign({}, process.env);
-  if (key) env.ANTHROPIC_API_KEY = key;
   let proc;
   try {
     proc = spawn(resolveUv(), args, { cwd: state.repo, env });
@@ -344,14 +342,24 @@ function runSession(cmd) {
     });
   proc.stdout.on("data", onText);
   proc.stderr.on("data", onText);
-  proc.on("error", (e) => status(`session error: ${e.message}`));
+  proc.on("error", (e) => status(`tool error: ${e.message}`));
   proc.on("close", (code) => {
     child = null;
     inFlight = false;
     cancelled = false;
     Max.outlet("busy", 0);
-    if (code !== 0) status(`session exited ${code} — see Max console`);
+    if (code !== 0) status(`tool exited ${code} — see Max console`);
   });
+}
+
+function runSession(cmd) {
+  const args = ["mimic.session", "--plan", state.plan, cmd];
+  if (cmd === "record" && state.input != null) args.push("--input", String(state.input));
+  runTool(args);
+}
+
+function runLiveData(cmd) {
+  runTool(["mimic.live_ingest", cmd, "--plan", state.plan]);
 }
 
 function listInputs() {
@@ -441,8 +449,10 @@ Max.addHandler("key", (...a) => (state.key = a.join(" ").trim()));
 Max.addHandler("scale", (...a) => (state.scale = a.join(" ").trim()));
 // dataset recording (reference-linked samples for calibration/eval/training)
 Max.addHandler("plan", (...a) => (state.plan = a.join(" ").trim() || state.plan));
+Max.addHandler("data_setup", () => runLiveData("setup"));   // reference clips into the set
+Max.addHandler("data_ingest", () => runLiveData("ingest")); // selected take clip -> dataset
 Max.addHandler("data_next", () => runSession("next"));
-Max.addHandler("data_record", () => runSession("record"));
+Max.addHandler("data_record", () => runSession("record"));  // mic playrec fallback
 Max.addHandler("data_keep", () => runSession("keep"));
 Max.addHandler("data_skip", () => runSession("skip"));
 // start/stop recording (performer-controlled length)
