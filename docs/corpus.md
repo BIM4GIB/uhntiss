@@ -57,3 +57,53 @@ Pitched ground truth uses a different convention: a reference melody grid
 `mimic/<name>.hum.wav` by `eval/note_eval.py` (note P/R/F1 + octave-error,
 onset-aligned). No real tonal takes are recorded yet; that is the pending
 next step for tuning bass/lead on real voice.
+
+
+## The voice dataset (2026-07-04 design)
+
+Quality is procedurally improvable only against ground truth from THE
+performer's voice. Every dataset row is a reference-linked pair: a synthesized
+riff/pattern the performer hears in headphones and imitates, recorded
+sample-synced (`sounddevice.playrec`) so **the reference grid IS the label**
+for what they *meant*. No manual annotation, ever.
+
+Harnesses: `mimic/take.py` (drums, existing) + `mimic/tonal.py` (bass/lead/
+drone, riff archetypes stressing one failure mode each) + `mimic/session.py`
+(guided runner: listen -> record -> auto-score -> auto-ingest, resumable).
+Accepted takes land in `datasets/<voice>/` (gitignored — voice recordings stay
+local) with a `manifest.jsonl` row (voice, riff, key, bpm, role, pipeline sha,
+scores).
+
+Every row is tagged with a **role**:
+
+| role | purpose | rule |
+|---|---|---|
+| calibrate | fit thresholds to this performer (min_note_s, confidence gates, velocity anchors, octave snap) | tune freely |
+| eval | the honest number; CI-gateable | recorded LAST, never tuned against |
+| train | per-user models (k-NN today, embedding/prototype later) | grows over time |
+
+### Starter counts (~3 sessions of 15–20 min)
+
+| plan | takes | split | what it unlocks |
+|---|---|---|---|
+| `starter_bass` | 20 (3 archetypes x keys x 85–140 BPM) | 12 cal / 8 eval | bass threshold calibration + the pyin-vs-SwiftF0 A/B **with a number** |
+| `starter_lead` | 10 | 6 cal / 4 eval | lead register + octave-continuity calibration |
+| `starter_drone` | 5 | 5 cal | held-pitch/chord sanity |
+| drums (`take.py`) | 20 (presets x 85/100/120/140 + freestyle) | 12 train / 8 eval | replaces the train-contaminated fixture corpus; honest CI class-acc |
+
+Bass archetypes: `roots` (sustained pitch/octave stability), `pump8`
+(same-pitch staccato 8ths — re-articulation + velocity), `funk` (syncopation,
+rests, octave jump). Lead: `steps`, `arp`, `held`. Genre coverage enters
+through drum patterns and tempo bands — extend `PRESETS`/`PLANS` per genre.
+
+### Growth loop
+
+1. Record a plan (or a few takes after any session — 2 min).
+2. `eval/note_eval` + `run_eval` read `datasets/` -> per-voice honest F1.
+3. Changes are accepted only if the eval-role numbers don't regress.
+4. When enough `train` rows exist per voice: per-user recalibration, then the
+   neural-ears A/B (SwiftF0 etc.) decided by the eval split, not vibes.
+
+Upgrade path: render references through actual Live instruments via the
+bridge (same grids, real target sounds) so imitation and instrument-matching
+share one dataset.
