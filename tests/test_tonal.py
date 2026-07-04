@@ -56,3 +56,25 @@ def test_all_plan_riffs_exist():
             assert riff in tonal.RIFFS[voice], (name, voice, riff)
             tonal._root_midi(voice, key)  # raises on a bad key
             assert role in ("calibrate", "eval", "train")
+
+
+# --- live-native flow (mimic/live_ingest.py) -----------------------------------
+
+
+def test_live_row_notes_match_riff():
+    from mimic.live_ingest import _row_notes
+
+    notes = _row_notes("bass", "pump8", "F")
+    assert len(notes) == len(tonal.BASS_RIFFS["pump8"])
+    root = tonal._root_midi("bass", "F")
+    assert all(n["pitch"] >= root for n in notes)
+    assert all(0 <= n["start_time"] < 8.0 for n in notes)  # riffs span 2 bars
+
+
+def test_live_plan_chunking_fits_default_scenes():
+    from mimic.live_ingest import _SLOTS_PER_TRACK
+    from mimic.session import PLANS
+
+    for rows in PLANS.values():
+        chunks = [rows[i:i + _SLOTS_PER_TRACK] for i in range(0, len(rows), _SLOTS_PER_TRACK)]
+        assert all(len(c) <= 8 for c in chunks)

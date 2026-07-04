@@ -214,14 +214,23 @@ def _pipeline_sha() -> str:
         return "unknown"
 
 
-def score(name: str, role: str = "calibrate", force: bool = False) -> bool:
+def score(
+    name: str,
+    role: str = "calibrate",
+    force: bool = False,
+    offset_range: tuple[float, float] | None = None,
+) -> bool:
     """Score the take against its grid, gate, and ingest into datasets/."""
+    from eval.note_eval import OFFSET_MAX, OFFSET_MIN
     from eval.note_eval import score as note_score
 
     p = _paths(name)
     grid = json.load(open(p["grid"]))
     voice = grid["voice"]
-    stats = note_score(_transcriber(voice), p["take"], grid)
+    stats = note_score(
+        _transcriber(voice), p["take"], grid,
+        offset_range=offset_range or (OFFSET_MIN, OFFSET_MAX),
+    )
     n_ref = stats["notes_ref"]
     matched = stats["tp"] + stats["octave_err"] + stats["wrong_pitch"]
     print(f"{name}: matched {matched}/{n_ref}  P {stats['precision']:.2f} "
@@ -240,6 +249,8 @@ def score(name: str, role: str = "calibrate", force: bool = False) -> bool:
 
     files = {}
     for kind in ("reference", "grid", "take"):
+        if not p[kind].exists():
+            continue  # live-flow rows have no synthesized reference file
         target = dest / p[kind].name
         shutil.copy2(p[kind], target)
         try:

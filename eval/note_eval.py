@@ -42,16 +42,20 @@ OFFSET_MIN = -0.05
 OFFSET_MAX = 0.35
 
 
-def _align_offset(pred_t: np.ndarray, ref_t: np.ndarray) -> float:
+def _align_offset(
+    pred_t: np.ndarray, ref_t: np.ndarray, lo: float = OFFSET_MIN, hi: float = OFFSET_MAX
+) -> float:
     """Best constant offset (pred = ref + offset) by max onset matches.
 
     Ties are broken toward the smallest |offset| — with a dense grid, several
     offsets can match equally by count, and the least-shifted alignment is the
-    physically plausible one."""
+    physically plausible one. ``lo``/``hi`` widen the window for sources with
+    unknown lead-in (audio clips recorded inside Live may carry count-in or
+    pre-roll before the performance starts)."""
     if pred_t.size == 0 or ref_t.size == 0:
         return 0.0
     best, best_key = 0.0, (-1, 0.0)
-    for d in np.arange(OFFSET_MIN, OFFSET_MAX + 1e-9, 0.005):
+    for d in np.arange(lo, hi + 1e-9, 0.005):
         n = sum(np.any(np.abs(pred_t - (tg + d)) <= ONSET_TOL) for tg in ref_t)
         key = (n, -abs(d))
         if key > best_key:
@@ -103,7 +107,12 @@ def match_stats(pred: list[tuple[float, int]], ref: list[tuple[float, int]], off
     }
 
 
-def score(transcriber: PitchedTranscriber, hum_wav: Path, notegrid: dict) -> dict:
+def score(
+    transcriber: PitchedTranscriber,
+    hum_wav: Path,
+    notegrid: dict,
+    offset_range: tuple[float, float] = (OFFSET_MIN, OFFSET_MAX),
+) -> dict:
     """Note P/R/F1 + octave-error of ``transcriber`` on ``hum_wav`` vs the grid."""
     t = transcriber.transcribe(hum_wav)
     pred = [(h.time_s, h.midi_note) for h in t.hits]
@@ -111,7 +120,7 @@ def score(transcriber: PitchedTranscriber, hum_wav: Path, notegrid: dict) -> dic
     ref = notegrid["notes"]
     ref_t = np.array([r[0] for r in ref], dtype=float)
 
-    offset = _align_offset(pred_t, ref_t)
+    offset = _align_offset(pred_t, ref_t, *offset_range)
     return match_stats(pred, [(float(tg), int(mg)) for tg, mg in ref], offset)
 
 
