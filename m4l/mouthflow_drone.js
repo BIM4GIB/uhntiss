@@ -28,6 +28,12 @@
  *   correct <0|1>          note correction (scale snap) off/on
  *   key <C|F#|Bb|...>      force the key for correction ("" = auto-detect)
  *   scale <major|minor|..> force the scale for correction ("" = auto)
+ *   plan <name>            dataset plan for the DATASET buttons (baked per voice)
+ *   data_next              show the plan's next reference take + progress
+ *   data_record            play the reference (headphones!) while recording the
+ *                          imitation sample-synced; auto-scores + ingests on pass
+ *   data_keep              accept the last take even though the gate said retry
+ *   data_skip              skip the plan's current take
  *   record_start           begin an open-ended mic recording
  *   record_stop            finish recording -> transcribe + apply
  *   record <0|1>           toggle form of record_start/record_stop
@@ -66,6 +72,7 @@ const state = {
   correct: 1, // note correction (scale snap) on/off
   key: "", // force key for correction (e.g. "C", "F#"); "" = auto-detect
   scale: "", // force scale (major|minor|...); "" = auto
+  plan: "starter_drone", // dataset recording plan; per-voice panels bake theirs
 };
 
 // The pitched note-correction + bar-fit flags shared by every pipeline call.
@@ -303,6 +310,50 @@ function recordStop() {
   }
 }
 
+// --- dataset recording (reference-linked samples; see mimic/session.py) ------
+// Spawns `uv run python -m mimic.session --plan <plan> <cmd>` and routes its
+// progress lines to the status comment. The reference plays through the
+// system output while the mic records sample-synced — wear headphones.
+function runSession(cmd) {
+  if (child || inFlight) {
+    status("busy — cancel or finish the current run first");
+    return;
+  }
+  inFlight = true;
+  Max.outlet("busy", 1);
+  const args = ["run", "python", "-m", "mimic.session", "--plan", state.plan, cmd];
+  if (cmd === "record" && state.input != null) args.push("--input", String(state.input));
+
+  const key = loadApiKey(state.repo); // not needed here, but harmless parity
+  const env = Object.assign({}, process.env);
+  if (key) env.ANTHROPIC_API_KEY = key;
+  let proc;
+  try {
+    proc = spawn(resolveUv(), args, { cwd: state.repo, env });
+  } catch (e) {
+    inFlight = false;
+    Max.outlet("busy", 0);
+    status(`spawn failed: ${e.message}`);
+    return;
+  }
+  child = proc;
+  const onText = (d) =>
+    d.toString().split(/\r?\n/).forEach((line) => {
+      const clean = line.trim();
+      if (clean) status(clean);
+    });
+  proc.stdout.on("data", onText);
+  proc.stderr.on("data", onText);
+  proc.on("error", (e) => status(`session error: ${e.message}`));
+  proc.on("close", (code) => {
+    child = null;
+    inFlight = false;
+    cancelled = false;
+    Max.outlet("busy", 0);
+    if (code !== 0) status(`session exited ${code} — see Max console`);
+  });
+}
+
 function listInputs() {
   runCli(["input-devices"], {
     onLine: () => {},
@@ -388,6 +439,12 @@ Max.addHandler("bars", (...a) => {
 Max.addHandler("correct", (v) => (state.correct = Number(v) ? 1 : 0));
 Max.addHandler("key", (...a) => (state.key = a.join(" ").trim()));
 Max.addHandler("scale", (...a) => (state.scale = a.join(" ").trim()));
+// dataset recording (reference-linked samples for calibration/eval/training)
+Max.addHandler("plan", (...a) => (state.plan = a.join(" ").trim() || state.plan));
+Max.addHandler("data_next", () => runSession("next"));
+Max.addHandler("data_record", () => runSession("record"));
+Max.addHandler("data_keep", () => runSession("keep"));
+Max.addHandler("data_skip", () => runSession("skip"));
 // start/stop recording (performer-controlled length)
 Max.addHandler("record_start", recordStart);
 Max.addHandler("record_stop", recordStop);
@@ -407,4 +464,4 @@ Max.addHandler("cancel", () => {
   }
 });
 
-status("mouthflow drone ready · 56d9e19");
+status("mouthflow drone ready · 95f44c0*");
