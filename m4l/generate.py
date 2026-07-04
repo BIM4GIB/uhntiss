@@ -94,14 +94,23 @@ def write_amxd(path: Path, prefix: bytes, maxpat: dict) -> None:
 
 # --- per-voice glue ---
 
+# Dataset plan baked per voice (drums records via mimic/take.py, so its
+# panel gets no dataset buttons and the plan default is never used there).
+_VOICE_PLAN = {"bass": "starter_bass", "lead": "starter_lead", "drone": "starter_drone"}
+
+
 def write_voice_glue(voice: str, version: str = "") -> str:
-    """Write ``mouthflow_<voice>.js`` (a copy of the glue with ``device``
-    defaulted to ``voice`` and the build stamp baked into the ready line)
-    and return its filename."""
+    """Write ``mouthflow_<voice>.js`` (a copy of the glue with ``device`` and
+    the voice's dataset ``plan`` defaulted, and the build stamp baked into
+    the ready line) and return its filename."""
     text = _GLUE.read_text(encoding="utf-8")
     patched, n = re.subn(r'device:\s*"[^"]*"', f'device: "{voice}"', text, count=1)
     if n != 1:
         raise RuntimeError("could not find the `device:` default in mouthflow.js")
+    plan = _VOICE_PLAN.get(voice, "starter_bass")
+    patched, n = re.subn(r'plan:\s*"[^"]*"', f'plan: "{plan}"', patched, count=1)
+    if n != 1:
+        raise RuntimeError("could not find the `plan:` default in mouthflow.js")
     ready = f"mouthflow {voice} ready · {version}" if version else f"mouthflow {voice} ready"
     patched, n = re.subn(
         r'status\("mouthflow device ready[^"]*"\)', f'status("{ready}")', patched, count=1
@@ -237,11 +246,23 @@ def _inject_controls(maxpat: dict, pitched: bool = True) -> None:
     wire(_NODE_INLET, "obj-250")  # from node.script outlet 0
     wire("obj-250", "obj-251")
 
+    if pitched:
+        # DATASET column (third column, x>=546): record reference-linked
+        # samples for this voice's plan without leaving Live. Wear
+        # headphones — the reference plays while the mic records.
+        comment("obj-262", "dataset", [720, 480, 80, 18], [546, 20, 60, 14])
+        msg("obj-260", "data_next", [720, 500, 90, 20], [546, 36, 60, 22])
+        msg("obj-261", "data_record", [820, 500, 100, 20], [610, 36, 88, 22])
+        msg("obj-263", "data_keep", [720, 530, 90, 20], [546, 64, 60, 22])
+        msg("obj-264", "data_skip", [820, 530, 90, 20], [610, 64, 60, 22])
+        for b in ("obj-260", "obj-261", "obj-263", "obj-264"):
+            wire(b, _NODE_INLET)
+
     boxes.extend(add_b)
     lines.extend(add_l)
 
 
-def _grow_device(maxpat: dict, width: float = 600.0, height: float = 240.0) -> None:
+def _grow_device(maxpat: dict, width: float = 720.0, height: float = 240.0) -> None:
     """Widen the device so the second control column is in view.
 
     Live's device strip is fixed-height, so the fix is horizontal room, not

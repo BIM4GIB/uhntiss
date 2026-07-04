@@ -132,8 +132,89 @@ def _play_reference(name: str, output_dev: int | None) -> None:
     sd.wait()
 
 
+# --- one-shot verbs (drive these from the M4L panels — no terminal needed) ------
+
+
+def _next_row(plan_name: str, progress: dict):
+    done = set(progress.get(plan_name, [])) | set(progress.get(plan_name + "_skipped", []))
+    for row in PLANS[plan_name]:
+        if row[0] not in done:
+            return row
+    return None
+
+
+def _progress_str(plan_name: str, progress: dict) -> str:
+    done = len(set(progress.get(plan_name, [])))
+    return f"{done}/{len(PLANS[plan_name])}"
+
+
+def cmd_next(plan_name: str) -> None:
+    progress = _load_progress()
+    row = _next_row(plan_name, progress)
+    if row is None:
+        print(f"{plan_name} COMPLETE ({_progress_str(plan_name, progress)}) — thank you!")
+        return
+    name, voice, riff, key, bpm, role = row
+    print(f"next: {name} · {voice}/{riff} in {key} @ {bpm:g} ({role}) · {_progress_str(plan_name, progress)} done")
+
+
+def cmd_record(plan_name: str, input_dev: int | None, output_dev: int | None) -> int:
+    """Gen + play/record + score the next take. Advances only on PASS."""
+    from mimic import tonal
+
+    progress = _load_progress()
+    row = _next_row(plan_name, progress)
+    if row is None:
+        print(f"{plan_name} COMPLETE — nothing to record")
+        return 0
+    name, voice, riff, key, bpm, role = row
+    tonal.gen(name, voice, riff, key, bpm)
+    print(f"REC · imitate what you hear · {name} {voice}/{riff} {key}@{bpm:g}")
+    tonal.rec(name, input_dev, output_dev)
+    progress["_last"] = {"plan": plan_name, "name": name, "role": role}
+    _save_progress(progress)
+    if tonal.score(name, role=role):
+        progress = _load_progress()
+        progress.setdefault(plan_name, []).append(name)
+        _save_progress(progress)
+        nxt = _next_row(plan_name, _load_progress())
+        print(f"PASS · {_progress_str(plan_name, _load_progress())} done"
+              + (f" · next: {nxt[0]} {nxt[1]}/{nxt[2]} {nxt[3]}@{nxt[4]:g}" if nxt else " · PLAN COMPLETE"))
+        return 0
+    print("RETRY · hit 'rec sample' again (or 'keep' to accept it anyway)")
+    return 0
+
+
+def cmd_keep(plan_name: str) -> None:
+    """Force-ingest the last attempted take (the gate said no; you say yes)."""
+    from mimic import tonal
+
+    progress = _load_progress()
+    last = progress.get("_last")
+    if not last or last.get("plan") != plan_name:
+        print("nothing to keep — record a take first")
+        return
+    tonal.score(last["name"], role=last.get("role", "calibrate"), force=True)
+    progress.setdefault(plan_name, []).append(last["name"])
+    _save_progress(progress)
+    print(f"KEPT · {_progress_str(plan_name, progress)} done")
+
+
+def cmd_skip(plan_name: str) -> None:
+    progress = _load_progress()
+    row = _next_row(plan_name, progress)
+    if row is None:
+        print(f"{plan_name} COMPLETE — nothing to skip")
+        return
+    progress.setdefault(plan_name + "_skipped", []).append(row[0])
+    _save_progress(progress)
+    print(f"skipped {row[0]} · {_progress_str(plan_name, progress)} done")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
+    ap.add_argument("cmd", nargs="?", default="run",
+                    choices=["run", "next", "record", "keep", "skip"])
     ap.add_argument("--plan", default=None, choices=list(PLANS))
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--input", type=int, default=None, help="input device index")
@@ -147,7 +228,16 @@ def main() -> None:
         if not a.plan:
             print("\nrun one with: uv run python -m mimic.session --plan <name>")
         return
-    run_plan(a.plan, a.input, a.output)
+    if a.cmd == "run":
+        run_plan(a.plan, a.input, a.output)
+    elif a.cmd == "next":
+        cmd_next(a.plan)
+    elif a.cmd == "record":
+        cmd_record(a.plan, a.input, a.output)
+    elif a.cmd == "keep":
+        cmd_keep(a.plan)
+    elif a.cmd == "skip":
+        cmd_skip(a.plan)
 
 
 if __name__ == "__main__":
