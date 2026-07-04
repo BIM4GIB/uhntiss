@@ -32,7 +32,9 @@ BASS_CONFIG = VoiceConfig(
     target_hi=52,   # E3
     division=8,     # bass tends to sit on 1/8 grid
     frame_length=4096,  # large window for reliable low-f0 estimation
-    min_note_s=0.08,
+    # Punchy staccato bass notes are voiced for only ~50-90 ms (pyin sees the
+    # vowel, not the attack) — 0.08 ate half of a real take's notes.
+    min_note_s=0.05,
     merge_gap_s=0.10,
 )
 

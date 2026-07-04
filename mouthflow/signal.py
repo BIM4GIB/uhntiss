@@ -121,15 +121,23 @@ def velocity_from_rms(rms: float) -> int:
     return int(np.clip(vel, 1, 127))
 
 
-def velocities_from_rms(values: list[float]) -> list[int]:
+def velocities_from_rms(
+    values: list[float], *, lo: float = 45.0, hi: float = 120.0, floor: float = 30.0
+) -> list[int]:
     """Per-take velocity mapping: the TAKE's dynamics set the range, not the
     absolute mic level.
 
     The take's median loudness lands at ~90; spread is measured in dB
     (p10–p90) and the output range scales with it — a genuinely dynamic take
-    reaches ghost notes (~35) and accents (~126), a deliberately flat take
-    stays flat instead of having noise amplified into fake dynamics. Short
-    takes (< 4 events) fall back to the absolute map.
+    reaches ghosts (``lo`` at p10) and accents (``hi`` at p90), a
+    deliberately flat take stays flat instead of having noise amplified into
+    fake dynamics. Values beyond the percentiles extrapolate at most half an
+    anchor further and never below ``floor`` — verified on a real bass take:
+    unbounded extrapolation mapped the (naturally quieter) low root notes to
+    velocity 20, which is inaudible on most patches. Percussive voices want
+    real ghosts (low ``lo``/``floor``); a hummed line's quiet notes are
+    usually weak phonation, not intent, so pitched voices pass gentler
+    anchors. Short takes (< 4 events) fall back to the absolute map.
     """
     if not values:
         return []
@@ -142,19 +150,43 @@ def velocities_from_rms(values: list[float]) -> list[int]:
     if spread < 1.0:
         return [90] * len(values)  # essentially flat performance — keep it flat
     scale = min(1.0, spread / 12.0)  # full range only for truly dynamic takes
-    # Piecewise-linear percentile anchors: p10 -> ghost (45), median -> 90,
-    # p90 -> accent (120), extrapolated beyond and clipped. Denominators are
-    # floored so a skewed take can't divide by ~0.
     lo_den = max(med - p10, spread / 4.0)
     hi_den = max(p90 - med, spread / 4.0)
+    lo_span, hi_span = (90.0 - lo), (hi - 90.0)
     out = []
     for d in db:
         if d <= med:
-            v = 90 + (d - med) / lo_den * 45.0 * scale
+            x = min((med - d) / lo_den, 1.5)  # p10 -> 1.0; cap the tail
+            v = 90 - x * lo_span * scale
         else:
-            v = 90 + (d - med) / hi_den * 30.0 * scale
-        out.append(int(np.clip(round(v), 20, 127)))
+            x = min((d - med) / hi_den, 1.5)
+            v = 90 + x * hi_span * scale
+        out.append(int(np.clip(round(v), floor, 127)))
     return out
+
+
+def grid_phase(times, step: float) -> float:
+    """Fractional phase (∈ [-0.5, 0.5] of ``step``) of the played grid —
+    circular mean, so a constant lead-in offset is measured, not averaged
+    away. Voice-neutral twin of the drum device's phase estimator."""
+    t = np.asarray(times, dtype=float)
+    if t.size == 0 or step <= 0:
+        return 0.0
+    frac = (t / step) % 1.0
+    return float(np.angle(np.mean(np.exp(2j * np.pi * frac))) / (2 * np.pi))
+
+
+def grid_fit(times, step: float) -> float:
+    """Mean distance (in steps, ∈ [0, 0.5]) of ``times`` to the best-phase
+    grid at ``step``. Low = the performance sits on this grid; ~0.25 = the
+    grid is unrelated to the performance (snapping to it would shear it)."""
+    t = np.asarray(times, dtype=float)
+    if t.size == 0 or step <= 0:
+        return 0.5
+    frac = (t / step) % 1.0
+    phi = np.angle(np.mean(np.exp(2j * np.pi * frac))) / (2 * np.pi)
+    d = np.abs(((frac - phi + 0.5) % 1.0) - 0.5)
+    return float(np.mean(d))
 
 
 def quantise(t_s: float, tempo_bpm: float, division: int = 16) -> float:

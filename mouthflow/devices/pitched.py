@@ -24,6 +24,11 @@ from mouthflow.schemas import NoteEvent, Transcription
 
 _HOP = 512  # ~11.6 ms at 44.1 kHz — pitch/time resolution
 
+# Snap note starts to the grid only when the performance actually sits on it
+# (mean best-phase distance in steps; ~0.25 = unrelated grid). Above this,
+# performed timing is kept raw — snapping to an alien grid shears the line.
+_GRID_TRUST_MAX = 0.20
+
 
 @dataclass(frozen=True)
 class VoiceConfig:
@@ -71,7 +76,12 @@ class PitchedTranscriber:
         stones = self._frame_semitones(f0, voiced_flag, voiced_prob, rms)
         merge_gap_frames = max(1, int(cfg.merge_gap_s * sr / _HOP))
 
-        segments = self._segment(stones, merge_gap_frames)
+        # Articulation-resolution RMS (23ms window) for the gap-continuity
+        # check: the pitch-window RMS above (e.g. 93ms for bass) smears right
+        # across a staccato gap, so an 80ms silence never reads as silent
+        # through it.
+        art_rms = librosa.feature.rms(y=y, frame_length=1024, hop_length=_HOP)[0][:n]
+        segments = self._segment(stones, merge_gap_frames, art_rms)
         hits = self._segments_to_notes(segments, times, rms, voiced_prob, tempo_bpm, merge_gap_frames)
 
         bars = len(y) / sr * (tempo_bpm / 60.0) / 4.0
@@ -115,17 +125,20 @@ class PitchedTranscriber:
 
         return [int(round(smoothed[i])) if voiced[i] else None for i in range(len(midi))]
 
-    def _segment(self, stones, merge_gap_frames):
+    def _segment(self, stones, merge_gap_frames, rms):
         """Group consecutive same-semitone voiced frames into note segments.
 
-        A segment closes on a *held* semitone change or a long unvoiced gap.
-        The change must persist >= ``min_stable`` frames to split a note — a
-        momentary excursion (a vibrato peak, or a glide passing through a
+        A segment closes on a *held* semitone change, a long unvoiced gap, or
+        a short gap through which the LEVEL dropped (a re-articulation: a
+        pumping same-pitch 8th line dips to near-silence between notes, while
+        pyin flicker during a genuinely held tone keeps its RMS up — verified
+        on a real take where gap-bridging fused ~36 hummed notes into 20).
+        A pitch change must persist >= ``min_stable`` frames to split a note —
+        a momentary excursion (a vibrato peak, or a glide passing through a
         semitone on its way somewhere) is absorbed into the current note
         instead of spawning a spurious fragment. Onsets are deliberately NOT
         used to split: ``onset_detect`` fires on a sustained tone, which would
-        shatter one held note. Re-articulated same-pitch notes are separated by
-        the silence between them (the gap rule) or merged downstream.
+        shatter one held note.
         """
         min_stable = max(2, int(self.cfg.min_stable_s * (signal._SR / _HOP)))
         segments: list[dict] = []
@@ -150,6 +163,12 @@ class PitchedTranscriber:
                         pend_pitch = None
                         pend_count = 0
                 continue
+            if cur is not None and gap > 0 and not _gap_continuous(rms, i - gap - 1, i):
+                # Bridged gap, but the sound stopped in it -> re-articulation.
+                close(cur)
+                cur = None
+                pend_pitch = None
+                pend_count = 0
             gap = 0
             if cur is None:
                 cur = {"start": i, "end": i, "pitches": [stone]}
@@ -184,16 +203,26 @@ class PitchedTranscriber:
         vprob = np.nan_to_num(voiced_prob)
 
         # Snap each segment's pitch, then merge adjacent same-pitch segments
-        # split only by a single-frame median-smoothing flip or a tiny gap.
+        # split only by a single-frame median-smoothing flip or a tiny gap —
+        # but ONLY when the sound actually continued through the gap. A real
+        # re-articulation dips to near-silence between notes; merging those
+        # collapsed a pumping same-pitch 8th line into one held note
+        # (verified on a real take: ~36 hummed notes came out as 20). pyin
+        # flicker during a held tone keeps its RMS up, so it still bridges.
         snapped: list[list] = []  # [pitch, start_i, end_i]
         for seg in segments:
             pitch = _snap_octave(_mode(seg["pitches"]), cfg.target_lo, cfg.target_hi)
-            if snapped and snapped[-1][0] == pitch and seg["start"] - snapped[-1][2] <= merge_gap_frames:
+            if (
+                snapped
+                and snapped[-1][0] == pitch
+                and seg["start"] - snapped[-1][2] <= merge_gap_frames
+                and _gap_continuous(rms, snapped[-1][2], seg["start"])
+            ):
                 snapped[-1][2] = seg["end"]
             else:
                 snapped.append([pitch, seg["start"], seg["end"]])
 
-        accepted: list[tuple[int, float, float, float, float]] = []  # pitch, t_q, dur, conf, rms
+        accepted: list[tuple[int, float, float, float, float]] = []  # pitch, t_raw, dur, conf, rms
         for pitch, start_i, end_i in snapped:
             start_t = float(times[start_i])
             # Extend to the next frame's time so a 1-frame note still has a real
@@ -206,11 +235,29 @@ class PitchedTranscriber:
             if conf < cfg.min_confidence:
                 continue  # spurious attack/breath blip pyin isn't sure about
             seg_rms = float(np.mean(rms[start_i : end_i + 1]))
-            start_q = signal.quantise(start_t, tempo_bpm, division=cfg.division)
-            accepted.append((int(pitch), start_q, float(dur), conf, seg_rms))
+            accepted.append((int(pitch), start_t, float(dur), conf, seg_rms))
+
+        # Quantise only when the take actually SITS on this grid (the drum
+        # path's trust discipline, verified needed on a real bass take: a hum
+        # at an internal ~127 BPM force-snapped to the project's 120 grid
+        # drifted across slots — notes sheared, collided, and got eaten).
+        # The grid is phase-aligned to the performance; an alien grid leaves
+        # the performed timing untouched.
+        starts = [a[1] for a in accepted]
+        step = (60.0 / tempo_bpm) * (4.0 / cfg.division)
+        if len(starts) >= 4 and signal.grid_fit(starts, step) <= _GRID_TRUST_MAX:
+            phase = signal.grid_phase(starts, step)
+            accepted = [
+                (p, max(0.0, (round(t / step - phase) + phase) * step), d, c, r)
+                for p, t, d, c, r in accepted
+            ]
 
         # Velocities normalised against the take's own dynamics, not mic gain.
-        velocities = signal.velocities_from_rms([a[4] for a in accepted])
+        # Gentler anchors than drums: a hummed line's quiet notes are weak
+        # phonation, not ghost-note intent — they must stay audible.
+        velocities = signal.velocities_from_rms(
+            [a[4] for a in accepted], lo=60.0, hi=115.0, floor=40.0
+        )
         notes = [
             NoteEvent(
                 time_s=t_q,
@@ -223,6 +270,21 @@ class PitchedTranscriber:
         ]
         notes.sort(key=lambda nt: (nt.time_s, nt.midi_note))
         return _enforce_monophony(notes)
+
+
+def _gap_continuous(rms, a_end: int, b_start: int, dip_ratio: float = 0.5) -> bool:
+    """Did the sound continue through the unvoiced gap between two segments?
+
+    True = pyin flicker during a held tone (RMS stays up) — bridge it.
+    False = the level dipped toward silence — that's a re-articulation and
+    the segments are separate notes.
+    """
+    gap = rms[a_end + 1 : b_start]
+    if gap.size == 0:
+        return True
+    edges = np.concatenate([rms[max(0, a_end - 2) : a_end + 1], rms[b_start : b_start + 3]])
+    level = float(np.mean(edges)) if edges.size else 0.0
+    return level <= 0 or float(np.min(gap)) > dip_ratio * level
 
 
 def _enforce_monophony(notes: list[NoteEvent]) -> list[NoteEvent]:

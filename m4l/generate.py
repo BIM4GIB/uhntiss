@@ -33,7 +33,27 @@ import json
 import re
 import shutil
 import struct
+import subprocess
 from pathlib import Path
+
+
+def _version() -> str:
+    """Short build stamp baked into panel titles and the glue's ready line,
+    so the device itself shows which build is actually running — 'am I on
+    the latest?' must be answerable from inside Live (compare against
+    `git rev-parse --short HEAD`). The commit SHA, `*` when the working tree
+    was dirty at build time; no timestamp, so committed artifacts only churn
+    when the code actually changed."""
+    try:
+        sha = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"], cwd=Path(__file__).parent, text=True
+        ).strip()
+        dirty = subprocess.call(
+            ["git", "diff", "--quiet"], cwd=Path(__file__).parent
+        ) != 0
+    except Exception:
+        sha, dirty = "unknown", False
+    return f"{sha}{'*' if dirty else ''}"
 
 _HERE = Path(__file__).resolve().parent
 _TEMPLATE = _HERE / "Mouthflow.amxd"
@@ -74,13 +94,20 @@ def write_amxd(path: Path, prefix: bytes, maxpat: dict) -> None:
 
 # --- per-voice glue ---
 
-def write_voice_glue(voice: str) -> str:
+def write_voice_glue(voice: str, version: str = "") -> str:
     """Write ``mouthflow_<voice>.js`` (a copy of the glue with ``device``
-    defaulted to ``voice``) and return its filename."""
+    defaulted to ``voice`` and the build stamp baked into the ready line)
+    and return its filename."""
     text = _GLUE.read_text(encoding="utf-8")
     patched, n = re.subn(r'device:\s*"[^"]*"', f'device: "{voice}"', text, count=1)
     if n != 1:
         raise RuntimeError("could not find the `device:` default in mouthflow.js")
+    ready = f"mouthflow {voice} ready · {version}" if version else f"mouthflow {voice} ready"
+    patched, n = re.subn(
+        r'status\("mouthflow device ready[^"]*"\)', f'status("{ready}")', patched, count=1
+    )
+    if n != 1:
+        raise RuntimeError("could not find the ready line in mouthflow.js")
     name = f"mouthflow_{voice}.js"
     (_HERE / name).write_text(patched, encoding="utf-8")
     return name
@@ -241,10 +268,12 @@ def _validate(maxpat: dict) -> None:
                 raise RuntimeError(f"patchline {end} references missing box {ref}")
 
 
-def generate_panel(voice: str, out_name: str, title: str, pitched: bool = True) -> tuple[Path, str]:
-    js_name = write_voice_glue(voice)
+def generate_panel(
+    voice: str, out_name: str, title: str, pitched: bool = True, version: str = ""
+) -> tuple[Path, str]:
+    js_name = write_voice_glue(voice, version)
     prefix, maxpat = read_maxpat(_TEMPLATE)
-    make_panel(maxpat, js_name, title)
+    make_panel(maxpat, js_name, f"{title} · {version}" if version else title)
     _inject_controls(maxpat, pitched=pitched)
     _grow_device(maxpat)  # make room for the second control column
     _validate(maxpat)
@@ -272,16 +301,23 @@ _PANELS = [
 ]
 
 
+# Files earlier installs put in the User Library that newer panels replace.
+# Leaving them means two near-identical devices in the browser and no way to
+# know which is current — remove them on install.
+_SUPERSEDED = ["Mouthflow.amxd", "mouthflow.js"]  # replaced by MouthflowDrums
+
+
 def install_to_user_library(dest: Path = _USER_DEVICES) -> None:
     """Copy the panels + glue into Live's User Library/Devices (with .bak backups).
 
     Keeps the device Live actually loads in sync with the repo — otherwise a
     regenerated panel here looks 'the same' in Live, which loads the stale copy.
     Both the .amxd and its node.script .js must land here (node.script resolves
-    the glue next to the .amxd)."""
+    the glue next to the .amxd). Superseded device files are REMOVED so the
+    browser only ever offers current devices."""
     if not dest.is_dir():
         raise SystemExit(f"User Library devices folder not found: {dest}")
-    names = ["Mouthflow.amxd", "mouthflow.js", "package.json"]
+    names = ["package.json"]
     names += [out for _, out, _, _ in _PANELS]
     names += [f"mouthflow_{voice}.js" for voice, _, _, _ in _PANELS]
     for name in names:
@@ -293,6 +329,11 @@ def install_to_user_library(dest: Path = _USER_DEVICES) -> None:
             shutil.copy2(target, target.with_name(target.name + ".bak"))
         shutil.copy2(src, target)
         print(f"ok   installed {name}")
+    for name in _SUPERSEDED:
+        target = dest / name
+        if target.exists():
+            target.unlink()
+            print(f"ok   removed superseded {name} (use MouthflowDrums)")
 
 
 def main() -> None:
@@ -304,8 +345,10 @@ def main() -> None:
     args = parser.parse_args()
 
     _self_check()
+    ver = _version()
+    print(f"ok   build stamp: {ver}")
     for voice, out_name, title, pitched in _PANELS:
-        out, js_name = generate_panel(voice, out_name, title, pitched=pitched)
+        out, js_name = generate_panel(voice, out_name, title, pitched=pitched, version=ver)
         print(f"ok   wrote {out.name}  ->  node.script {js_name}  (device {voice})")
     if args.install:
         install_to_user_library()
