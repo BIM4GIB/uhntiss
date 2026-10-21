@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: Cycling74/max-sdk-base
-          ref: cc03a2922a2a8ff149165a1e2ea134e9321d6e202
+          ref: c03a2922a2a8ff149165a1e2ea134e9321d6e202
           path: max-sdk-base
       - run: MAX_SDK_PATH="$PWD/max-sdk-base" native/pocket/tools/build-mac.sh "$RUNNER_TEMP/uhntiss-pocket"
       - run: codesign --verify --strict "$RUNNER_TEMP/uhntiss-pocket/uhntiss.pocket01~.mxo"

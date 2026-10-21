@@ -99,7 +99,7 @@ On macOS, the direct compiler script also works without CMake:
 
 ```sh
 git clone https://github.com/Cycling74/max-sdk-base.git ../max-sdk-base
-git -C ../max-sdk-base checkout cc03a2922a2a8ff149165a1e2ea134e9321d6e202
+git -C ../max-sdk-base checkout c03a2922a2a8ff149165a1e2ea134e9321d6e202
 MAX_SDK_PATH="$PWD/../max-sdk-base" native/pocket/tools/build-mac.sh /tmp/uhntiss-pocket
 ```
 
