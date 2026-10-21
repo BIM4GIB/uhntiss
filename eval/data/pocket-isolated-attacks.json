@@ -1,0 +1,272 @@
+{
+  "heldout_attacks": [
+    {
+      "source": "calibration/hat_closed.wav",
+      "time": 1.933469388,
+      "drum": 2
+    },
+    {
+      "source": "calibration/hat_closed.wav",
+      "time": 3.920045351,
+      "drum": 2
+    },
+    {
+      "source": "calibration/hat_closed.wav",
+      "time": 5.891269841,
+      "drum": 2
+    },
+    {
+      "source": "calibration/hat_open.wav",
+      "time": 4.219251701,
+      "drum": 2
+    },
+    {
+      "source": "calibration/kick.wav",
+      "time": 1.587460317,
+      "drum": 0
+    },
+    {
+      "source": "calibration/kick.wav",
+      "time": 3.459931973,
+      "drum": 0
+    },
+    {
+      "source": "calibration/kick.wav",
+      "time": 5.298707483,
+      "drum": 0
+    },
+    {
+      "source": "calibration/kick.wav",
+      "time": 7.247709751,
+      "drum": 0
+    },
+    {
+      "source": "calibration/snare.wav",
+      "time": 1.836235828,
+      "drum": 1
+    },
+    {
+      "source": "calibration/snare.wav",
+      "time": 5.825102041,
+      "drum": 1
+    }
+  ],
+  "takes": [
+    {
+      "source": "calibration/hat_closed.wav",
+      "sha256": "963dccce31b5a7bc387e0d5c414007d0ba82f01822277ad6d3dc8c5c595cd1c2",
+      "events": [
+        {
+          "time": 0.4362811791,
+          "drum": 2
+        },
+        {
+          "time": 0.9260544218,
+          "drum": 2
+        },
+        {
+          "time": 1.427482993,
+          "drum": 2
+        },
+        {
+          "time": 1.933469388,
+          "drum": 2
+        },
+        {
+          "time": 2.427120181,
+          "drum": 2
+        },
+        {
+          "time": 2.920113379,
+          "drum": 2
+        },
+        {
+          "time": 3.432086168,
+          "drum": 2
+        },
+        {
+          "time": 3.920045351,
+          "drum": 2
+        },
+        {
+          "time": 4.433696145,
+          "drum": 2
+        },
+        {
+          "time": 4.924104308,
+          "drum": 2
+        },
+        {
+          "time": 5.413877551,
+          "drum": 2
+        },
+        {
+          "time": 5.891269841,
+          "drum": 2
+        },
+        {
+          "time": 6.38537415,
+          "drum": 2
+        },
+        {
+          "time": 6.893560091,
+          "drum": 2
+        },
+        {
+          "time": 7.396439909,
+          "drum": 2
+        }
+      ]
+    },
+    {
+      "source": "calibration/hat_open.wav",
+      "sha256": "6dbac74d6e61c9e277a7ec09e7243bedda1dc1c24c15c4ed5ee35926265ed926",
+      "events": [
+        {
+          "time": 0.336031746,
+          "drum": 2
+        },
+        {
+          "time": 1.616485261,
+          "drum": 2
+        },
+        {
+          "time": 2.877936508,
+          "drum": 2
+        },
+        {
+          "time": 4.219251701,
+          "drum": 2
+        },
+        {
+          "time": 5.465238095,
+          "drum": 2
+        },
+        {
+          "time": 6.176281179,
+          "drum": 2
+        },
+        {
+          "time": 6.729410431,
+          "drum": 2
+        }
+      ]
+    },
+    {
+      "source": "calibration/kick.wav",
+      "sha256": "60be61611d62897a1c0ec63387ae5feaab0d7cf210190ff436cd7320db899e05",
+      "events": [
+        {
+          "time": 0.1762358277,
+          "drum": 0
+        },
+        {
+          "time": 0.6327210884,
+          "drum": 0
+        },
+        {
+          "time": 1.102902494,
+          "drum": 0
+        },
+        {
+          "time": 1.587460317,
+          "drum": 0
+        },
+        {
+          "time": 2.054965986,
+          "drum": 0
+        },
+        {
+          "time": 2.527414966,
+          "drum": 0
+        },
+        {
+          "time": 2.974671202,
+          "drum": 0
+        },
+        {
+          "time": 3.459931973,
+          "drum": 0
+        },
+        {
+          "time": 3.921496599,
+          "drum": 0
+        },
+        {
+          "time": 4.37845805,
+          "drum": 0
+        },
+        {
+          "time": 4.859138322,
+          "drum": 0
+        },
+        {
+          "time": 5.298707483,
+          "drum": 0
+        },
+        {
+          "time": 5.776235828,
+          "drum": 0
+        },
+        {
+          "time": 6.244421769,
+          "drum": 0
+        },
+        {
+          "time": 6.706031746,
+          "drum": 0
+        },
+        {
+          "time": 7.247709751,
+          "drum": 0
+        },
+        {
+          "time": 7.715895692,
+          "drum": 0
+        }
+      ]
+    },
+    {
+      "source": "calibration/snare.wav",
+      "sha256": "9f1988dc116a9bb3389639d1457916f10939fdcddea343819eb43ae6562f0cc9",
+      "events": [
+        {
+          "time": 0.3255782313,
+          "drum": 1
+        },
+        {
+          "time": 0.8276417234,
+          "drum": 1
+        },
+        {
+          "time": 1.321904762,
+          "drum": 1
+        },
+        {
+          "time": 1.836235828,
+          "drum": 1
+        },
+        {
+          "time": 2.843106576,
+          "drum": 1
+        },
+        {
+          "time": 3.856258503,
+          "drum": 1
+        },
+        {
+          "time": 4.853786848,
+          "drum": 1
+        },
+        {
+          "time": 5.825102041,
+          "drum": 1
+        },
+        {
+          "time": 6.813197279,
+          "drum": 1
+        }
+      ]
+    }
+  ]
+}

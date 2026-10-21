@@ -8,7 +8,7 @@ namespace pocket {
 constexpr std::size_t maxEvents = 512;
 constexpr std::size_t undoDepth = 16;
 constexpr double loopBeats = 8.; // Deliberate first release: two bars of 4/4.
-enum class Drum : int { kick, snare, hat };
+enum class Drum : int { kick, snare, hat, noise };
 enum class Mode : int { replace, overdub };
 enum class State : int {
   live,
@@ -61,7 +61,7 @@ private:
   double base_ = 0., previous_ = 0., host_ = 0.;
   bool valid_ = false, running_ = false, fourFour_ = true;
 };
-using Features = std::array<double, 14>;
+using Features = std::array<double, 17>;
 struct Detection {
   Drum drum;
   float velocity;
@@ -82,9 +82,12 @@ struct Profile {
 };
 class Detector {
 public:
+  // candidates is an offline research policy: collect a model-independent
+  // superset of attacks. The Engine only uses automatic or fixedVoice.
+  enum class Policy { automatic, fixedVoice, candidates };
   void prepare(double sampleRate) noexcept;
-  bool process(double input, double beat, double threshold,
-               Detection &event) noexcept;
+  bool process(double input, double beat, double threshold, Detection &event,
+               Policy policy = Policy::automatic) noexcept;
   bool started() const noexcept { return started_; }
   float attackVelocity() const noexcept;
   bool pending() const noexcept { return collect_ > 0; }
@@ -96,10 +99,15 @@ private:
   double sr_ = 48000., hp_ = 0., dc_ = 0.;
   double fast_ = 0., slow_ = 0., previous_ = 0., onsetBeat_ = 0.;
   double total_ = 0., peak_ = 0.;
+  // Thirty milliseconds of past power, bounded even at 384 kHz. This adds
+  // context, not lookahead. The classification deadline is still 10 ms.
+  std::array<double, 11520> history_{};
+  double historySum_ = 0., onsetPower_ = 0., earlyPower_ = 0.;
+  double onsetDc_ = 0., onsetCoeff_ = 0., onsetPeak_ = 0., rejectedPeak_ = 0.;
+  int historyIndex_ = 0, historyCount_ = 0, historySize_ = 1440;
   std::array<double, 5> bands_{}, bandCoeffs_{};
   std::array<std::array<double, 6>, 2> energy_{};
-  double dcCoeff_ = 0., attack_ = 0.,
-         release_ = 0., slowCoeff_ = 0.;
+  double dcCoeff_ = 0., attack_ = 0., release_ = 0., slowCoeff_ = 0.;
   int collect_ = 0, window_ = 480, refractory_ = 0, count_ = 0, crossings_ = 0,
       quiet_ = 0, releaseSamples_ = 0;
   bool released_ = true, started_ = false;

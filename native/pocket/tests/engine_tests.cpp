@@ -58,7 +58,7 @@ int main() {
     Loop after;
     Profile restored;
     check(decodeState(values.data(), size, after, restored),
-          "v3 loop/profile state decodes");
+          "v4 loop/profile state decodes");
     check(after.anchor == before.anchor &&
               after.events[0].beat == before.events[0].beat &&
               after.events[0].velocity == before.events[0].velocity,
@@ -75,6 +75,21 @@ int main() {
               after.count == 1 && after.events[0].drum == Drum::hat &&
               !restored.ready(),
           "v2 migrates loop and resets incompatible voice centroids");
+    std::array<double, 135> v3{};
+    v3[0] = 3.;
+    v3[1] = 4.125;
+    v3[2] = 1.;
+    v3[3] = .07123;
+    v3[4] = .37;
+    v3[5] = 2.;
+    v3[6] = v3[49] = v3[92] = 3.;
+    check(decodeState(v3.data(), v3.size(), after, restored) &&
+              after.anchor == 4.125 && after.events[0].beat == .07123 &&
+              after.events[0].drum == Drum::hat && !restored.ready(),
+          "v3 migrates pocket exactly and resets obsolete attack descriptors");
+    Detection rejected{Drum::noise, .1f, 0., {}};
+    check(learned.classify(rejected) == Drum::noise,
+          "personal profile preserves factory noise rejection");
     old[5] = 2.5;
     check(!decodeState(old.data(), old.size(), after, restored),
           "fractional drum id rejected");

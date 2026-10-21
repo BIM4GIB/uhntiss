@@ -35,3 +35,11 @@ jobs:
 
       - name: Verify causal Auto on reserved vocal attacks
         run: uv run python -m eval.test_native_auto
+
+      - name: Verify full real takes, capture timing and causality
+        run: uv run python -m eval.test_real_auto --build native/pocket/build --report native/pocket/build/real-takes.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pocket-real-take-regression
+          path: native/pocket/build/real-takes.json

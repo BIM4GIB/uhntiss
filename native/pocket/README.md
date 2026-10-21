@@ -1,4 +1,4 @@
-# UHNTISS Pocket 02 · Auto drums
+# UHNTISS Pocket 03 · Auto drums
 
 A local voice-to-drum instrument and two-bar looper for Ableton Live. Native C++
 handles detection, synthesis, transport and recording. Max for Live supplies the
@@ -6,7 +6,7 @@ host connection and controls. Python remains an offline research tool.
 
 **Playable performance alpha.** Auto now uses a native, trained attack classifier
 and captures mixed kick/snare/hat performances without changing voices. The
-factory examples come from this repo’s isolated vocal recordings. Different
+factory model uses the isolated recordings and eight full takes you confirmed. Different
 voices, mic positions and snare articulations can still need a short soundcheck.
 This is not a claim of stage reliability or performer endorsement.
 
@@ -16,7 +16,7 @@ Requires macOS 11+, Ableton Live with Max for Live, and a mono mic input. The
 provided external is universal Apple Silicon/Intel. The portable core also builds
 on Linux; there is no Windows Max external in this release.
 
-1. Keep `UHNTISS Pocket.amxd`, `pocket-ui.js` and `uhntiss.pocket02~.mxo` together.
+1. Keep `UHNTISS Pocket.amxd`, `pocket-ui.js` and `uhntiss.pocket03~.mxo` together.
    Drag the `.amxd` onto an **audio track**. No API key, bridge, Python, Node server,
    network connection or downloaded kit is needed to play.
 2. Select your mono mic channel in Live; set the track's Monitor to **In**. The
@@ -59,22 +59,26 @@ examples before the profile is used. The profile and loop are stored with the
 Live device/set via a `pattr` blob.
 
 Auto measures six log-energy bands in the early and late halves of a **10 ms**
-attack window, plus sample-rate-normalized zero crossings and crest shape. A
-bounded three-neighbour classifier compares these 14 features with 125 compiled
-examples. Gain variants of one source attack share one vote. No audio samples,
-model download, rhythm prediction, grid or Python process is used at runtime.
+attack window, zero crossings, crest shape, and three power/context descriptors.
+The context uses the **preceding** 30 ms; it adds no lookahead. A compiled forest
+of 300 trees (maximum depth 12) chooses kick, snare, hat or rejection. Its two
+training weightings balance in-context articulation with isolated timbre. Inference
+is bounded C++; no audio samples, model download, rhythm prediction or grid enters
+this path. Low rumble is attenuated in the onset envelope while the timbre and
+velocity path retains the lower-frequency body. A rejected precursor cannot lock
+out a subsequent fresh attack.
 
-The personal profile keeps all **nine examples**, rather than collapsing each
-voice into one average. It uses the same features and distance metric as the
-factory model. Save your Set after teaching. The v3 state decoder also accepts
-v2 loop blobs, but discards their incompatible four-feature voice profiles;
-re-teach those profiles. Replacing a device in Live does not itself transfer its
-old device state. Keep the old device/Set if you need its take.
+The optional personal profile keeps all **nine examples** and uses three nearest
+examples to choose among accepted drums. It preserves factory noise rejection.
+Save your Set after teaching. State v4 preserves the 17-feature profile and accepts
+v2/v3 loop blobs with their timing unchanged; incompatible older voice profiles
+are reset. Replacing a device in Live does not itself transfer its old state.
+Keep the old device/Set if you need its take.
 
 Onset release must last 4 ms, suppressing a second trigger from a transient’s
 small trough. After a genuine quiet gap the slow detector baseline recovers,
 so the previous loud hit does not mask a soft one. The minimum onset separation
-is **35 ms**. Open hats map to the closed-hat voice. Simultaneous overlapping
+between accepted hits is **35 ms**. Rejected precursors can re-arm sooner on a fresh rise. Open hats map to the closed-hat voice. Simultaneous overlapping
 vocal classes, continuous textures, speech rejection and speaker-bleed cancellation
 remain outside this version. Fixed voices remain available for deliberate layering.
 
@@ -133,32 +137,35 @@ For native Auto regression and research (Python is development-only):
 
 ```sh
 uv run python -m eval.test_native_auto
-uv run python -m eval.native_auto report
-uv run python -m eval.native_auto train  # regenerate the compiled feature table
+uv run python -m eval.test_real_auto --build native/pocket/build --report native/pocket/build/real-takes.json
+uv run python -m eval.real_auto report --binary native/pocket/build/pocket_analyze
+uv run python -m eval.real_auto train --binary native/pocket/build/pocket_analyze
+# Rebuild after regenerating the compiled model, then repeat both regressions.
 ```
 
-`auto-model.json` records the exact source hashes, reserved attack times and
-training settings. Every fourth primary isolated attack is reserved before
-augmentation; all examples within 200 ms of it are excluded from training. The
-factory model never trains on the mixed `mimic/` grooves. Model generation calls
-the actual C++ detector, avoiding a separate Python feature implementation.
+`auto-model.json` records source hashes, reserved attacks, the acoustic audit hash,
+model parameters, scikit-learn version and native whole-take cross-validation.
+Training uses all eight personal takes plus isolated examples in varied preceding
+contexts. Every fourth isolated primary attack and candidates within 200 ms are
+excluded before augmentation. The constructed regression is never training audio.
+Its reserved attacks have been used during development; it is a regression, not
+an untouched test set. Model extraction uses the actual C++ detector. The offline
+candidate policy is independent of the current classifier, preventing training
+or validation from borrowing the all-data model's rejection decisions.
 
-The regression constructs unsnapped 32-hit mixed grooves from those reserved
-recordings. All 32 voices and onsets pass at 44.1/48/96 kHz and 0.5×/1×/2× gain,
-with no extra triggers; capture retains the detected timestamps within one
-sample. Source attack association uses a 25 ms window: changes in gain can move
-threshold crossing (observed maximum 15.91 ms), so that result is **not** a claim
-of one-sample accuracy relative to a human-labelled physical mouth onset.
-Quiet-room noise, full audio-to-loop capture, dynamics and a 12 ms algorithmic
-monitoring bound are also checked. See `auto-regression.json` and `VALIDATION.md`.
+The new `eval/data/pocket-real-takes.json` audit records distinct acoustic bursts,
+including ghost hits and multipart phrases, without imposing a beat grid. These
+are **signal-assisted waveform/spectral labels, not independent human listening
+annotations**. Full-take matching is one-to-one with a 25 ms association tolerance.
+`auto-real-takes.json` includes every before/after error, rate/gain stress case,
+24 capture windows covering the complete recordings, and a causality check.
 
-These are constructed performances from one recording collection. The separate
-whole-take report retains every result, including failures: several legacy
-fixed-grid labels drift or omit real attacks, and results on those takes remain
-mixed. It is not a clean, independently annotated accuracy benchmark. New
-performers, stage microphones, bleed and very fast flams still need audition and
-labelled recordings. The older offline Python oracle is not evidence about the
-native classifier.
+Scores on the supplied takes are **personal-corpus regressions** because those
+takes now train the model. The separate leave-one-whole-take-out estimate rebuilds
+and replays a native model excluding every gain variant of that take. All folds,
+including misses, wrong voices and extra triggers, remain in `auto-model.json`.
+It is a development estimate from the same performer, not proof of stage or
+unseen-performer reliability. Read `VALIDATION.md` for current results and limits.
 
 ## Architecture decision
 
@@ -193,6 +200,9 @@ physical footswitch hardware.
 
 The additional `qa/build-auto-smoke.mjs` harness feeds reserved real vocal audio
 through the new external inside Live, then checks voices, relative timing,
-Clear/Undo and v3 state restore. It needs `auto-input.wav` and
-`auto-expected.json` in the test build folder, and a 120 BPM host. Its source
+Clear/Undo and v4 state restore. It needs `auto-input.wav` and
+`auto-expected.json` in the test build folder, and a host tempo matching the fixture (`beat_seconds`, default 0.5 / 120 BPM).
+The whole-take fixture uses 30 BPM so the full 14.4-second recording fits inside
+two bars without changing its playback speed. The result is written beside the
+fixture as `auto-host-smoke.json`. Its source
 player, audio files and QA script are excluded from the playable release.

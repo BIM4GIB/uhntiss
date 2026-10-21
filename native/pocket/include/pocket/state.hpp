@@ -3,15 +3,15 @@
 #include <cmath>
 
 namespace pocket {
-// Used only at the control boundary. Versions 2 and 3 retain the same loop
-// representation. V2's four-feature centroids cannot classify V3 attacks.
+// All versions retain loop timing. Older feature profiles are reset because
+// their descriptors cannot classify the current causal attacks.
 constexpr size_t profileValues = 3 * (1 + 3 * Features{}.size());
 constexpr size_t maxStateValues = 3 + maxEvents * 3 + profileValues;
 using StateValues = std::array<double, maxStateValues>;
 inline size_t encodeState(const Loop &loop, const Profile &profile,
                           StateValues &out) noexcept {
   size_t n = 0;
-  out[n++] = 3.;
+  out[n++] = 4.;
   out[n++] = loop.anchor;
   out[n++] = double(loop.count);
   for (size_t i = 0; i < loop.count; ++i) {
@@ -32,12 +32,13 @@ inline bool stateInteger(double v, int lo, int hi) noexcept {
 }
 inline bool decodeState(const double *values, size_t count, Loop &loop,
                         Profile &profile) noexcept {
-  if (!values || count < 3 || !stateInteger(values[0], 2, 3) ||
+  if (!values || count < 3 || !stateInteger(values[0], 2, 4) ||
       !std::isfinite(values[1]) || !stateInteger(values[2], 0, int(maxEvents)))
     return false;
   const bool legacy = values[0] == 2.;
+  const bool current = values[0] == 4.;
   const size_t events = size_t(values[2]);
-  if (count != 3 + events * 3 + (legacy ? 15 : profileValues))
+  if (count != 3 + events * 3 + (legacy ? 15 : current ? profileValues : 129))
     return false;
   Loop next;
   Profile voice;
@@ -53,15 +54,18 @@ inline bool decodeState(const double *values, size_t count, Loop &loop,
   for (int d = 0; d < 3; ++d) {
     if (!stateInteger(values[n], 0, legacy ? 100 : 3))
       return false;
-    if (!legacy)
+    if (current)
       voice.count[d] = int(values[n]);
     ++n;
-    for (size_t i = 0; i < (legacy ? 4 : 3 * Features{}.size()); ++i) {
+    for (size_t i = 0; i < (legacy    ? 4
+                            : current ? 3 * Features{}.size()
+                                      : 42);
+         ++i) {
       const double f = values[n++];
       if (!std::isfinite(f) || f < (legacy ? 0. : -64.) ||
           f > (legacy ? 1. : 64.))
         return false;
-      if (!legacy)
+      if (current)
         voice.examples[d][i / Features{}.size()][i % Features{}.size()] = f;
     }
   }

@@ -1,52 +1,90 @@
 {
-  "feature_version": 1,
+  "compiled_model_sha256": "19685d38c384626cae212bd0e28a8a1d886ebe79d81a97c01a6eec7f5235fcbe",
+  "audit_sha256": "130bd7f50c4f72549b6324adc22f7d135fdd5eb7ba8577b19d2c7b3ce335f1cf",
+  "isolated_audit_sha256": "d99e3fc3a6c7443615bad240bf67a2b28791e91eadc2738df5fcb0a48ac6769c",
+  "feature_version": 2,
+  "features": 17,
   "window_ms": 10,
-  "distance_weights": [
-    1,
-    1,
-    1,
-    1,
-    1,
-    1,
-    4,
-    4,
-    4,
-    4,
-    4,
-    4,
-    1,
-    1
+  "history_ms": 30,
+  "envelope_highpass_hz": 70,
+  "feature_highpass_hz": 25,
+  "classifier": "ExtraTreesClassifier",
+  "sklearn_version": "1.8.0",
+  "parameters": {
+    "max_depth": 12,
+    "min_samples_leaf": 1,
+    "random_state": 42
+  },
+  "ensemble": [
+    {
+      "trees": 200,
+      "criterion": "entropy",
+      "isolated_weight": 1.0,
+      "vote_weight": 0.9
+    },
+    {
+      "trees": 100,
+      "criterion": "gini",
+      "isolated_weight": 3.0,
+      "vote_weight": 0.1
+    }
   ],
+  "context_seed": 93021,
+  "context_scenes": 8,
   "gain_augmentation": [
     0.5,
     1.0,
     2.0
   ],
-  "prototypes": 125,
+  "training_rows": 5135,
   "training": [
     {
+      "source": "mimic/bb100.mimic.wav",
+      "sha256": "1d6c2f38c06b77f000233f7a8486570e81f5fcd7b1c92385f752ef1135aa5bd6"
+    },
+    {
+      "source": "mimic/bb84.mimic.wav",
+      "sha256": "2aff08c01c151c47e2a963808baea64ed105d054b3b6a61a292f9aa568d7c98d"
+    },
+    {
+      "source": "mimic/live_1_boombap.mimic.wav",
+      "sha256": "171166eeb01de10631881262022cf7fe02aa673eac1db0d97cf880718b770bd0"
+    },
+    {
+      "source": "mimic/live_2_fourfloor.mimic.wav",
+      "sha256": "37aa735d9c81a8bcd40a29091272b68fe881c447dcf503a588c3c170c0e623b1"
+    },
+    {
+      "source": "mimic/live_3_snareheavy.mimic.wav",
+      "sha256": "844422f8923951e5df6c3852496118883c35fdb92846f0a24b258d111d87da4b"
+    },
+    {
+      "source": "mimic/live_4_kicksnare.mimic.wav",
+      "sha256": "e26533d28c29cc52354bd9edb218809842d0a1b4eae9e04daeb6e092c3b529eb"
+    },
+    {
+      "source": "mimic/live_5_sparse.mimic.wav",
+      "sha256": "4935720eb687962da86e3c3b7778e649ce9346f80a7bfc0b6f9c244867502abc"
+    },
+    {
+      "source": "mimic/live_6_uptempo.mimic.wav",
+      "sha256": "3b1720e13241b20ec70216ed60ea101d90467e36fe927c2d7c3f7cadd182d60f"
+    },
+    {
       "source": "calibration/hat_closed.wav",
-      "sha256": "963dccce31b5a7bc387e0d5c414007d0ba82f01822277ad6d3dc8c5c595cd1c2",
-      "primary_training_attacks": 12,
-      "heldout_attacks": 3
+      "sha256": "963dccce31b5a7bc387e0d5c414007d0ba82f01822277ad6d3dc8c5c595cd1c2"
     },
     {
       "source": "calibration/hat_open.wav",
-      "sha256": "6dbac74d6e61c9e277a7ec09e7243bedda1dc1c24c15c4ed5ee35926265ed926",
-      "primary_training_attacks": 6,
-      "heldout_attacks": 1
+      "sha256": "6dbac74d6e61c9e277a7ec09e7243bedda1dc1c24c15c4ed5ee35926265ed926"
     },
     {
       "source": "calibration/kick.wav",
-      "sha256": "60be61611d62897a1c0ec63387ae5feaab0d7cf210190ff436cd7320db899e05",
-      "primary_training_attacks": 13,
-      "heldout_attacks": 4
+      "sha256": "60be61611d62897a1c0ec63387ae5feaab0d7cf210190ff436cd7320db899e05"
     },
     {
       "source": "calibration/snare.wav",
-      "sha256": "9f1988dc116a9bb3389639d1457916f10939fdcddea343819eb43ae6562f0cc9",
-      "primary_training_attacks": 7,
-      "heldout_attacks": 2
+      "sha256": "9f1988dc116a9bb3389639d1457916f10939fdcddea343819eb43ae6562f0cc9"
     }
   ],
   "heldout_attacks": [
@@ -101,6 +139,319 @@
       "drum": 1
     }
   ],
-  "exclusions": "Every fourth primary attack per source is excluded before all gain augmentation. No mimic or fixture groove is used for training.",
-  "compiled_model_sha256": "ff13c2cc60663212f0ae6599fd91c40c589fdc8c6be36016e9d5e745c5947791"
+  "exclusions": "Every fourth isolated primary attack and all candidates within 200ms excluded at every gain. Whole-take CV excludes all gains of the evaluated take; deployment trains on all eight personal takes. Constructed test grooves excluded.",
+  "reference": "Signal-assisted audit of full waveforms, 256-sample spectrograms and 80-100 ms spectral bodies, inspected before model changes. Approximate acoustic onset times; no snapping or grid-derived timestamps. Labels infer acoustic drum intent; not independent human listening annotations. Every distinct burst retained; within-body retriggers and steady rumble excluded.",
+  "development_cross_validation": {
+    "summary": {
+      "reference_hits": 271,
+      "correct": 239,
+      "missed": 14,
+      "wrong": 18,
+      "extra": 16
+    },
+    "takes": [
+      {
+        "take": "bb100",
+        "reference_hits": 31,
+        "detected": 31,
+        "correct": 25,
+        "wrong": [
+          {
+            "time": 11.74342404,
+            "expected": 1,
+            "actual": 2
+          },
+          {
+            "time": 5.450589569,
+            "expected": 2,
+            "actual": 1
+          },
+          {
+            "time": 3.982335601,
+            "expected": 0,
+            "actual": 1
+          }
+        ],
+        "missed": [
+          {
+            "time": 3.38032,
+            "drum": 1
+          },
+          {
+            "time": 6.93224,
+            "drum": 1
+          },
+          {
+            "time": 9.32481,
+            "drum": 1
+          }
+        ],
+        "extra": [
+          {
+            "time": 5.380385488,
+            "drum": 2
+          },
+          {
+            "time": 8.634965986,
+            "drum": 2
+          },
+          {
+            "time": 11.07269841,
+            "drum": 2
+          }
+        ]
+      },
+      {
+        "take": "bb84",
+        "reference_hits": 31,
+        "detected": 34,
+        "correct": 28,
+        "wrong": [
+          {
+            "time": 9.624263039,
+            "expected": 1,
+            "actual": 2
+          },
+          {
+            "time": 9.281133787,
+            "expected": 2,
+            "actual": 1
+          },
+          {
+            "time": 12.43285714,
+            "expected": 1,
+            "actual": 2
+          }
+        ],
+        "missed": [],
+        "extra": [
+          {
+            "time": 10.88950113,
+            "drum": 2
+          },
+          {
+            "time": 10.99337868,
+            "drum": 1
+          },
+          {
+            "time": 12.99818594,
+            "drum": 2
+          }
+        ]
+      },
+      {
+        "take": "live_1_boombap",
+        "reference_hits": 21,
+        "detected": 22,
+        "correct": 14,
+        "wrong": [
+          {
+            "time": 4.64399093,
+            "expected": 1,
+            "actual": 0
+          },
+          {
+            "time": 3.462063492,
+            "expected": 1,
+            "actual": 0
+          },
+          {
+            "time": 1.341814059,
+            "expected": 2,
+            "actual": 1
+          },
+          {
+            "time": 1.066734694,
+            "expected": 1,
+            "actual": 0
+          }
+        ],
+        "missed": [
+          {
+            "time": 0.149,
+            "drum": 2
+          },
+          {
+            "time": 2.549,
+            "drum": 2
+          },
+          {
+            "time": 6.234,
+            "drum": 2
+          }
+        ],
+        "extra": [
+          {
+            "time": 0.1757596372,
+            "drum": 2
+          },
+          {
+            "time": 2.404240363,
+            "drum": 1
+          },
+          {
+            "time": 2.581133787,
+            "drum": 2
+          },
+          {
+            "time": 5.878820862,
+            "drum": 1
+          }
+        ]
+      },
+      {
+        "take": "live_2_fourfloor",
+        "reference_hits": 29,
+        "detected": 29,
+        "correct": 26,
+        "wrong": [
+          {
+            "time": 0.06700680272,
+            "expected": 1,
+            "actual": 0
+          },
+          {
+            "time": 0.666984127,
+            "expected": 1,
+            "actual": 0
+          }
+        ],
+        "missed": [
+          {
+            "time": 8.029,
+            "drum": 2
+          }
+        ],
+        "extra": [
+          {
+            "time": 8.064603175,
+            "drum": 2
+          }
+        ]
+      },
+      {
+        "take": "live_3_snareheavy",
+        "reference_hits": 45,
+        "detected": 47,
+        "correct": 42,
+        "wrong": [
+          {
+            "time": 2.442879819,
+            "expected": 1,
+            "actual": 0
+          },
+          {
+            "time": 10.10535147,
+            "expected": 1,
+            "actual": 0
+          },
+          {
+            "time": 1.218367347,
+            "expected": 1,
+            "actual": 0
+          }
+        ],
+        "missed": [],
+        "extra": [
+          {
+            "time": 0.05528344671,
+            "drum": 1
+          },
+          {
+            "time": 0.2689115646,
+            "drum": 1
+          }
+        ]
+      },
+      {
+        "take": "live_4_kicksnare",
+        "reference_hits": 33,
+        "detected": 34,
+        "correct": 32,
+        "wrong": [
+          {
+            "time": 5.081292517,
+            "expected": 1,
+            "actual": 2
+          }
+        ],
+        "missed": [],
+        "extra": [
+          {
+            "time": 0.2733786848,
+            "drum": 0
+          }
+        ]
+      },
+      {
+        "take": "live_5_sparse",
+        "reference_hits": 44,
+        "detected": 45,
+        "correct": 42,
+        "wrong": [
+          {
+            "time": 14.60988662,
+            "expected": 1,
+            "actual": 0
+          },
+          {
+            "time": 7.908571429,
+            "expected": 1,
+            "actual": 2
+          }
+        ],
+        "missed": [],
+        "extra": [
+          {
+            "time": 8.587528345,
+            "drum": 2
+          }
+        ]
+      },
+      {
+        "take": "live_6_uptempo",
+        "reference_hits": 37,
+        "detected": 31,
+        "correct": 30,
+        "wrong": [],
+        "missed": [
+          {
+            "time": 2.313,
+            "drum": 0
+          },
+          {
+            "time": 4.604,
+            "drum": 1
+          },
+          {
+            "time": 7.148,
+            "drum": 1
+          },
+          {
+            "time": 7.242,
+            "drum": 0
+          },
+          {
+            "time": 7.564,
+            "drum": 2
+          },
+          {
+            "time": 9.573,
+            "drum": 1
+          },
+          {
+            "time": 9.671,
+            "drum": 0
+          }
+        ],
+        "extra": [
+          {
+            "time": 7.590521542,
+            "drum": 2
+          }
+        ]
+      }
+    ]
+  },
+  "export": "Exact shared leaves/subtrees, double thresholds and probabilities; no quantization"
 }

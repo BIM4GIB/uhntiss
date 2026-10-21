@@ -1,0 +1,1150 @@
+{
+  "version": 1,
+  "method": "Signal-assisted audit of full waveforms, 256-sample spectrograms and 80-100 ms spectral bodies, inspected before model changes. Approximate acoustic onset times; no snapping or grid-derived timestamps. Labels infer acoustic drum intent; not independent human listening annotations. Every distinct burst retained; within-body retriggers and steady rumble excluded.",
+  "tolerance_ms": 25,
+  "takes": [
+    {
+      "name": "bb100",
+      "source": "mimic/bb100.mimic.wav",
+      "sha256": "1d6c2f38c06b77f000233f7a8486570e81f5fcd7b1c92385f752ef1135aa5bd6",
+      "events": [
+        {
+          "time": 3.38032,
+          "drum": 1
+        },
+        {
+          "time": 3.61379,
+          "drum": 2
+        },
+        {
+          "time": 3.98594,
+          "drum": 0
+        },
+        {
+          "time": 4.27429,
+          "drum": 2
+        },
+        {
+          "time": 4.53968,
+          "drum": 1
+        },
+        {
+          "time": 4.80807,
+          "drum": 2
+        },
+        {
+          "time": 5.17025,
+          "drum": 0
+        },
+        {
+          "time": 5.45361,
+          "drum": 2
+        },
+        {
+          "time": 5.74195,
+          "drum": 1
+        },
+        {
+          "time": 6.02132,
+          "drum": 2
+        },
+        {
+          "time": 6.35755,
+          "drum": 0
+        },
+        {
+          "time": 6.64091,
+          "drum": 2
+        },
+        {
+          "time": 6.93224,
+          "drum": 1
+        },
+        {
+          "time": 7.23456,
+          "drum": 2
+        },
+        {
+          "time": 7.54685,
+          "drum": 0
+        },
+        {
+          "time": 7.81424,
+          "drum": 2
+        },
+        {
+          "time": 8.11256,
+          "drum": 1
+        },
+        {
+          "time": 8.42186,
+          "drum": 2
+        },
+        {
+          "time": 8.81596,
+          "drum": 0
+        },
+        {
+          "time": 9.03147,
+          "drum": 2
+        },
+        {
+          "time": 9.32481,
+          "drum": 1
+        },
+        {
+          "time": 9.62113,
+          "drum": 2
+        },
+        {
+          "time": 10.01125,
+          "drum": 0
+        },
+        {
+          "time": 10.25469,
+          "drum": 2
+        },
+        {
+          "time": 10.53605,
+          "drum": 1
+        },
+        {
+          "time": 10.8244,
+          "drum": 2
+        },
+        {
+          "time": 11.19655,
+          "drum": 0
+        },
+        {
+          "time": 11.43102,
+          "drum": 2
+        },
+        {
+          "time": 11.74331,
+          "drum": 1
+        },
+        {
+          "time": 12.02766,
+          "drum": 2
+        },
+        {
+          "time": 12.37288,
+          "drum": 0
+        }
+      ]
+    },
+    {
+      "name": "bb84",
+      "source": "mimic/bb84.mimic.wav",
+      "sha256": "2aff08c01c151c47e2a963808baea64ed105d054b3b6a61a292f9aa568d7c98d",
+      "events": [
+        {
+          "time": 3.89215,
+          "drum": 1
+        },
+        {
+          "time": 4.23438,
+          "drum": 2
+        },
+        {
+          "time": 4.60952,
+          "drum": 0
+        },
+        {
+          "time": 4.94676,
+          "drum": 2
+        },
+        {
+          "time": 5.27401,
+          "drum": 1
+        },
+        {
+          "time": 5.6741,
+          "drum": 2
+        },
+        {
+          "time": 6.05923,
+          "drum": 0
+        },
+        {
+          "time": 6.43138,
+          "drum": 2
+        },
+        {
+          "time": 6.73769,
+          "drum": 1
+        },
+        {
+          "time": 7.11283,
+          "drum": 2
+        },
+        {
+          "time": 7.47302,
+          "drum": 0
+        },
+        {
+          "time": 7.81923,
+          "drum": 2
+        },
+        {
+          "time": 8.17243,
+          "drum": 1
+        },
+        {
+          "time": 8.52961,
+          "drum": 2
+        },
+        {
+          "time": 8.91474,
+          "drum": 0
+        },
+        {
+          "time": 9.27592,
+          "drum": 2
+        },
+        {
+          "time": 9.62612,
+          "drum": 1
+        },
+        {
+          "time": 9.98132,
+          "drum": 2
+        },
+        {
+          "time": 10.31456,
+          "drum": 0
+        },
+        {
+          "time": 10.67274,
+          "drum": 2
+        },
+        {
+          "time": 11.11474,
+          "drum": 1
+        },
+        {
+          "time": 11.38014,
+          "drum": 2
+        },
+        {
+          "time": 11.74531,
+          "drum": 0
+        },
+        {
+          "time": 12.04762,
+          "drum": 2
+        },
+        {
+          "time": 12.42676,
+          "drum": 1
+        },
+        {
+          "time": 12.76399,
+          "drum": 2
+        },
+        {
+          "time": 13.2419,
+          "drum": 0
+        },
+        {
+          "time": 13.56417,
+          "drum": 2
+        },
+        {
+          "time": 13.92435,
+          "drum": 1
+        },
+        {
+          "time": 14.22567,
+          "drum": 2
+        },
+        {
+          "time": 14.57687,
+          "drum": 0
+        }
+      ]
+    },
+    {
+      "name": "live_1_boombap",
+      "source": "mimic/live_1_boombap.mimic.wav",
+      "sha256": "171166eeb01de10631881262022cf7fe02aa673eac1db0d97cf880718b770bd0",
+      "events": [
+        {
+          "time": 0.149,
+          "drum": 2
+        },
+        {
+          "time": 0.468,
+          "drum": 0
+        },
+        {
+          "time": 0.753,
+          "drum": 2
+        },
+        {
+          "time": 1.067,
+          "drum": 1
+        },
+        {
+          "time": 1.342,
+          "drum": 2
+        },
+        {
+          "time": 1.677,
+          "drum": 0
+        },
+        {
+          "time": 1.97,
+          "drum": 2
+        },
+        {
+          "time": 2.275,
+          "drum": 1
+        },
+        {
+          "time": 2.549,
+          "drum": 2
+        },
+        {
+          "time": 2.875,
+          "drum": 0
+        },
+        {
+          "time": 3.146,
+          "drum": 2
+        },
+        {
+          "time": 3.462,
+          "drum": 1
+        },
+        {
+          "time": 3.77,
+          "drum": 2
+        },
+        {
+          "time": 4.058,
+          "drum": 0
+        },
+        {
+          "time": 4.349,
+          "drum": 2
+        },
+        {
+          "time": 4.644,
+          "drum": 1
+        },
+        {
+          "time": 4.931,
+          "drum": 2
+        },
+        {
+          "time": 5.256,
+          "drum": 0
+        },
+        {
+          "time": 5.518,
+          "drum": 2
+        },
+        {
+          "time": 5.838,
+          "drum": 1
+        },
+        {
+          "time": 6.234,
+          "drum": 2
+        }
+      ]
+    },
+    {
+      "name": "live_2_fourfloor",
+      "source": "mimic/live_2_fourfloor.mimic.wav",
+      "sha256": "37aa735d9c81a8bcd40a29091272b68fe881c447dcf503a588c3c170c0e623b1",
+      "events": [
+        {
+          "time": 0.067,
+          "drum": 1
+        },
+        {
+          "time": 0.367,
+          "drum": 2
+        },
+        {
+          "time": 0.667,
+          "drum": 1
+        },
+        {
+          "time": 1.399,
+          "drum": 0
+        },
+        {
+          "time": 1.688,
+          "drum": 2
+        },
+        {
+          "time": 1.987,
+          "drum": 0
+        },
+        {
+          "time": 2.253,
+          "drum": 2
+        },
+        {
+          "time": 2.583,
+          "drum": 0
+        },
+        {
+          "time": 2.853,
+          "drum": 2
+        },
+        {
+          "time": 3.175,
+          "drum": 0
+        },
+        {
+          "time": 3.449,
+          "drum": 2
+        },
+        {
+          "time": 3.778,
+          "drum": 0
+        },
+        {
+          "time": 4.023,
+          "drum": 2
+        },
+        {
+          "time": 4.358,
+          "drum": 0
+        },
+        {
+          "time": 4.594,
+          "drum": 2
+        },
+        {
+          "time": 4.947,
+          "drum": 0
+        },
+        {
+          "time": 5.193,
+          "drum": 2
+        },
+        {
+          "time": 5.512,
+          "drum": 0
+        },
+        {
+          "time": 5.746,
+          "drum": 2
+        },
+        {
+          "time": 6.087,
+          "drum": 0
+        },
+        {
+          "time": 6.323,
+          "drum": 2
+        },
+        {
+          "time": 6.675,
+          "drum": 0
+        },
+        {
+          "time": 6.92,
+          "drum": 2
+        },
+        {
+          "time": 7.25,
+          "drum": 0
+        },
+        {
+          "time": 7.477,
+          "drum": 2
+        },
+        {
+          "time": 7.802,
+          "drum": 0
+        },
+        {
+          "time": 8.029,
+          "drum": 2
+        },
+        {
+          "time": 8.385,
+          "drum": 0
+        },
+        {
+          "time": 8.632,
+          "drum": 2
+        }
+      ]
+    },
+    {
+      "name": "live_3_snareheavy",
+      "source": "mimic/live_3_snareheavy.mimic.wav",
+      "sha256": "844422f8923951e5df6c3852496118883c35fdb92846f0a24b258d111d87da4b",
+      "events": [
+        {
+          "time": 0.63556,
+          "drum": 0
+        },
+        {
+          "time": 0.94286,
+          "drum": 2
+        },
+        {
+          "time": 1.21324,
+          "drum": 1
+        },
+        {
+          "time": 1.51156,
+          "drum": 1
+        },
+        {
+          "time": 1.83982,
+          "drum": 0
+        },
+        {
+          "time": 2.13315,
+          "drum": 2
+        },
+        {
+          "time": 2.44345,
+          "drum": 1
+        },
+        {
+          "time": 2.74476,
+          "drum": 1
+        },
+        {
+          "time": 3.05905,
+          "drum": 0
+        },
+        {
+          "time": 3.32744,
+          "drum": 2
+        },
+        {
+          "time": 3.64272,
+          "drum": 1
+        },
+        {
+          "time": 3.94404,
+          "drum": 1
+        },
+        {
+          "time": 4.2683,
+          "drum": 2
+        },
+        {
+          "time": 4.57061,
+          "drum": 0
+        },
+        {
+          "time": 4.88889,
+          "drum": 1
+        },
+        {
+          "time": 5.1932,
+          "drum": 1
+        },
+        {
+          "time": 5.51247,
+          "drum": 0
+        },
+        {
+          "time": 5.79583,
+          "drum": 2
+        },
+        {
+          "time": 6.11111,
+          "drum": 1
+        },
+        {
+          "time": 6.419,
+          "drum": 1
+        },
+        {
+          "time": 6.73669,
+          "drum": 2
+        },
+        {
+          "time": 7.03401,
+          "drum": 0
+        },
+        {
+          "time": 7.3473,
+          "drum": 1
+        },
+        {
+          "time": 7.64163,
+          "drum": 1
+        },
+        {
+          "time": 7.95093,
+          "drum": 2
+        },
+        {
+          "time": 8.24825,
+          "drum": 0
+        },
+        {
+          "time": 8.55556,
+          "drum": 1
+        },
+        {
+          "time": 8.86884,
+          "drum": 1
+        },
+        {
+          "time": 9.1961,
+          "drum": 0
+        },
+        {
+          "time": 9.47646,
+          "drum": 2
+        },
+        {
+          "time": 9.80372,
+          "drum": 1
+        },
+        {
+          "time": 10.10204,
+          "drum": 1
+        },
+        {
+          "time": 10.44825,
+          "drum": 0
+        },
+        {
+          "time": 10.72662,
+          "drum": 2
+        },
+        {
+          "time": 11.064,
+          "drum": 1
+        },
+        {
+          "time": 11.3512,
+          "drum": 1
+        },
+        {
+          "time": 11.69043,
+          "drum": 0
+        },
+        {
+          "time": 11.96381,
+          "drum": 2
+        },
+        {
+          "time": 12.29306,
+          "drum": 1
+        },
+        {
+          "time": 12.58639,
+          "drum": 1
+        },
+        {
+          "time": 12.90866,
+          "drum": 0
+        },
+        {
+          "time": 13.20599,
+          "drum": 2
+        },
+        {
+          "time": 13.526,
+          "drum": 1
+        },
+        {
+          "time": 13.8166,
+          "drum": 1
+        },
+        {
+          "time": 14.15982,
+          "drum": 2
+        }
+      ]
+    },
+    {
+      "name": "live_4_kicksnare",
+      "source": "mimic/live_4_kicksnare.mimic.wav",
+      "sha256": "e26533d28c29cc52354bd9edb218809842d0a1b4eae9e04daeb6e092c3b529eb",
+      "events": [
+        {
+          "time": 0.39909,
+          "drum": 0
+        },
+        {
+          "time": 0.66649,
+          "drum": 2
+        },
+        {
+          "time": 0.9698,
+          "drum": 1
+        },
+        {
+          "time": 1.31601,
+          "drum": 2
+        },
+        {
+          "time": 1.66023,
+          "drum": 0
+        },
+        {
+          "time": 1.94159,
+          "drum": 2
+        },
+        {
+          "time": 2.26785,
+          "drum": 1
+        },
+        {
+          "time": 2.56417,
+          "drum": 1
+        },
+        {
+          "time": 2.91537,
+          "drum": 0
+        },
+        {
+          "time": 3.17179,
+          "drum": 2
+        },
+        {
+          "time": 3.50902,
+          "drum": 1
+        },
+        {
+          "time": 4.17551,
+          "drum": 0
+        },
+        {
+          "time": 4.45388,
+          "drum": 2
+        },
+        {
+          "time": 4.78512,
+          "drum": 1
+        },
+        {
+          "time": 5.08145,
+          "drum": 1
+        },
+        {
+          "time": 5.44463,
+          "drum": 0
+        },
+        {
+          "time": 5.7619,
+          "drum": 2
+        },
+        {
+          "time": 6.05624,
+          "drum": 1
+        },
+        {
+          "time": 6.73669,
+          "drum": 0
+        },
+        {
+          "time": 6.96816,
+          "drum": 2
+        },
+        {
+          "time": 7.30739,
+          "drum": 1
+        },
+        {
+          "time": 7.59474,
+          "drum": 1
+        },
+        {
+          "time": 7.89805,
+          "drum": 0
+        },
+        {
+          "time": 8.17941,
+          "drum": 2
+        },
+        {
+          "time": 8.49868,
+          "drum": 1
+        },
+        {
+          "time": 8.79601,
+          "drum": 1
+        },
+        {
+          "time": 9.11429,
+          "drum": 0
+        },
+        {
+          "time": 9.37569,
+          "drum": 2
+        },
+        {
+          "time": 9.70295,
+          "drum": 1
+        },
+        {
+          "time": 9.98132,
+          "drum": 1
+        },
+        {
+          "time": 10.27764,
+          "drum": 0
+        },
+        {
+          "time": 10.5181,
+          "drum": 2
+        },
+        {
+          "time": 10.87329,
+          "drum": 1
+        }
+      ]
+    },
+    {
+      "name": "live_5_sparse",
+      "source": "mimic/live_5_sparse.mimic.wav",
+      "sha256": "4935720eb687962da86e3c3b7778e649ce9346f80a7bfc0b6f9c244867502abc",
+      "events": [
+        {
+          "time": 1.935,
+          "drum": 0
+        },
+        {
+          "time": 2.538,
+          "drum": 1
+        },
+        {
+          "time": 2.735,
+          "drum": 2
+        },
+        {
+          "time": 2.889,
+          "drum": 2
+        },
+        {
+          "time": 3.132,
+          "drum": 0
+        },
+        {
+          "time": 3.787,
+          "drum": 2
+        },
+        {
+          "time": 4.492,
+          "drum": 0
+        },
+        {
+          "time": 4.967,
+          "drum": 2
+        },
+        {
+          "time": 5.183,
+          "drum": 1
+        },
+        {
+          "time": 5.411,
+          "drum": 1
+        },
+        {
+          "time": 5.561,
+          "drum": 1
+        },
+        {
+          "time": 5.771,
+          "drum": 0
+        },
+        {
+          "time": 6.361,
+          "drum": 2
+        },
+        {
+          "time": 6.981,
+          "drum": 0
+        },
+        {
+          "time": 7.564,
+          "drum": 1
+        },
+        {
+          "time": 7.773,
+          "drum": 1
+        },
+        {
+          "time": 7.908,
+          "drum": 1
+        },
+        {
+          "time": 8.143,
+          "drum": 0
+        },
+        {
+          "time": 8.737,
+          "drum": 2
+        },
+        {
+          "time": 9.342,
+          "drum": 0
+        },
+        {
+          "time": 9.95,
+          "drum": 1
+        },
+        {
+          "time": 10.16,
+          "drum": 1
+        },
+        {
+          "time": 10.31,
+          "drum": 1
+        },
+        {
+          "time": 10.522,
+          "drum": 0
+        },
+        {
+          "time": 11.074,
+          "drum": 2
+        },
+        {
+          "time": 11.715,
+          "drum": 0
+        },
+        {
+          "time": 12.288,
+          "drum": 1
+        },
+        {
+          "time": 12.499,
+          "drum": 1
+        },
+        {
+          "time": 12.654,
+          "drum": 1
+        },
+        {
+          "time": 12.866,
+          "drum": 0
+        },
+        {
+          "time": 13.456,
+          "drum": 2
+        },
+        {
+          "time": 14.048,
+          "drum": 0
+        },
+        {
+          "time": 14.61,
+          "drum": 1
+        },
+        {
+          "time": 14.814,
+          "drum": 1
+        },
+        {
+          "time": 14.958,
+          "drum": 1
+        },
+        {
+          "time": 15.171,
+          "drum": 0
+        },
+        {
+          "time": 15.75,
+          "drum": 2
+        },
+        {
+          "time": 16.361,
+          "drum": 0
+        },
+        {
+          "time": 16.96,
+          "drum": 1
+        },
+        {
+          "time": 17.158,
+          "drum": 1
+        },
+        {
+          "time": 17.314,
+          "drum": 1
+        },
+        {
+          "time": 17.54,
+          "drum": 0
+        },
+        {
+          "time": 18.122,
+          "drum": 2
+        },
+        {
+          "time": 18.749,
+          "drum": 0
+        }
+      ]
+    },
+    {
+      "name": "live_6_uptempo",
+      "source": "mimic/live_6_uptempo.mimic.wav",
+      "sha256": "3b1720e13241b20ec70216ed60ea101d90467e36fe927c2d7c3f7cadd182d60f",
+      "events": [
+        {
+          "time": 0.068,
+          "drum": 2
+        },
+        {
+          "time": 0.802,
+          "drum": 0
+        },
+        {
+          "time": 1.101,
+          "drum": 2
+        },
+        {
+          "time": 1.38,
+          "drum": 2
+        },
+        {
+          "time": 1.686,
+          "drum": 2
+        },
+        {
+          "time": 1.969,
+          "drum": 1
+        },
+        {
+          "time": 2.156,
+          "drum": 0
+        },
+        {
+          "time": 2.313,
+          "drum": 0
+        },
+        {
+          "time": 2.594,
+          "drum": 2
+        },
+        {
+          "time": 2.887,
+          "drum": 2
+        },
+        {
+          "time": 3.23,
+          "drum": 0
+        },
+        {
+          "time": 3.499,
+          "drum": 2
+        },
+        {
+          "time": 3.8,
+          "drum": 2
+        },
+        {
+          "time": 4.134,
+          "drum": 2
+        },
+        {
+          "time": 4.46,
+          "drum": 1
+        },
+        {
+          "time": 4.604,
+          "drum": 1
+        },
+        {
+          "time": 5.122,
+          "drum": 0
+        },
+        {
+          "time": 5.427,
+          "drum": 2
+        },
+        {
+          "time": 5.714,
+          "drum": 2
+        },
+        {
+          "time": 6.031,
+          "drum": 2
+        },
+        {
+          "time": 6.694,
+          "drum": 2
+        },
+        {
+          "time": 6.99,
+          "drum": 1
+        },
+        {
+          "time": 7.148,
+          "drum": 1
+        },
+        {
+          "time": 7.242,
+          "drum": 0
+        },
+        {
+          "time": 7.564,
+          "drum": 2
+        },
+        {
+          "time": 7.885,
+          "drum": 2
+        },
+        {
+          "time": 8.211,
+          "drum": 0
+        },
+        {
+          "time": 8.488,
+          "drum": 2
+        },
+        {
+          "time": 8.8,
+          "drum": 2
+        },
+        {
+          "time": 9.098,
+          "drum": 2
+        },
+        {
+          "time": 9.424,
+          "drum": 1
+        },
+        {
+          "time": 9.573,
+          "drum": 1
+        },
+        {
+          "time": 9.671,
+          "drum": 0
+        },
+        {
+          "time": 10.09,
+          "drum": 0
+        },
+        {
+          "time": 10.377,
+          "drum": 2
+        },
+        {
+          "time": 10.676,
+          "drum": 2
+        },
+        {
+          "time": 10.987,
+          "drum": 2
+        }
+      ]
+    }
+  ],
+  "revision_notes": [
+    "Corrected live_1_boombap 5.485 to 5.518 and live_6_uptempo 7.516 to 7.564 after waveform review: earlier times were rumble precursors, not acoustic attacks."
+  ]
+}

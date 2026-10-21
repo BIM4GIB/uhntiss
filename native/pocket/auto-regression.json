@@ -14,7 +14,7 @@
       "gain": 1.0,
       "hits": 32,
       "correct_voices": 32,
-      "max_source_alignment_ms": 6.654195297505633,
+      "max_source_alignment_ms": 6.631519497505622,
       "capture_error_samples_less_than": 1
     },
     {
@@ -22,7 +22,7 @@
       "gain": 2.0,
       "hits": 32,
       "correct_voices": 32,
-      "max_source_alignment_ms": 15.902494617234254,
+      "max_source_alignment_ms": 15.879818817234215,
       "capture_error_samples_less_than": 1
     },
     {
@@ -54,7 +54,7 @@
       "gain": 0.5,
       "hits": 32,
       "correct_voices": 32,
-      "max_source_alignment_ms": 2.8899521405896245,
+      "max_source_alignment_ms": 2.869118140589544,
       "capture_error_samples_less_than": 1
     },
     {
@@ -70,7 +70,7 @@
       "gain": 2.0,
       "hits": 32,
       "correct_voices": 32,
-      "max_source_alignment_ms": 15.88995241723401,
+      "max_source_alignment_ms": 15.879535417234191,
       "capture_error_samples_less_than": 1
     }
   ],

@@ -113,10 +113,19 @@ struct Neighbours {
 };
 } // namespace
 Drum classifyAttack(const Features &features) noexcept {
-  Neighbours n;
-  for (const auto &e : model::examples)
-    n.add(features, e.features, e.drum, e.source);
-  return n.choose();
+  std::array<double, 4> votes{};
+  for (auto root : model::roots) {
+    const model::Node *node = &model::nodes[root];
+    while (node->feature >= 0) {
+      // sklearn's training/evaluation input is float32. Keep split semantics
+      // identical in the exported model, including values on a boundary.
+      const bool left = float(features[node->feature]) <= node->threshold;
+      node = &model::nodes[left ? node->left : node->right];
+    }
+    for (size_t d = 0; d < votes.size(); ++d)
+      votes[d] += model::leafVotes[node->left][d];
+  }
+  return Drum(std::max_element(votes.begin(), votes.end()) - votes.begin());
 }
 void Profile::add(Drum drum, const Features &features) noexcept {
   const auto d = int(drum);
@@ -130,7 +139,7 @@ void Profile::add(Drum drum, const Features &features) noexcept {
   count[d] = std::min(i + 1, 3);
 }
 Drum Profile::classify(const Detection &detection) const noexcept {
-  if (!ready())
+  if (!ready() || detection.drum == Drum::noise)
     return detection.drum;
   Neighbours n;
   for (int d = 0; d < 3; ++d)
@@ -146,6 +155,8 @@ void Detector::prepare(double sr) noexcept {
   for (size_t i = 0; i < bands_.size(); ++i)
     bandCoeffs_[i] = coeff(std::min(edges[i], sr * .45), sr);
   dcCoeff_ = coeff(25., sr);
+  onsetCoeff_ = coeff(70., sr);
+  historySize_ = int(std::round(.030 * sr));
   attack_ = 1. - std::exp(-1. / (.0004 * sr));
   release_ = 1. - std::exp(-1. / (.004 * sr));
   slowCoeff_ = 1. - std::exp(-1. / (.045 * sr));
@@ -153,6 +164,10 @@ void Detector::prepare(double sr) noexcept {
 }
 void Detector::reset() noexcept {
   hp_ = dc_ = fast_ = slow_ = previous_ = total_ = peak_ = 0.;
+  history_ = {};
+  historySum_ = onsetPower_ = earlyPower_ = onsetDc_ = onsetPeak_ =
+      rejectedPeak_ = 0.;
+  historyIndex_ = historyCount_ = 0;
   bands_ = {};
   energy_ = {};
   collect_ = refractory_ = count_ = crossings_ = quiet_ = releaseSamples_ = 0;
@@ -163,7 +178,8 @@ float Detector::attackVelocity() const noexcept {
   return float(clamp(std::pow(peak_, .55), .08, 1.));
 }
 bool Detector::process(double x, double beat, double threshold,
-                       Detection &result) noexcept {
+                       Detection &result, Policy policy) noexcept {
+  const bool recoverRejected = policy != Policy::fixedVoice;
   started_ = false;
   if (!std::isfinite(x))
     x = 0.;
@@ -172,7 +188,8 @@ bool Detector::process(double x, double beat, double threshold,
   hp_ = x - dc_;
   for (size_t i = 0; i < bands_.size(); ++i)
     bands_[i] += bandCoeffs_[i] * (hp_ - bands_[i]);
-  const auto a = std::abs(hp_);
+  onsetDc_ += onsetCoeff_ * (x - onsetDc_);
+  const auto a = std::abs(x - onsetDc_);
   fast_ += (a > fast_ ? attack_ : release_) * (a - fast_);
   slow_ += slowCoeff_ * (a - slow_);
   // Once the input really falls below the gate, an earlier loud hit must
@@ -191,13 +208,21 @@ bool Detector::process(double x, double beat, double threshold,
       released_ = true;
   } else
     releaseSamples_ = 0;
+  // A rejected precursor must not consume the next real attack. Require a
+  // fresh rise above its peak; a steady tail cannot repeatedly re-arm itself.
+  const bool freshAfterReject =
+      recoverRejected && rejectedPeak_ > 0. && fast_ > rejectedPeak_ * 1.8;
   if (!collect_ && !refractory_ && fast_ > threshold && fast_ > slow_ * 1.65 &&
-      released_) {
+      (released_ || freshAfterReject)) {
     started_ = true;
     collect_ = window_;
     count_ = crossings_ = 0;
     energy_ = {};
     total_ = peak_ = 0.;
+    earlyPower_ = 0.;
+    onsetPower_ = historyCount_ ? historySum_ / historyCount_ : 0.;
+    onsetPeak_ = fast_;
+    rejectedPeak_ = 0.;
     onsetBeat_ = beat;
     released_ = false;
     releaseSamples_ = 0;
@@ -205,6 +230,7 @@ bool Detector::process(double x, double beat, double threshold,
   }
   bool detected = false;
   if (collect_) {
+    onsetPeak_ = std::max(onsetPeak_, fast_);
     auto &energies = energy_[count_ < window_ / 2 ? 0 : 1];
     double previousBand = 0.;
     for (size_t i = 0; i < bands_.size(); ++i) {
@@ -214,7 +240,9 @@ bool Detector::process(double x, double beat, double threshold,
     }
     energies[5] += (hp_ - previousBand) * (hp_ - previousBand);
     total_ += hp_ * hp_;
-    peak_ = std::max(peak_, a);
+    if (count_ < window_ / 2)
+      earlyPower_ += hp_ * hp_;
+    peak_ = std::max(peak_, std::abs(hp_));
     crossings_ += (hp_ * previous_ < 0.);
     ++count_;
     if (!--collect_) {
@@ -232,11 +260,27 @@ bool Detector::process(double x, double beat, double threshold,
       }
       features[12] = double(crossings_) / count_ * sr_ / 48000. * 10.;
       features[13] = std::sqrt(total_ / count_) / (peak_ + 1e-12) * 5.;
+      const double power = total_ / count_;
+      features[14] =
+          std::log((power + 1e-12) / (std::max(0., onsetPower_) + 1e-12));
+      features[15] =
+          std::log(((total_ - earlyPower_) / (window_ - window_ / 2) + 1e-12) /
+                   (earlyPower_ / (window_ / 2) + 1e-12));
+      features[16] = std::log(power + 1e-12);
       result = {classifyAttack(features), attackVelocity(), onsetBeat_,
                 features};
+      if (recoverRejected &&
+          (result.drum == Drum::noise || policy == Policy::candidates)) {
+        refractory_ = 0;
+        rejectedPeak_ = onsetPeak_;
+      }
       detected = true;
     }
   }
+  historySum_ += hp_ * hp_ - history_[historyIndex_];
+  history_[historyIndex_] = hp_ * hp_;
+  historyIndex_ = (historyIndex_ + 1) % historySize_;
+  historyCount_ = std::min(historyCount_ + 1, historySize_);
   previous_ = hp_;
   return detected;
 }
@@ -577,9 +621,11 @@ void Engine::process(double input, Clock clock, double &left,
   inputSmooth_ += (settings_.inputGain - inputSmooth_) * .002;
   outputSmooth_ += (settings_.outputGain - outputSmooth_) * .002;
   Detection detection{};
-  const bool complete =
-      detector_.process(clamp(input * inputSmooth_, -4., 4.), clock.beat,
-                        settings_.threshold, detection);
+  const bool complete = detector_.process(
+      clamp(input * inputSmooth_, -4., 4.), clock.beat, settings_.threshold,
+      detection,
+      settings_.voice < 0 && learning_ < 0 ? Detector::Policy::automatic
+                                           : Detector::Policy::fixedVoice);
   if (detector_.started()) {
     earlyDrum_ = learning_ >= 0 ? learning_
                                 : (settings_.voice >= 0 && settings_.voice <= 2

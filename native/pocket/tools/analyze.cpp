@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <iomanip>
 #include <iostream>
+#include <string>
 int main(int argc, char **argv) {
   if (argc < 2)
     return 1;
@@ -10,13 +11,16 @@ int main(int argc, char **argv) {
   if (sr < 8000. || sr > 192000.)
     return 1;
   pocket::Detector d;
+  const auto policy = argc > 3 && std::string(argv[3]) == "candidates"
+                          ? pocket::Detector::Policy::candidates
+                          : pocket::Detector::Policy::automatic;
   d.prepare(sr);
   pocket::Detection hit;
   float x;
   uint64_t i = 0;
   std::cout << std::setprecision(10);
   while (std::cin.read(reinterpret_cast<char *>(&x), sizeof(x))) {
-    if (d.process(x, double(i) / sr, gate, hit)) {
+    if (d.process(x, double(i) / sr, gate, hit, policy)) {
       std::cout << hit.beat << "," << int(hit.drum) << "," << hit.velocity
                 << "," << double(i) / sr;
       for (double f : hit.features)
