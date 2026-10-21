@@ -1,0 +1,37 @@
+name: native-pocket
+on:
+  push:
+  pull_request:
+jobs:
+  core:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S native/pocket -B native/pocket/build -DPOCKET_SANITIZE=ON -DCMAKE_BUILD_TYPE=Debug
+      - run: cmake --build native/pocket/build --parallel
+      - run: ctest --test-dir native/pocket/build --output-on-failure
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test m4l/pocket/build.test.mjs
+  mac-device:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/checkout@v4
+        with:
+          repository: Cycling74/max-sdk-base
+          ref: cc03a2922a2a8ff149165a1e2ea134e9321d6e202
+          path: max-sdk-base
+      - run: MAX_SDK_PATH="$PWD/max-sdk-base" native/pocket/tools/build-mac.sh "$RUNNER_TEMP/uhntiss-pocket"
+      - run: codesign --verify --strict "$RUNNER_TEMP/uhntiss-pocket/uhntiss.pocket01~.mxo"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: UHNTISS-Pocket-macOS
+          path: ${{ runner.temp }}/uhntiss-pocket

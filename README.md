@@ -1,4 +1,13 @@
-# Mouthflow
+# UHNTISS
+
+**New: [Pocket drums milestone 01](native/pocket/README.md)** — a native C++ /
+Max for Live instrument: immediate drum response, two-bar capture without
+quantization, overdub, undo and offline operation. Fixed-voice layering is the
+predictable performance path; automatic recognition remains experimental.
+Python stays on the research side. Build and playing instructions are in the
+[Pocket guide](native/pocket/README.md).
+
+## Mouthflow research / legacy pipeline
 
 A voice-driven arrangement agent for Ableton Live. Make a sound with your
 voice, get it into your session — as **drums**, **bass**, **lead**, or an
