@@ -181,7 +181,7 @@ def check_capture(folder, audio, rows):
     return checks
 
 
-def evaluate(binary, cache=None):
+def evaluate(binary, cache=None, report=None):
     rows, sources, _ = corpus(binary)
     if cache:
         cache.write_text(json.dumps(rows))
@@ -293,6 +293,9 @@ def evaluate(binary, cache=None):
     result["deployment_model_matches_reserved_fold"] = (
         deployed_hash == deployment_fold["native_model_sha256"]
     )
+    # Preserve the evidence even when a release gate fails on another host.
+    if report:
+        report.write_text(json.dumps(result, indent=2) + "\n")
     baseline = json.loads(
         (ROOT / "native/pocket/auto-heldout-pocket04.json").read_text()
     )
@@ -302,9 +305,12 @@ def evaluate(binary, cache=None):
             before_fold["cases"], after_fold["cases"], strict=True
         ):
             before, after = before_case["score"], after_case["score"]
+            context = (after_fold["test_take"], after_case["gain"])
             assert after["correct"] >= before["correct"], "individual take regressed"
             assert all(e in before["missed"] for e in after["missed"]), (
-                "new missed reference attack"
+                context,
+                "new missed reference attack",
+                [e for e in after["missed"] if e not in before["missed"]],
             )
             for metric in ("wrong", "extra"):
                 assert len(after[metric]) <= len(before[metric]), f"new {metric} count"
@@ -341,7 +347,7 @@ def main():
     p.add_argument("--report", type=Path, required=True)
     p.add_argument("--cache", type=Path)
     a = p.parse_args()
-    result = evaluate(a.binary.resolve(), a.cache)
+    result = evaluate(a.binary.resolve(), a.cache, a.report)
     a.report.write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(result["summaries"], indent=2))
 
