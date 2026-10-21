@@ -2,7 +2,7 @@
   "scope": "Whole-source held-out development replay; not an untouched or unseen-performer benchmark.",
   "sample_rate": 48000,
   "audit_sha256": "130bd7f50c4f72549b6324adc22f7d135fdd5eb7ba8577b19d2c7b3ce335f1cf",
-  "engine_sha256": "2a7c3e270089fc24fdaea3b69b01c1bd4067996309c219786a6f10133287b31d",
+  "engine_sha256": "8d628ca85c039c401dfa306ddb0fc1b912299bf0a16c4fc2cc3c243b317687f6",
   "summaries": [
     {
       "gain": 1.0,
@@ -23,10 +23,10 @@
     {
       "gain": 0.25,
       "reference_hits": 271,
-      "correct": 220,
-      "missed": 39,
+      "correct": 225,
+      "missed": 34,
       "wrong": 12,
-      "extra": 16
+      "extra": 13
     }
   ],
   "folds": [
@@ -92,8 +92,21 @@
         }
       ],
       "training_rows": 4941,
-      "native_model_sha256": "2d0795894e7acb16fb85c94966fa226df75da8efe96e6614dc6e1fdf0d145085",
+      "native_model_sha256": "030c1989ca4a4f5743f9919aa22763026d74b6c1d74e75c20ed3e3c4b5ba8055",
+      "primary_model_sha256": "2d0795894e7acb16fb85c94966fa226df75da8efe96e6614dc6e1fdf0d145085",
+      "transient_model_sha256": "b77a3e31cea280fbc01fcf69577056c19d26fb331b2e5eb669d7a6dbda5d33d2",
+      "transient_training_groups": [
+        "bb84",
+        "isolated",
+        "isolated_context",
+        "live_1_boombap",
+        "live_2_fourfloor",
+        "live_3_snareheavy",
+        "live_4_kicksnare",
+        "live_5_sparse"
+      ],
       "parity_rows": 18906,
+      "transient_parity_rows": 13466,
       "highrate_parity_rows": 18906,
       "causality": "pass",
       "cases": [
@@ -380,8 +393,21 @@
         }
       ],
       "training_rows": 4948,
-      "native_model_sha256": "dc28d41086897ba5b1956ade7573f26b609ecd44229d5479d1f05db2ee30a2f1",
+      "native_model_sha256": "23ad577ae5562bab0211555b6ebead9b06e1c1f2c45dd89d4e5fc00b9a0fbc43",
+      "primary_model_sha256": "dc28d41086897ba5b1956ade7573f26b609ecd44229d5479d1f05db2ee30a2f1",
+      "transient_model_sha256": "6b5bddab6e70b3c77297d0c0864316d5d547cedeec94714d6da0227b20eb8ab8",
+      "transient_training_groups": [
+        "bb100",
+        "isolated",
+        "isolated_context",
+        "live_1_boombap",
+        "live_2_fourfloor",
+        "live_3_snareheavy",
+        "live_4_kicksnare",
+        "live_5_sparse"
+      ],
       "parity_rows": 18825,
+      "transient_parity_rows": 13176,
       "highrate_parity_rows": 18825,
       "causality": "pass",
       "cases": [
@@ -457,14 +483,14 @@
             "correct": 28,
             "wrong": [
               {
+                "time": 9.622479167,
+                "expected": 1,
+                "actual": 2
+              },
+              {
                 "time": 9.281208333,
                 "expected": 2,
                 "actual": 1
-              },
-              {
-                "time": 9.633354167,
-                "expected": 1,
-                "actual": 2
               },
               {
                 "time": 12.43697917,
@@ -489,7 +515,7 @@
             {
               "start_seconds": 4.8,
               "hits": 13,
-              "max_error_samples": 1.612802691397519e-05
+              "max_error_samples": 1.6127984281411045e-05
             },
             {
               "start_seconds": 9.6,
@@ -508,8 +534,8 @@
           "score": {
             "take": "bb84",
             "reference_hits": 31,
-            "detected": 29,
-            "correct": 25,
+            "detected": 30,
+            "correct": 27,
             "wrong": [
               {
                 "time": 9.281291667,
@@ -529,24 +555,11 @@
             ],
             "missed": [
               {
-                "time": 10.67274,
-                "drum": 2
-              },
-              {
                 "time": 12.42676,
                 "drum": 1
-              },
-              {
-                "time": 13.2419,
-                "drum": 0
               }
             ],
-            "extra": [
-              {
-                "time": 10.69791667,
-                "drum": 2
-              }
-            ]
+            "extra": []
           },
           "capture": [
             {
@@ -561,7 +574,7 @@
             },
             {
               "start_seconds": 9.6,
-              "hits": 12,
+              "hits": 13,
               "max_error_samples": 0.00016012799619602447
             },
             {
@@ -635,8 +648,21 @@
         }
       ],
       "training_rows": 5002,
-      "native_model_sha256": "5eccd640261ecff736aee5e391d35035e1fa739cf418774c16f671e4afddd925",
+      "native_model_sha256": "0c3ab79219e232e5391fcbe73cb67dbb20324f9bda1bcc05271756a6980b27ce",
+      "primary_model_sha256": "5eccd640261ecff736aee5e391d35035e1fa739cf418774c16f671e4afddd925",
+      "transient_model_sha256": "6ef8395193da9ed678f738c1645b8c98026007f1c89360ce239865d8bc0bde78",
+      "transient_training_groups": [
+        "bb100",
+        "bb84",
+        "isolated",
+        "isolated_context",
+        "live_2_fourfloor",
+        "live_3_snareheavy",
+        "live_4_kicksnare",
+        "live_5_sparse"
+      ],
       "parity_rows": 19079,
+      "transient_parity_rows": 13265,
       "highrate_parity_rows": 19079,
       "causality": "pass",
       "cases": [
@@ -808,8 +834,8 @@
           "score": {
             "take": "live_1_boombap",
             "reference_hits": 21,
-            "detected": 14,
-            "correct": 11,
+            "detected": 15,
+            "correct": 12,
             "wrong": [],
             "missed": [
               {
@@ -845,10 +871,6 @@
                 "drum": 2
               },
               {
-                "time": 5.838,
-                "drum": 1
-              },
-              {
                 "time": 6.234,
                 "drum": 2
               }
@@ -876,7 +898,7 @@
             },
             {
               "start_seconds": 4.8,
-              "hits": 3,
+              "hits": 4,
               "max_error_samples": 1.612802691397519e-05
             }
           ]
@@ -945,8 +967,21 @@
         }
       ],
       "training_rows": 4964,
-      "native_model_sha256": "0576f68772150fcd71d95c2446967149b8059b34b4b08c119862c89f64161004",
+      "native_model_sha256": "9a506efcba06771c9f8fb1966d640c5f4159ed6af75370977f4c0ca461e03ed3",
+      "primary_model_sha256": "0576f68772150fcd71d95c2446967149b8059b34b4b08c119862c89f64161004",
+      "transient_model_sha256": "9b21de02dea7f31eb49eb47f1f2adc32f03fb4e8efafaaf180c6ef16502c03c2",
+      "transient_training_groups": [
+        "bb100",
+        "bb84",
+        "isolated",
+        "isolated_context",
+        "live_1_boombap",
+        "live_3_snareheavy",
+        "live_4_kicksnare",
+        "live_5_sparse"
+      ],
       "parity_rows": 19013,
+      "transient_parity_rows": 13346,
       "highrate_parity_rows": 19013,
       "causality": "pass",
       "cases": [
@@ -1167,8 +1202,21 @@
         }
       ],
       "training_rows": 4843,
-      "native_model_sha256": "64d76a1dfdb9fc615d5c8d1eee570ac5d903db7a22eef728620fbb4d5e4d2f59",
+      "native_model_sha256": "503239f5e3622fde9f7dbf68ba11f028c717a047524151ae3faf3f7a8e2988da",
+      "primary_model_sha256": "64d76a1dfdb9fc615d5c8d1eee570ac5d903db7a22eef728620fbb4d5e4d2f59",
+      "transient_model_sha256": "b257304afa9914dec0c63f9aa149d31eb81d40023fd568c870c1f950efe2b83d",
+      "transient_training_groups": [
+        "bb100",
+        "bb84",
+        "isolated",
+        "isolated_context",
+        "live_1_boombap",
+        "live_2_fourfloor",
+        "live_4_kicksnare",
+        "live_5_sparse"
+      ],
       "parity_rows": 18552,
+      "transient_parity_rows": 12120,
       "highrate_parity_rows": 18552,
       "causality": "pass",
       "cases": [
@@ -1386,8 +1434,21 @@
         }
       ],
       "training_rows": 4917,
-      "native_model_sha256": "5d8c201ae3b56c90703423032455d7cc8bd84e6ab79bbcbfa2b16cd6dc71854b",
+      "native_model_sha256": "fa5ae633cb9b3a079b74315a86c7c34f1282146badd4d5caa82da2c5b48d5a78",
+      "primary_model_sha256": "5d8c201ae3b56c90703423032455d7cc8bd84e6ab79bbcbfa2b16cd6dc71854b",
+      "transient_model_sha256": "864e313cab177f179da1ff3fabf4f7c1668cd50bb4f1cb488213dcdb0d9636ba",
+      "transient_training_groups": [
+        "bb100",
+        "bb84",
+        "isolated",
+        "isolated_context",
+        "live_1_boombap",
+        "live_2_fourfloor",
+        "live_3_snareheavy",
+        "live_5_sparse"
+      ],
       "parity_rows": 18841,
+      "transient_parity_rows": 12585,
       "highrate_parity_rows": 18841,
       "causality": "pass",
       "cases": [
@@ -1580,8 +1641,21 @@
         }
       ],
       "training_rows": 4853,
-      "native_model_sha256": "f3005372de26df14a4836d4b7dcde83d927b61d2bd25f31ed4f60440d0e04f6a",
+      "native_model_sha256": "75ce9c1fdcb3611e065436a27cff14bd493492d72c5e39f6f0f5e1dcded16af8",
+      "primary_model_sha256": "f3005372de26df14a4836d4b7dcde83d927b61d2bd25f31ed4f60440d0e04f6a",
+      "transient_model_sha256": "8e811f62006c33ea3e1ea0a66fa9220fa3a309e8d8c3e2af85c246eccc8af6bc",
+      "transient_training_groups": [
+        "bb100",
+        "bb84",
+        "isolated",
+        "isolated_context",
+        "live_1_boombap",
+        "live_2_fourfloor",
+        "live_3_snareheavy",
+        "live_4_kicksnare"
+      ],
       "parity_rows": 18478,
+      "transient_parity_rows": 12133,
       "highrate_parity_rows": 18478,
       "causality": "pass",
       "cases": [
@@ -1808,8 +1882,22 @@
         }
       ],
       "training_rows": 4906,
-      "native_model_sha256": "6a3397b336cfd2a941c0ce92819588fafec6b41414d1fffcfc0c8d403112b5b9",
+      "native_model_sha256": "2ecb4aaf05ab811413fe5ff23eb642e8333e266462919074592d0b9c3d0da479",
+      "primary_model_sha256": "6a3397b336cfd2a941c0ce92819588fafec6b41414d1fffcfc0c8d403112b5b9",
+      "transient_model_sha256": "bfedf36abf7c527a141cf23bd3d0cfc25accd9ac8ed7e11aa62bbf542001d504",
+      "transient_training_groups": [
+        "bb100",
+        "bb84",
+        "isolated",
+        "isolated_context",
+        "live_1_boombap",
+        "live_2_fourfloor",
+        "live_3_snareheavy",
+        "live_4_kicksnare",
+        "live_5_sparse"
+      ],
       "parity_rows": 18750,
+      "transient_parity_rows": 14034,
       "highrate_parity_rows": 18750,
       "causality": "pass",
       "cases": [
@@ -1955,7 +2043,7 @@
             "take": "live_6_uptempo",
             "reference_hits": 37,
             "detected": 31,
-            "correct": 25,
+            "correct": 27,
             "wrong": [
               {
                 "time": 1.971854167,
@@ -1989,14 +2077,6 @@
                 "drum": 0
               },
               {
-                "time": 7.564,
-                "drum": 2
-              },
-              {
-                "time": 9.098,
-                "drum": 2
-              },
-              {
                 "time": 9.573,
                 "drum": 1
               },
@@ -2016,14 +2096,6 @@
               },
               {
                 "time": 6.726645833,
-                "drum": 2
-              },
-              {
-                "time": 7.589041667,
-                "drum": 2
-              },
-              {
-                "time": 9.12575,
                 "drum": 2
               },
               {
@@ -2053,7 +2125,7 @@
       ]
     }
   ],
-  "baseline_sha256": "caa4c41847662936ca4ea490a22400a81343893bf8f85e949ca27bce9ea602de",
-  "release_gate": "pass: no aggregate correct/missed/wrong/extra regression at any tested gain",
-  "deployment_model_matches_reserved_fold": true
+  "deployment_model_matches_reserved_fold": true,
+  "baseline_sha256": "e9a33b6dedd1659d59ced1bf5709bf3dbbdf23d336d5eac0cb6b57ad91e3c14a",
+  "release_gate": "pass: no per-take regression, newly missed reference attacks, or new wrong/extra events at any tested gain; existing wrong/extra events associated within 25ms"
 }

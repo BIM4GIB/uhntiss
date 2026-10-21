@@ -25,6 +25,7 @@ from eval.transfer_auto import (
     rate_examples,
     recovery_corpus,
 )
+from eval import transient_auto
 
 RATE = 48000
 GAINS = (1.0, 0.5, 0.25)
@@ -34,13 +35,14 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def compile_fold(folder, header):
+def compile_fold(folder, header, transient_header):
     """Use an isolated source tree; quoted includes cannot find a shipping model."""
     include = folder / "include/pocket"
     source = folder / "src"
     include.mkdir(parents=True)
     source.mkdir()
-    model_hash = hashlib.sha256(header.encode()).hexdigest()
+    model_hash = hashlib.sha256((header + "\n" + transient_header).encode()).hexdigest()
+    (include / "transient_model.hpp").write_text(transient_header)
     (include / "attack_model.hpp").write_text(
         header
         + f'\nnamespace pocket::model {{ inline constexpr char auditSignature[] = "{model_hash}"; }}\n'
@@ -123,6 +125,26 @@ def check_parity(binary, model, x, sample_rate=48000):
     return len(probes)
 
 
+def check_transient_parity(binary, model, x):
+    rng = np.random.default_rng(5051)
+    a, b = rng.integers(0, len(x), (2, 256))
+    mix = rng.uniform(0.1, 0.9, (256, 1))
+    probes = np.concatenate((x, x[a] * mix + x[b] * (1 - mix)))
+    payload = "\n".join(" ".join(format(v, ".17g") for v in row) for row in probes)
+    actual = np.fromstring(
+        subprocess.run(
+            [str(binary), "transient"],
+            input=payload,
+            text=True,
+            capture_output=True,
+            check=True,
+        ).stdout,
+        sep=" ",
+    )
+    assert np.array_equal(actual, transient_auto.predict(model, probes))
+    return len(probes)
+
+
 def check_capture(folder, audio, rows):
     checks = []
     for start in np.arange(0, len(audio) / RATE, 4.8):
@@ -165,6 +187,7 @@ def evaluate(binary, cache=None):
         cache.write_text(json.dumps(rows))
     recovery_rows = recovery_corpus(binary)
     rate_rows = rate_examples(binary)
+    transient_rows = transient_auto.corpus(binary)
     groups = np.array([r["take"] for r in rows])
     audit = load("pocket-real-takes.json")
     folds = []
@@ -177,9 +200,15 @@ def evaluate(binary, cache=None):
                 rows, recovery_rows, rate_rows, exclude=(take["name"],)
             )
             folder = Path(tmp) / take["name"]
-            model_hash = compile_fold(folder, header)
+            transient_model, transient_header, transient_probes = transient_auto.fit(
+                transient_rows, exclude=(take["name"],)
+            )
+            model_hash = compile_fold(folder, header, transient_header)
             parity = check_parity(folder / "classify", model, probes)
             highrate_parity = check_parity(folder / "classify", model, probes, 96000)
+            transient_parity = check_transient_parity(
+                folder / "classify", transient_model, transient_probes
+            )
             audio, sr = read(ROOT / take["source"])
             assert digest(ROOT / take["source"]) == take["sha256"], (
                 "test source changed"
@@ -213,7 +242,15 @@ def evaluate(binary, cache=None):
                 training_sources=[s for s in sources if s["source"] != take["source"]],
                 training_rows=int(keep.sum()),
                 native_model_sha256=model_hash,
+                primary_model_sha256=hashlib.sha256(header.encode()).hexdigest(),
+                transient_model_sha256=hashlib.sha256(
+                    transient_header.encode()
+                ).hexdigest(),
+                transient_training_groups=sorted(
+                    {r["take"] for r in transient_rows if r["take"] != take["name"]}
+                ),
                 parity_rows=parity,
+                transient_parity_rows=transient_parity,
                 highrate_parity_rows=highrate_parity,
                 causality="pass",
                 cases=cases,
@@ -238,10 +275,16 @@ def evaluate(binary, cache=None):
 
     info = json.loads((ROOT / "native/pocket/auto-model.json").read_text())
     deployment_fold = next(f for f in folds if f["test_take"] == "live_6_uptempo")
-    deployed_hash = digest(ROOT / "native/pocket/include/pocket/attack_model.hpp")
-    assert deployed_hash == info["compiled_model_sha256"], (
+    primary_path = ROOT / "native/pocket/include/pocket/attack_model.hpp"
+    transient_path = ROOT / "native/pocket/include/pocket/transient_model.hpp"
+    assert digest(primary_path) == info["compiled_model_sha256"], (
         "deployment header/provenance mismatch"
     )
+    assert digest(transient_path) == info["transient_model_sha256"]
+    deployed_hash = hashlib.sha256(
+        (primary_path.read_text() + "\n" + transient_path.read_text()).encode()
+    ).hexdigest()
+    assert deployed_hash == info["combined_model_sha256"]
     assert "live_6_uptempo" not in info["training_groups"], (
         "deployment trained on the reserved take"
     )
@@ -251,8 +294,27 @@ def evaluate(binary, cache=None):
         deployed_hash == deployment_fold["native_model_sha256"]
     )
     baseline = json.loads(
-        (ROOT / "native/pocket/auto-heldout-pocket03.json").read_text()
+        (ROOT / "native/pocket/auto-heldout-pocket04.json").read_text()
     )
+    for before_fold, after_fold in zip(baseline["folds"], result["folds"], strict=True):
+        assert before_fold["test_take"] == after_fold["test_take"]
+        for before_case, after_case in zip(
+            before_fold["cases"], after_fold["cases"], strict=True
+        ):
+            before, after = before_case["score"], after_case["score"]
+            assert after["correct"] >= before["correct"], "individual take regressed"
+            assert all(e in before["missed"] for e in after["missed"]), (
+                "new missed reference attack"
+            )
+            for metric in ("wrong", "extra"):
+                assert len(after[metric]) <= len(before[metric]), f"new {metric} count"
+                for event in after[metric]:
+                    assert any(
+                        abs(event["time"] - old["time"]) < 0.025
+                        and {k: v for k, v in event.items() if k != "time"}
+                        == {k: v for k, v in old.items() if k != "time"}
+                        for old in before[metric]
+                    ), f"new {metric} event"
     for before, after in zip(baseline["summaries"], result["summaries"]):
         assert before["gain"] == after["gain"]
         assert after["correct"] >= before["correct"], (
@@ -260,11 +322,15 @@ def evaluate(binary, cache=None):
         )
         for metric in ("missed", "wrong", "extra"):
             assert after[metric] <= before[metric], f"held-out {metric} regressed"
+    quiet = next(s for s in result["summaries"] if s["gain"] == 0.25)
+    assert quiet["correct"] >= 225 and quiet["missed"] <= 34 and quiet["extra"] <= 13, (
+        "Pocket05 quiet transient gains disappeared"
+    )
     result["baseline_sha256"] = digest(
-        ROOT / "native/pocket/auto-heldout-pocket03.json"
+        ROOT / "native/pocket/auto-heldout-pocket04.json"
     )
     result["release_gate"] = (
-        "pass: no aggregate correct/missed/wrong/extra regression at any tested gain"
+        "pass: no per-take regression, newly missed reference attacks, or new wrong/extra events at any tested gain; existing wrong/extra events associated within 25ms"
     )
     return result
 

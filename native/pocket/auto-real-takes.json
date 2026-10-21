@@ -1914,24 +1914,19 @@
       "gain": 0.25,
       "summary": {
         "reference_hits": 271,
-        "correct": 239,
-        "missed": 25,
-        "wrong": 7,
-        "extra": 9
+        "correct": 248,
+        "missed": 17,
+        "wrong": 6,
+        "extra": 7
       },
       "takes": [
         {
           "take": "bb100",
           "reference_hits": 31,
-          "detected": 32,
-          "correct": 30,
+          "detected": 33,
+          "correct": 31,
           "wrong": [],
-          "missed": [
-            {
-              "time": 9.32481,
-              "drum": 1
-            }
-          ],
+          "missed": [],
           "extra": [
             {
               "time": 4.116833333,
@@ -1946,8 +1941,8 @@
         {
           "take": "bb84",
           "reference_hits": 31,
-          "detected": 29,
-          "correct": 27,
+          "detected": 31,
+          "correct": 29,
           "wrong": [
             {
               "time": 11.7564375,
@@ -1960,23 +1955,14 @@
               "actual": 2
             }
           ],
-          "missed": [
-            {
-              "time": 12.42676,
-              "drum": 1
-            },
-            {
-              "time": 13.2419,
-              "drum": 0
-            }
-          ],
+          "missed": [],
           "extra": []
         },
         {
           "take": "live_1_boombap",
           "reference_hits": 21,
-          "detected": 14,
-          "correct": 13,
+          "detected": 15,
+          "correct": 14,
           "wrong": [],
           "missed": [
             {
@@ -2006,10 +1992,6 @@
             {
               "time": 5.518,
               "drum": 2
-            },
-            {
-              "time": 5.838,
-              "drum": 1
             }
           ],
           "extra": [
@@ -2051,8 +2033,8 @@
         {
           "take": "live_4_kicksnare",
           "reference_hits": 33,
-          "detected": 32,
-          "correct": 31,
+          "detected": 33,
+          "correct": 32,
           "wrong": [
             {
               "time": 5.087833333,
@@ -2060,36 +2042,22 @@
               "actual": 2
             }
           ],
-          "missed": [
-            {
-              "time": 10.5181,
-              "drum": 2
-            }
-          ],
+          "missed": [],
           "extra": []
         },
         {
           "take": "live_5_sparse",
           "reference_hits": 44,
-          "detected": 42,
-          "correct": 40,
+          "detected": 43,
+          "correct": 42,
           "wrong": [
             {
               "time": 5.1844375,
               "expected": 1,
               "actual": 0
-            },
-            {
-              "time": 7.781458333,
-              "expected": 1,
-              "actual": 2
             }
           ],
           "missed": [
-            {
-              "time": 7.908,
-              "drum": 1
-            },
             {
               "time": 11.715,
               "drum": 0
@@ -2101,7 +2069,7 @@
           "take": "live_6_uptempo",
           "reference_hits": 37,
           "detected": 31,
-          "correct": 25,
+          "correct": 27,
           "wrong": [
             {
               "time": 1.971854167,
@@ -2135,14 +2103,6 @@
               "drum": 0
             },
             {
-              "time": 7.564,
-              "drum": 2
-            },
-            {
-              "time": 9.098,
-              "drum": 2
-            },
-            {
               "time": 9.573,
               "drum": 1
             },
@@ -2165,14 +2125,6 @@
               "drum": 2
             },
             {
-              "time": 7.589041667,
-              "drum": 2
-            },
-            {
-              "time": 9.12575,
-              "drum": 2
-            },
-            {
               "time": 10.70491667,
               "drum": 2
             }
@@ -2185,9 +2137,9 @@
       "gain": 0.5,
       "summary": {
         "reference_hits": 271,
-        "correct": 254,
-        "missed": 15,
-        "wrong": 2,
+        "correct": 260,
+        "missed": 10,
+        "wrong": 1,
         "extra": 2
       },
       "takes": [
@@ -2204,42 +2156,24 @@
           "take": "bb84",
           "reference_hits": 31,
           "detected": 31,
-          "correct": 30,
-          "wrong": [
-            {
-              "time": 9.633354167,
-              "expected": 1,
-              "actual": 2
-            }
-          ],
+          "correct": 31,
+          "wrong": [],
           "missed": [],
           "extra": []
         },
         {
           "take": "live_1_boombap",
           "reference_hits": 21,
-          "detected": 17,
-          "correct": 16,
+          "detected": 20,
+          "correct": 19,
           "wrong": [],
           "missed": [
-            {
-              "time": 2.549,
-              "drum": 2
-            },
-            {
-              "time": 3.77,
-              "drum": 2
-            },
             {
               "time": 4.349,
               "drum": 2
             },
             {
               "time": 4.931,
-              "drum": 2
-            },
-            {
-              "time": 5.518,
               "drum": 2
             }
           ],
@@ -2253,19 +2187,10 @@
         {
           "take": "live_2_fourfloor",
           "reference_hits": 29,
-          "detected": 27,
-          "correct": 27,
+          "detected": 29,
+          "correct": 29,
           "wrong": [],
-          "missed": [
-            {
-              "time": 7.477,
-              "drum": 2
-            },
-            {
-              "time": 8.029,
-              "drum": 2
-            }
-          ],
+          "missed": [],
           "extra": []
         },
         {
@@ -2485,8 +2410,8 @@
       "gain": 2.0,
       "summary": {
         "reference_hits": 271,
-        "correct": 260,
-        "missed": 10,
+        "correct": 261,
+        "missed": 9,
         "wrong": 1,
         "extra": 2
       },
@@ -2518,16 +2443,12 @@
         {
           "take": "live_1_boombap",
           "reference_hits": 21,
-          "detected": 19,
-          "correct": 19,
+          "detected": 20,
+          "correct": 20,
           "wrong": [],
           "missed": [
             {
               "time": 4.931,
-              "drum": 2
-            },
-            {
-              "time": 5.518,
               "drum": 2
             }
           ],

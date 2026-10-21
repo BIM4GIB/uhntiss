@@ -42,7 +42,9 @@ struct Rig {
   }
 };
 int main() {
-  {
+  // Separate test frames keep large fixed audio buffers from accumulating
+  // in one Debug/ASan stack frame. Runtime engines remain allocation-free.
+  [] {
     Loop before;
     before.anchor = 17.125;
     before.append({.07123, .37f, Drum::hat});
@@ -99,7 +101,7 @@ int main() {
     check(decodeState(values.data(), quietSize, after, restored) &&
               after.events[0].velocity == .02f,
           "minimum float velocity survives persistence");
-  }
+  }();
 
   for (double sr : {44100., 48000., 96000.}) {
     Engine e;
@@ -166,15 +168,15 @@ int main() {
           "single-tracker test exercised real attack windows");
   }
 
-  {
+  [] {
     Rig r;
     r.e.learn(1);
     r.e.undo();
     check(r.e.learning() == -1,
           "undo exits teaching without touching loop history");
-  }
+  }();
 
-  {
+  [] {
     HostClock c;
     double ppq = 0.;
     for (int block = 0; block < 4000; ++block) {
@@ -195,9 +197,9 @@ int main() {
     c.begin(42.5, 0., false, true);
     check(!c.next(0.).running && c.next(0.).beat == 42.5,
           "stopped clock uses host PPQ");
-  }
+  }();
 
-  {
+  [] {
     Loop l;
     check(l.append({.7, .5f, Drum::hat}), "append");
     l.append({.1, .9f, Drum::kick});
@@ -207,8 +209,8 @@ int main() {
     for (size_t i = l.count; i < maxEvents; ++i)
       l.append({.2, .4f, Drum::snare});
     check(!l.append({.3, .4f, Drum::hat}), "bounded event capacity");
-  }
-  {
+  }();
+  [] {
     Rig r;
     r.sample();
     r.record();
@@ -224,8 +226,8 @@ int main() {
     check(r.e.loop().count == 1, "undo clear");
     r.e.undo();
     check(r.e.loop().count == 0, "undo recording");
-  }
-  {
+  }();
+  [] {
     Rig r;
     r.e.arm();
     r.sample(false);
@@ -236,8 +238,8 @@ int main() {
     r.e.tap(Drum::kick);
     r.to(8.05);
     check(r.e.loop().count == 1, "stopped arm captures two bars");
-  }
-  {
+  }();
+  [] {
     Rig r;
     r.sample();
     r.record();
@@ -248,8 +250,8 @@ int main() {
     check(r.e.loop().count == 1 && r.e.state() == State::playing,
           "undo cancels recording, preserves loop");
     check(r.e.undoCount() == 1, "cancel consumes no undo");
-  }
-  {
+  }();
+  [] {
     Rig r;
     r.sample();
     r.record();
@@ -265,8 +267,8 @@ int main() {
           "overdub preserves absolute loop phase across alternate bar");
     r.e.undo();
     check(r.e.loop().count == 1, "undo overdub");
-  }
-  {
+  }();
+  [] {
     Rig r;
     r.sample();
     r.record();
@@ -275,8 +277,8 @@ int main() {
     check(r.e.loop().count == 1 && r.e.state() == State::empty,
           "silent take preserves previous loop");
     check(r.e.undoCount() == 1, "silent take does not consume undo");
-  }
-  {
+  }();
+  [] {
     Rig r;
     r.e.arm();
     r.sample();
@@ -286,8 +288,8 @@ int main() {
     r.to(8.05);
     check(r.e.loop().count == 2, "late classification belongs to prior take");
     check(r.e.undoCount() == 1, "tail stays in same transaction");
-  }
-  {
+  }();
+  [] {
     Rig r;
     r.e.arm();
     r.sample();
@@ -295,8 +297,8 @@ int main() {
     r.to(8.001);
     r.e.undo();
     check(r.e.loop().count == 0, "undo in seam tail undoes committed loop");
-  }
-  {
+  }();
+  [] {
     Rig r;
     r.e.arm();
     r.sample();
@@ -304,8 +306,8 @@ int main() {
     r.e.hit(Drum::hat, .5f, 7.999);
     r.to(8.05);
     check(r.e.loop().count == 1, "only hit in analysis tail is kept");
-  }
-  {
+  }();
+  [] {
     Rig r;
     r.sample();
     r.record();
@@ -320,8 +322,8 @@ int main() {
     r.sample(true, false);
     check(r.e.state() == State::unsupportedMeter,
           "unsupported meter is explicit");
-  }
-  {
+  }();
+  [] {
     Rig r;
     r.sample();
     r.record();
@@ -330,8 +332,8 @@ int main() {
     r.sample(false);
     check(r.e.state() == State::interrupted && r.e.loop().count == 1,
           "stop preserves committed loop");
-  }
-  {
+  }();
+  [] {
     Rig r;
     r.e.arm();
     r.sample();
@@ -339,8 +341,8 @@ int main() {
       r.e.tap(Drum::hat);
     check(r.e.state() == State::full && r.e.loop().count == 0,
           "overflow rolls back take");
-  }
-  {
+  }();
+  [] {
     Rig r;
     Loop l;
     l.append({.1, .8f, Drum::kick});
@@ -350,8 +352,8 @@ int main() {
     for (int i = 0; i < 22; ++i)
       r.e.undo();
     check(r.e.undoCount() == 0, "history exhaustion safe");
-  }
-  {
+  }();
+  [] {
     for (double sr : {44100., 48000., 96000.}) {
       Detector d;
       d.prepare(sr);
@@ -378,8 +380,8 @@ int main() {
       check(onset / 2. - .05 < .004,
             "onset timestamp excludes analysis latency");
     }
-  }
-  {
+  }();
+  [] {
     Rig r;
     Loop loop;
     loop.append({.061, .7f, Drum::snare});
@@ -405,8 +407,8 @@ int main() {
     r.beat = 200.;
     r.sample();
     check(r.e.playbackSerial() == 6, "seek does not burst old events");
-  }
-  {
+  }();
+  [] {
     Rig r;
     r.sample();
     r.record();
@@ -416,8 +418,8 @@ int main() {
     r.e.arm();
     r.to(24.05);
     check(r.e.undoCount() == 1, "silent overdub does not consume history");
-  }
-  {
+  }();
+  [] {
     Profile p;
     for (int d = 0; d < 3; ++d)
       for (int i = 0; i < 3; ++i)
@@ -426,8 +428,8 @@ int main() {
     Detection d{Drum::kick, .5f, 0., {.42, .58, .32, .3}};
     check(p.classify(d) == Drum::snare,
           "profile classifies independent of fallback");
-  }
-  {
+  }();
+  [] {
     Rig r;
     Settings s;
     s.voice = 1;
@@ -441,8 +443,8 @@ int main() {
       r.sample(false, true, x);
     }
     check(r.e.lastDrum() == 1, "fixed voice bypasses classifier");
-  }
-  {
+  }();
+  [] {
     Rig r;
     r.e.learn(2);
     for (int i = 0; i < 48000; ++i) {
@@ -456,8 +458,8 @@ int main() {
     check(r.e.profile().count[2] == 3 && r.e.learning() == -1,
           "teaching captures three attacks then stops");
     check(r.e.loop().count == 0, "teaching never records a loop");
-  }
-  {
+  }();
+  [] {
     Queue<int, 64> q;
     constexpr int n = 100000;
     std::thread producer([&] {
@@ -472,8 +474,8 @@ int main() {
       check(v == i, "SPSC order");
     }
     producer.join();
-  }
-  {
+  }();
+  [] {
     Rig r;
     Settings s;
     r.e.setSettings(s);
@@ -483,6 +485,6 @@ int main() {
       r.sample();
     }
     check(true, "dense polyphony finite and bounded");
-  }
+  }();
   std::cout << "PASS: " << checks << " checks\n";
 }

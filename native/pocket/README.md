@@ -1,4 +1,4 @@
-# UHNTISS Pocket 04 · Auto drums
+# UHNTISS Pocket 05 · Auto drums
 
 A local voice-to-drum instrument and two-bar looper for Ableton Live. Native C++
 handles detection, synthesis, transport and recording. Max for Live supplies the
@@ -17,7 +17,7 @@ Requires macOS 11+, Ableton Live with Max for Live, and a mono mic input. The
 provided external is universal Apple Silicon/Intel. The portable core also builds
 on Linux; there is no Windows Max external in this release.
 
-1. Keep `UHNTISS Pocket.amxd`, `pocket-ui.js` and `uhntiss.pocket04~.mxo` together.
+1. Keep `UHNTISS Pocket.amxd`, `pocket-ui.js` and `uhntiss.pocket05~.mxo` together.
    Drag the `.amxd` onto an **audio track**. No API key, bridge, Python, Node server,
    network connection or downloaded kit is needed to play.
 2. Select your mono mic channel in Live; set the track's Monitor to **In**. The
@@ -65,13 +65,18 @@ The context uses the **preceding** 30 ms; it adds no lookahead. The primary
 300-tree model chooses a voice or rejection. A second model may recover a rejected
 window only when its voice and attack evidence are strong. A parallel, quieter
 tracker accepts only low-level hats, with primary attacks taking priority and a
-shared 35 ms minimum separation. Both paths retain raw dynamics and original
-onset timestamps. Neither path boosts the audible input or changes the 10 ms
-classification deadline. Fixed voices and Teach retain their single-track path.
+shared 35 ms minimum separation. At exactly **48 kHz**, a third tracker detects
+changes within individual frequency bands, recovering some quiet kicks, snares
+and hats masked by a louder tail. It uses six additional contrasts against past
+band energy, strict voice confidence, and the same raw-velocity cap of 0.22.
+All paths retain raw dynamics and detected onset timestamps. None boosts the
+audible input or changes the 10 ms classification deadline. Fixed voices and
+Teach retain their single-track path. State still uses the original 17 features.
 
 Above 48 kHz, a separately calibrated primary forest replaces the normal-rate
 forest; it uses additional resampled, non-reserved isolated calibration hits.
-Only one primary forest runs per attack. All trees have depth at most 12. The
+Only one primary forest runs per attack. Primary/recovery trees have depth at most
+12; the new 200-tree transient model has depth at most 14. The
 runtime remains fixed-storage C++ with no model download or rhythm grid.
 
 The optional personal profile keeps all **nine examples** and uses three nearest
@@ -144,7 +149,7 @@ For native Auto regression and research (Python is development-only):
 ```sh
 uv run python -m eval.test_native_auto
 uv run python -m eval.test_real_auto --build native/pocket/build --report native/pocket/build/real-takes.json
-uv run python -m eval.real_auto report --binary native/pocket/build/pocket_analyze
+uv run python -m eval.test_transient_auto --binary native/pocket/build/pocket_analyze
 uv run --with scikit-learn==1.8.0 python -m eval.heldout_auto --binary native/pocket/build/pocket_analyze --report native/pocket/build/heldout.json
 uv run --with scikit-learn==1.8.0 python -m eval.transfer_auto --binary native/pocket/build/pocket_analyze
 # Rebuild after regenerating the compiled model, then repeat both regressions.
@@ -159,12 +164,18 @@ Random context augmentation uses only the remaining isolated clips.
 1 / 0.5 / 0.25 gain**. Each compiled engine identifies its exact model and must
 agree with Python on training descriptors and interpolated probes. Capture tests
 cover 72 successive two-bar windows with raw velocity and onset error below one
-sample. CI fails if any aggregate correct/missed/wrong/extra count worsens against
-Pocket03 at a tested gain. The shipped model is exactly the uptempo-excluded fold.
+sample. CI fails on per-take regressions, newly missed reference attacks, and new
+wrong/extra events against Pocket04. The shipped models match the uptempo-excluded
+fold on the development host; every platform independently verifies export parity
+and compiled fingerprints. The transient trainer never reads uptempo in any fold.
 
-Results are modest: correct held-out hits improve **241→243**, **226→228** and
-**213→220** out of 271, respectively. Wrong voices do not increase; quarter-level
-extras fall **18→16**. This does not establish stage or unseen-performer reliability.
+Results are modest: normal/half-level held-out results remain **243/271** and
+**228/271**. Quarter-level correct hits improve **220→225** across K/S/H; extras
+fall **16→13**, with no new wrong hits. The permanent uptempo holdout improves
+**25→27/37** at quarter level, but remains **30/37** at normal level: the hard
+kick/snare roll misses are unresolved. A frozen set of 27 breath-shaped noise
+controls has the same 19 false triggers before and after; it does not prove zero
+breath errors. This does not establish stage or unseen-performer reliability.
 The recordings informed development; the labels are signal-assisted rather than
 independent listening annotations. The 25 ms scoring tolerance is separate from
 the sub-sample capture check. Every remaining error is retained in the reports.

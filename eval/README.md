@@ -99,14 +99,22 @@ rather than nearest-centroid because drum classes are multi-modal (a bright
 slow hat and a darker fast one are both hats). New recorded takes are picked
 up automatically on the next training run.
 
-## Pocket 04: source-held-out 48 kHz validation
+## Pocket 05: source-held-out 48 kHz validation
 
 `python -m eval.heldout_auto --binary native/pocket/build/pocket_analyze --report heldout.json`
 rebuilds eight isolated native models, each excluding every derivative of its test
 source. Use scikit-learn 1.8.0. It checks the engine-embedded model fingerprint,
 Python/native parity, 72 capture windows, causality and unchanged 10 ms decisions.
-Frozen Pocket03 counts are in `native/pocket/auto-heldout-pocket03.json`; CI gates
-all four error metrics separately at gains 1, .5 and .25.
+Frozen Pocket04 counts are in `native/pocket/auto-heldout-pocket04.json`; CI gates
+each take at gains 1, .5 and .25, including new missed/wrong/extra events. The new
+transient model uses 23 causal features at 48 kHz and never reads the permanent
+uptempo holdout, including when other sources are held out. The older 17-feature
+primary/recovery models and persistent state are unchanged.
+
+`eval.test_transient_auto` checks 27 frozen breath-shaped noise controls. They
+never train the model. Pocket04 already produces 19 false triggers on these
+synthetic controls; Pocket05 adds none. Actual breath/speech rejection remains
+incomplete. Do not describe these controls as a human breath benchmark.
 
 `eval.transfer_auto` is the current trainer. Its deployed model excludes the whole
 uptempo source before reading or augmentation. This is a development holdout, not

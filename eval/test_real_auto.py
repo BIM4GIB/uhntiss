@@ -16,7 +16,7 @@ def check(build):
     binary = build / "pocket_analyze"
     audit = load("pocket-real-takes.json")
     result = report(binary)
-    baseline = load("pocket04-deployment-baseline.json")
+    baseline = load("pocket05-deployment-baseline.json")
     assert result["after"]["summary"] == baseline["original_summary"], (
         "original full-take output changed"
     )

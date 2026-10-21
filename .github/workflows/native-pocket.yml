@@ -30,7 +30,7 @@ jobs:
           ref: c03a2922a2a8ff149165a1e2ea134e9321d6e202
           path: max-sdk-base
       - run: MAX_SDK_PATH="$PWD/max-sdk-base" native/pocket/tools/build-mac.sh "$RUNNER_TEMP/uhntiss-pocket"
-      - run: codesign --verify --strict "$RUNNER_TEMP/uhntiss-pocket/uhntiss.pocket04~.mxo"
+      - run: codesign --verify --strict "$RUNNER_TEMP/uhntiss-pocket/uhntiss.pocket05~.mxo"
       - uses: actions/upload-artifact@v4
         with:
           name: UHNTISS-Pocket-macOS

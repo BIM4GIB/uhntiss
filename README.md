@@ -1,6 +1,6 @@
 # UHNTISS
 
-**[Pocket 04: held-out and quiet-hit recovery](native/pocket/README.md)** — native C++ / Max for Live:
+**[Pocket 05: quiet transient recovery at 48 kHz](native/pocket/README.md)** — native C++ / Max for Live:
 beatbox kick, snare and hats in one pass, capture two bars with your original
 timing and dynamics, then overdub or undo. Auto uses a compiled causal classifier
 and optional personal voice examples. It runs offline; Python stays in research.

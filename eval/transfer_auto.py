@@ -1,4 +1,4 @@
-"""Pocket 04 research model: rejected-window recovery, with source-owned augmentation.
+"""Pocket 05 research models, with source-owned augmentation and quiet transients.
 
 The deployed model reserves the entire uptempo take. Native runtime uses only
 exported fixed trees; no Python, test timeline or waveform is shipped as a model.
@@ -245,27 +245,43 @@ def predict(models, x, sample_rate=48000):
 
 
 def train(binary, cache):
+    from eval import transient_auto
+
     # Skip the reserved source before opening audio or making derivatives.
     rows, sources, iso = corpus(binary, exclude=RESERVED)
     recovery_rows = recovery_corpus(binary, exclude=RESERVED)
     rate_rows = rate_examples(binary)
     models, header, probes = fit(rows, recovery_rows, rate_rows, RESERVED)
+    transient_rows = transient_auto.corpus(binary)
+    _, transient_header, _ = transient_auto.fit(transient_rows)
     if cache:
         cache.write_text(
-            json.dumps(dict(primary=rows, recovery=recovery_rows, rate=rate_rows))
+            json.dumps(
+                dict(
+                    primary=rows,
+                    recovery=recovery_rows,
+                    rate=rate_rows,
+                    transient=transient_rows,
+                )
+            )
         )
     target = ROOT / "native/pocket"
     (target / "include/pocket/attack_model.hpp").write_text(header)
+    (target / "include/pocket/transient_model.hpp").write_text(transient_header)
     import sklearn
 
     info = dict(
         sklearn_version=sklearn.__version__,
-        version=4,
+        version=5,
         feature_version=2,
         features=17,
         window_ms=10,
         history_ms=30,
         compiled_model_sha256=hashlib.sha256(header.encode()).hexdigest(),
+        transient_model_sha256=hashlib.sha256(transient_header.encode()).hexdigest(),
+        combined_model_sha256=hashlib.sha256(
+            (header + "\n" + transient_header).encode()
+        ).hexdigest(),
         audit_sha256=digest(ROOT / "eval/data/pocket-real-takes.json"),
         isolated_audit_sha256=digest(ROOT / "eval/data/pocket-isolated-attacks.json"),
         deployment_reserved_takes=list(RESERVED),
@@ -275,6 +291,27 @@ def train(binary, cache):
         highrate_training_rows=len(rows) + len(rate_rows),
         highrate_policy="Above 48 kHz: same primary forest specification plus isolated calibration at 48/96 kHz and .25/.5/1/2 gains. Replaces the primary vote; never runs both primary forests.",
         recovery_training_rows=len(recovery_rows),
+        transient=dict(
+            training_rows=len(transient_rows),
+            training_groups=sorted({r["take"] for r in transient_rows}),
+            sample_rate=48000,
+            features=23,
+            window_ms=10,
+            band_history_ms=12,
+            fast_attack_ms=0.4,
+            fast_release_ms=2,
+            slow_ms=8,
+            novelty_min=1.65,
+            reset_novelty_max=1.1,
+            reset_ms=1,
+            gate_ratio=0.3,
+            raw_velocity_max=0.22,
+            kick_snare_min=0.7,
+            hat_min=0.8,
+            forest="200 ExtraTrees, depth14, leaf2, entropy, max_features=.8, balanced, seed5042",
+            augmentation="24 isolated overlap scenes, 25–180ms gaps, .125–1.5 gain, seed5042. Reserved isolated attacks and whole uptempo take excluded.",
+            scope="Quiet recovery at exactly 48 kHz; existing path at other rates. Permanent reserved source excluded from this model in every fold.",
+        ),
         heldout_attacks=iso["heldout_attacks"],
         exclusions="Whole reserved source excluded before reading or augmentation. Every reserved isolated attack and its +/-200ms neighbourhood excluded at every gain. No test waveform or ordering enters augmentation.",
         primary="Pocket03 ensemble: 200 entropy + 100 gini trees, depth12, seed42",

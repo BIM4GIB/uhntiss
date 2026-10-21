@@ -1,11 +1,13 @@
 {
   "sklearn_version": "1.8.0",
-  "version": 4,
+  "version": 5,
   "feature_version": 2,
   "features": 17,
   "window_ms": 10,
   "history_ms": 30,
   "compiled_model_sha256": "6a3397b336cfd2a941c0ce92819588fafec6b41414d1fffcfc0c8d403112b5b9",
+  "transient_model_sha256": "bfedf36abf7c527a141cf23bd3d0cfc25accd9ac8ed7e11aa62bbf542001d504",
+  "combined_model_sha256": "2ecb4aaf05ab811413fe5ff23eb642e8333e266462919074592d0b9c3d0da479",
   "audit_sha256": "130bd7f50c4f72549b6324adc22f7d135fdd5eb7ba8577b19d2c7b3ce335f1cf",
   "isolated_audit_sha256": "d99e3fc3a6c7443615bad240bf67a2b28791e91eadc2738df5fcb0a48ac6769c",
   "deployment_reserved_takes": [
@@ -72,6 +74,37 @@
   "highrate_training_rows": 5632,
   "highrate_policy": "Above 48 kHz: same primary forest specification plus isolated calibration at 48/96 kHz and .25/.5/1/2 gains. Replaces the primary vote; never runs both primary forests.",
   "recovery_training_rows": 7956,
+  "transient": {
+    "training_rows": 13778,
+    "training_groups": [
+      "bb100",
+      "bb84",
+      "isolated",
+      "isolated_context",
+      "live_1_boombap",
+      "live_2_fourfloor",
+      "live_3_snareheavy",
+      "live_4_kicksnare",
+      "live_5_sparse"
+    ],
+    "sample_rate": 48000,
+    "features": 23,
+    "window_ms": 10,
+    "band_history_ms": 12,
+    "fast_attack_ms": 0.4,
+    "fast_release_ms": 2,
+    "slow_ms": 8,
+    "novelty_min": 1.65,
+    "reset_novelty_max": 1.1,
+    "reset_ms": 1,
+    "gate_ratio": 0.3,
+    "raw_velocity_max": 0.22,
+    "kick_snare_min": 0.7,
+    "hat_min": 0.8,
+    "forest": "200 ExtraTrees, depth14, leaf2, entropy, max_features=.8, balanced, seed5042",
+    "augmentation": "24 isolated overlap scenes, 25\u2013180ms gaps, .125\u20131.5 gain, seed5042. Reserved isolated attacks and whole uptempo take excluded.",
+    "scope": "Quiet recovery at exactly 48 kHz; existing path at other rates. Permanent reserved source excluded from this model in every fold."
+  },
   "heldout_attacks": [
     {
       "source": "calibration/hat_closed.wav",

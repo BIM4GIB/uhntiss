@@ -62,16 +62,19 @@ private:
   bool valid_ = false, running_ = false, fourFour_ = true;
 };
 using Features = std::array<double, 17>;
+using TransientFeatures = std::array<double, 23>;
 struct Detection {
   Drum drum;
   float velocity;
   double beat;
   Features features{};
+  std::array<double, 6> bandContrast{};
 };
 // The factory model contains causal attack descriptors, never audio or a
 // rhythm grid. A decision cannot move, invent or quantize an onset.
 Drum classifyAttack(const Features &features,
                     double sampleRate = 48000.) noexcept;
+Drum classifyTransientAttack(const TransientFeatures &features) noexcept;
 struct Profile {
   std::array<std::array<Features, 3>, 3> examples{};
   std::array<int, 3> count{};
@@ -81,14 +84,20 @@ struct Profile {
     return count[0] >= 3 && count[1] >= 3 && count[2] >= 3;
   }
 };
-// One causal 10 ms attack window with fixed storage. Auto uses a second
-// tracker only to recover low-level hats; forced voices and Teach use one.
+// One causal 10 ms attack window with fixed storage. Auto adds quiet-hat and
+// 48 kHz band-transient trackers; forced voices and Teach still use one.
 class AttackTracker {
 public:
   // candidates is an offline research policy: collect a model-independent
   // superset of attacks. The Engine only uses automatic or fixedVoice.
-  enum class Policy { automatic, fixedVoice, candidates, quiet };
-  void prepare(double sampleRate) noexcept;
+  enum class Policy {
+    automatic,
+    fixedVoice,
+    candidates,
+    quiet,
+    transientCandidates
+  };
+  void prepare(double sampleRate, bool transient = false) noexcept;
   bool process(double input, double beat, double threshold, Detection &event,
                Policy policy = Policy::automatic) noexcept;
   bool started() const noexcept { return started_; }
@@ -111,6 +120,9 @@ private:
   int historyIndex_ = 0, historyCount_ = 0, historySize_ = 1440;
   std::array<double, 5> bands_{}, bandCoeffs_{};
   std::array<std::array<double, 6>, 2> energy_{};
+  std::array<double, 6> bandFast_{}, bandSlow_{}, context_{}, prior_{};
+  double contextCoeff_ = 0.;
+  bool transient_ = false;
   double dcCoeff_ = 0., attack_ = 0., release_ = 0., slowCoeff_ = 0.;
   int collect_ = 0, window_ = 480, refractory_ = 0, count_ = 0, crossings_ = 0,
       quiet_ = 0, releaseSamples_ = 0;
@@ -130,8 +142,9 @@ public:
   void reset() noexcept;
 
 private:
-  // Both trackers see raw input. The quiet path never applies audio gain.
-  AttackTracker primary_{}, quiet_{};
+  // Every tracker sees raw input; recovery never applies an audio gain boost.
+  AttackTracker primary_{}, quiet_{}, transient_{};
+  bool transientEnabled_ = false;
   std::int64_t sample_ = 0, lastAccepted_ = -1000000;
   int refractory_ = 1680, window_ = 480;
   Policy previousPolicy_ = Policy::automatic;

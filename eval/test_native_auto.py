@@ -12,7 +12,6 @@ import subprocess
 import tempfile
 from pathlib import Path
 import numpy as np
-import soundfile as sf
 from scipy.signal import resample_poly
 from eval.native_auto import ROOT, analyze, read
 
@@ -81,6 +80,13 @@ def check(analyzer, stream):
         ).hexdigest()
         == info["compiled_model_sha256"]
     ), "compiled model/provenance mismatch"
+    assert (
+        hashlib.sha256(
+            (ROOT / "native/pocket/include/pocket/transient_model.hpp").read_bytes()
+        ).hexdigest()
+        == info["transient_model_sha256"]
+    ), "compiled transient model/provenance mismatch"
+    assert "live_6_uptempo" not in info["transient"]["training_groups"]
     cases = []
     for sr in (44100, 48000, 96000):
         for gain in (0.5, 1.0, 2.0):
@@ -113,8 +119,8 @@ def check(analyzer, stream):
                 )
                 events = np.array(
                     [
-                        list(map(float, l.split(",")))
-                        for l in p.stdout.decode().splitlines()
+                        list(map(float, line.split(",")))
+                        for line in p.stdout.decode().splitlines()
                     ]
                 )
                 assert len(events) == len(rows), "capture lost or duplicated an attack"

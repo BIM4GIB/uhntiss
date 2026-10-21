@@ -39,6 +39,9 @@ jobs:
       - name: Verify full real takes, capture timing and causality
         run: uv run python -m eval.test_real_auto --build native/pocket/build --report native/pocket/build/real-takes.json
 
+      - name: Reject added breath-shaped noise triggers
+        run: uv run python -m eval.test_transient_auto --binary native/pocket/build/pocket_analyze --report native/pocket/build/noise-controls.json
+
       - name: Verify 48k whole-source held-out transfer and model identity
         run: uv run --with scikit-learn==1.8.0 python -m eval.heldout_auto --binary native/pocket/build/pocket_analyze --report native/pocket/build/heldout.json
 
@@ -48,3 +51,4 @@ jobs:
           path: |
             native/pocket/build/real-takes.json
             native/pocket/build/heldout.json
+            native/pocket/build/noise-controls.json

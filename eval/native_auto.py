@@ -19,16 +19,26 @@ GAINS = (0.5, 1.0, 2.0)
 
 
 def analyze(
-    binary, samples, sr, gate=0.010, *, include_rejected=False, candidates=False
+    binary,
+    samples,
+    sr,
+    gate=0.010,
+    *,
+    include_rejected=False,
+    candidates=False,
+    transient=False,
 ):
     p = subprocess.run(
-        [str(binary), str(sr), str(gate)] + (["candidates"] if candidates else []),
+        [str(binary), str(sr), str(gate)]
+        + (["transient"] if transient else ["candidates"] if candidates else []),
         input=np.asarray(samples, dtype="<f4").tobytes(),
         capture_output=True,
         check=True,
     )
     rows = [list(map(float, row.split(","))) for row in p.stdout.decode().splitlines()]
-    result = np.asarray(rows).reshape(-1, len(rows[0]) if rows else 21)
+    result = np.asarray(rows).reshape(
+        -1, len(rows[0]) if rows else 27 if transient else 21
+    )
     return result if include_rejected else result[result[:, 1] < 3]
 
 

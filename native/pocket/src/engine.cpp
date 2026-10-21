@@ -1,5 +1,6 @@
 #include "pocket/engine.hpp"
 #include "pocket/attack_model.hpp"
+#include "pocket/transient_model.hpp"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -112,8 +113,8 @@ struct Neighbours {
   }
 };
 } // namespace
-template <class R, class N, class V>
-std::array<double, 4> vote(const Features &f, const R &roots, const N &nodes,
+template <class F, class R, class N, class V>
+std::array<double, 4> vote(const F &f, const R &roots, const N &nodes,
                            const V &leaves) noexcept {
   std::array<double, 4> result{};
   for (auto root : roots) {
@@ -147,6 +148,15 @@ Drum classifyAttack(const Features &features, double sampleRate) noexcept {
     return Drum::noise;
   return Drum(next);
 }
+Drum classifyTransientAttack(const TransientFeatures &features) noexcept {
+  const auto votes =
+      vote(features, transient::roots, transient::nodes, transient::leafVotes);
+  const int voice =
+      int(std::max_element(votes.begin(), votes.end()) - votes.begin());
+  if (voice == 3 || votes[voice] < (voice == 2 ? .8 : .7))
+    return Drum::noise;
+  return Drum(voice);
+}
 void Profile::add(Drum drum, const Features &features) noexcept {
   const auto d = int(drum);
   if (d < 0 || d > 2)
@@ -167,9 +177,10 @@ Drum Profile::classify(const Detection &detection) const noexcept {
       n.add(detection.features, examples[d][i], d, d * 3 + i);
   return n.choose();
 }
-void AttackTracker::prepare(double sr) noexcept {
+void AttackTracker::prepare(double sr, bool transient) noexcept {
   sr = std::isfinite(sr) ? clamp(sr, 8000., 384000.) : 48000.;
   sr_ = sr;
+  transient_ = transient;
   window_ = int(std::round(model::windowSeconds * sr));
   const double edges[] = {150., 400., 1000., 2500., 6000.};
   for (size_t i = 0; i < bands_.size(); ++i)
@@ -178,13 +189,15 @@ void AttackTracker::prepare(double sr) noexcept {
   onsetCoeff_ = coeff(70., sr);
   historySize_ = int(std::round(.030 * sr));
   attack_ = 1. - std::exp(-1. / (.0004 * sr));
-  release_ = 1. - std::exp(-1. / (.004 * sr));
-  slowCoeff_ = 1. - std::exp(-1. / (.045 * sr));
+  release_ = 1. - std::exp(-1. / ((transient_ ? .002 : .004) * sr));
+  slowCoeff_ = 1. - std::exp(-1. / ((transient_ ? .008 : .045) * sr));
+  contextCoeff_ = 1. - std::exp(-1. / (.012 * sr));
   reset();
 }
 void AttackTracker::reset() noexcept {
   hp_ = dc_ = fast_ = slow_ = previous_ = total_ = peak_ = 0.;
   history_ = {};
+  bandFast_ = bandSlow_ = context_ = prior_ = {};
   historySum_ = onsetPower_ = earlyPower_ = onsetDc_ = onsetPeak_ =
       rejectedPeak_ = 0.;
   historyIndex_ = historyCount_ = 0;
@@ -206,6 +219,8 @@ bool AttackTracker::process(double x, double beat, double threshold,
   threshold = std::isfinite(threshold) ? clamp(threshold, .002, .2) : .010;
   if (policy == Policy::quiet)
     threshold *= .3;
+  if (transient_ && policy != Policy::transientCandidates)
+    threshold *= .3;
   dc_ += dcCoeff_ * (x - dc_);
   hp_ = x - dc_;
   for (size_t i = 0; i < bands_.size(); ++i)
@@ -214,6 +229,22 @@ bool AttackTracker::process(double x, double beat, double threshold,
   const auto a = std::abs(x - onsetDc_);
   fast_ += (a > fast_ ? attack_ : release_) * (a - fast_);
   slow_ += slowCoeff_ * (a - slow_);
+  double novelty = 0.;
+  if (transient_) {
+    // A new frequency band can rise while an earlier, louder drum still
+    // dominates the broadband envelope. Context is exclusively past audio.
+    double low = 0.;
+    for (size_t j = 0; j < 6; ++j) {
+      const double band = j < 5 ? bands_[j] : hp_;
+      const double value = std::abs(band - low);
+      low = band;
+      bandFast_[j] +=
+          (value > bandFast_[j] ? attack_ : release_) * (value - bandFast_[j]);
+      bandSlow_[j] += slowCoeff_ * (value - bandSlow_[j]);
+      novelty =
+          std::max(novelty, bandFast_[j] / (bandSlow_[j] + threshold * .2));
+    }
+  }
   // Once the input really falls below the gate, an earlier loud hit must
   // not mask the next quiet attack through the slow envelope's long decay.
   if (fast_ < threshold * .5) {
@@ -224,9 +255,11 @@ bool AttackTracker::process(double x, double beat, double threshold,
     quiet_ = 0;
   if (refractory_ > 0)
     --refractory_;
-  if (fast_ < threshold * .5 || fast_ < slow_ * .65) {
-    releaseSamples_ = std::min(releaseSamples_ + 1, int(.004 * sr_) + 1);
-    if (releaseSamples_ > int(.004 * sr_))
+  const int releaseSamples = int((transient_ ? .001 : .004) * sr_);
+  if (transient_ ? novelty < 1.1
+                 : (fast_ < threshold * .5 || fast_ < slow_ * .65)) {
+    releaseSamples_ = std::min(releaseSamples_ + 1, releaseSamples + 1);
+    if (releaseSamples_ > releaseSamples)
       released_ = true;
   } else
     releaseSamples_ = 0;
@@ -234,8 +267,10 @@ bool AttackTracker::process(double x, double beat, double threshold,
   // fresh rise above its peak; a steady tail cannot repeatedly re-arm itself.
   const bool freshAfterReject =
       recoverRejected && rejectedPeak_ > 0. && fast_ > rejectedPeak_ * 1.8;
-  if (!collect_ && !refractory_ && fast_ > threshold && fast_ > slow_ * 1.65 &&
-      (released_ || freshAfterReject)) {
+  const bool onset = transient_ ? novelty > 1.65 && released_
+                                : fast_ > threshold && fast_ > slow_ * 1.65 &&
+                                      (released_ || freshAfterReject);
+  if (!collect_ && !refractory_ && onset) {
     started_ = true;
     collect_ = window_;
     count_ = crossings_ = 0;
@@ -246,9 +281,10 @@ bool AttackTracker::process(double x, double beat, double threshold,
     onsetPeak_ = fast_;
     rejectedPeak_ = 0.;
     onsetBeat_ = beat;
+    prior_ = context_;
     released_ = false;
     releaseSamples_ = 0;
-    refractory_ = int(.035 * sr_);
+    refractory_ = int((transient_ ? .020 : .035) * sr_);
   }
   bool detected = false;
   if (collect_) {
@@ -271,7 +307,17 @@ bool AttackTracker::process(double x, double beat, double threshold,
       const auto features = descriptor();
       const bool quiet = policy == Policy::quiet;
       auto drum = Drum::noise;
-      if (quiet) {
+      TransientFeatures transientFeatures{};
+      if (transient_) {
+        std::copy(features.begin(), features.end(), transientFeatures.begin());
+        for (size_t j = 0; j < 6; ++j)
+          transientFeatures[17 + j] =
+              std::log(((energy_[0][j] + energy_[1][j]) / count_ + 1e-12) /
+                       (prior_[j] + 1e-12));
+        drum = classifyTransientAttack(transientFeatures);
+        if (attackVelocity() > .22f)
+          drum = Drum::noise;
+      } else if (quiet) {
         const auto votes = vote(features, recovery::roots, recovery::nodes,
                                 recovery::leafVotes);
         const int voice = int(
@@ -281,8 +327,11 @@ bool AttackTracker::process(double x, double beat, double threshold,
       } else
         drum = classifyAttack(features, sr_);
       result = {drum, attackVelocity(), onsetBeat_, features};
-      if (recoverRejected &&
-          (result.drum == Drum::noise || policy == Policy::candidates)) {
+      if (transient_)
+        std::copy(transientFeatures.begin() + 17, transientFeatures.end(),
+                  result.bandContrast.begin());
+      if (recoverRejected && (transient_ || result.drum == Drum::noise ||
+                              policy == Policy::candidates)) {
         refractory_ = 0;
         rejectedPeak_ = onsetPeak_;
       }
@@ -293,6 +342,15 @@ bool AttackTracker::process(double x, double beat, double threshold,
   history_[historyIndex_] = hp_ * hp_;
   historyIndex_ = (historyIndex_ + 1) % historySize_;
   historyCount_ = std::min(historyCount_ + 1, historySize_);
+  if (transient_) {
+    double low = 0.;
+    for (size_t j = 0; j < 6; ++j) {
+      const double band = j < 5 ? bands_[j] : hp_;
+      const double value = band - low;
+      context_[j] += contextCoeff_ * (value * value - context_[j]);
+      low = band;
+    }
+  }
   previous_ = hp_;
   return detected;
 }
@@ -324,6 +382,10 @@ void Detector::prepare(double sr) noexcept {
   sr = std::isfinite(sr) ? clamp(sr, 8000., 384000.) : 48000.;
   primary_.prepare(sr);
   quiet_.prepare(sr);
+  transient_.prepare(sr, true);
+  // This recovery model is validated at 48 kHz. Other rates keep their
+  // existing detector path; there is no hidden resampling or added buffer.
+  transientEnabled_ = sr == 48000.;
   refractory_ = int(.035 * sr);
   window_ = int(std::round(model::windowSeconds * sr));
   reset();
@@ -331,6 +393,7 @@ void Detector::prepare(double sr) noexcept {
 void Detector::reset() noexcept {
   primary_.reset();
   quiet_.reset();
+  transient_.reset();
   sample_ = 0;
   lastAccepted_ = -1000000;
   previousPolicy_ = Policy::automatic;
@@ -339,10 +402,13 @@ bool Detector::process(double input, double beat, double threshold,
                        Detection &result, Policy policy) noexcept {
   if (policy != previousPolicy_) {
     quiet_.reset();
+    transient_.reset();
     previousPolicy_ = policy;
     lastAccepted_ = -1000000;
   }
   ++sample_;
+  if (policy == Policy::transientCandidates)
+    return transient_.process(input, beat, threshold, result, policy);
   Detection primary{}, quiet{};
   const bool ready = primary_.process(input, beat, threshold, primary, policy);
   if (policy != Policy::automatic) {
@@ -352,7 +418,11 @@ bool Detector::process(double input, double beat, double threshold,
   }
   const bool quietReady =
       quiet_.process(input, beat, threshold, quiet, Policy::quiet);
-  // Compare sample positions, never beat subdivisions. Both deadlines are
+  Detection transient{};
+  const bool transientReady =
+      transientEnabled_ &&
+      transient_.process(input, beat, threshold, transient);
+  // Compare sample positions, never beat subdivisions. All deadlines are
   // exactly one window after their own onset; no extra waiting or snapping.
   const bool available = sample_ - window_ + 1 - lastAccepted_ >= refractory_;
   if (ready && primary.drum != Drum::noise && available) {
@@ -365,6 +435,12 @@ bool Detector::process(double input, double beat, double threshold,
   if (quietReady && quiet.drum != Drum::noise && !primary_.pending() &&
       available) {
     result = quiet;
+    lastAccepted_ = sample_ - window_ + 1;
+    return true;
+  }
+  if (transientReady && transient.drum != Drum::noise && !primary_.pending() &&
+      available) {
+    result = transient;
     lastAccepted_ = sample_ - window_ + 1;
     return true;
   }
