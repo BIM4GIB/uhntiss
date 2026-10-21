@@ -1,0 +1,32 @@
+{
+  "scope": "Deployed-model shared correct attacks; source labels approximate. Detector timing is distinct from onset-to-loop capture accuracy.",
+  "cases": [
+    {
+      "gain": 1,
+      "shared_correct": 263,
+      "changed": 5,
+      "earliest_change_ms": -16.39583400000033,
+      "latest_change_ms": 0.0,
+      "before_mean_absolute_error_ms": 2.591391035741481,
+      "after_mean_absolute_error_ms": 2.4576299330798816
+    },
+    {
+      "gain": 0.5,
+      "shared_correct": 254,
+      "changed": 9,
+      "earliest_change_ms": -21.374999999999922,
+      "latest_change_ms": 0.0,
+      "before_mean_absolute_error_ms": 3.7495472667717062,
+      "after_mean_absolute_error_ms": 3.630029510866198
+    },
+    {
+      "gain": 0.25,
+      "shared_correct": 239,
+      "changed": 8,
+      "earliest_change_ms": -22.333332999999733,
+      "latest_change_ms": 0.0,
+      "before_mean_absolute_error_ms": 5.027587289246864,
+      "after_mean_absolute_error_ms": 4.704885082845183
+    }
+  ]
+}

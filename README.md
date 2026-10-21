@@ -1,4 +1,13 @@
-# Mouthflow
+# UHNTISS
+
+**[Pocket 05: quiet transient recovery at 48 kHz](native/pocket/README.md)** — native C++ / Max for Live:
+beatbox kick, snare and hats in one pass, capture two bars with your original
+timing and dynamics, then overdub or undo. Auto uses a compiled causal classifier
+and optional personal voice examples. It runs offline; Python stays in research.
+See the [Pocket guide](native/pocket/README.md) for playing, tests and the limits
+of the current voice model.
+
+## Mouthflow research / legacy pipeline
 
 A voice-driven arrangement agent for Ableton Live. Make a sound with your
 voice, get it into your session — as **drums**, **bass**, **lead**, or an
