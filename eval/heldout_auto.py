@@ -125,6 +125,36 @@ def check_parity(binary, model, x, sample_rate=48000):
     return len(probes)
 
 
+def compile_without_transient(folder):
+    """Paired ablation: identical fold models, host and input; third path off.
+
+    Only the temporary audit source is changed. No runtime switch is shipped.
+    This separates the new detector's effect from cross-platform retraining.
+    """
+    source = (folder / "src/engine.cpp").read_text()
+    enabled = "transientEnabled_ = sr == 48000.;"
+    assert source.count(enabled) == 1, "update the ablation for this detector"
+    source = source.replace(enabled, "transientEnabled_ = false;")
+    path = folder / "src/without_transient.cpp"
+    path.write_text(source)
+    subprocess.run(
+        [
+            "c++",
+            "-std=c++17",
+            "-O2",
+            "-I",
+            str(folder / "include"),
+            str(path),
+            str(folder / "src/analyze.cpp"),
+            "-o",
+            str(folder / "without_transient"),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    return digest(path)
+
+
 def check_transient_parity(binary, model, x):
     rng = np.random.default_rng(5051)
     a, b = rng.integers(0, len(x), (2, 256))
@@ -204,6 +234,7 @@ def evaluate(binary, cache=None, report=None):
                 transient_rows, exclude=(take["name"],)
             )
             model_hash = compile_fold(folder, header, transient_header)
+            ablation_hash = compile_without_transient(folder)
             parity = check_parity(folder / "classify", model, probes)
             highrate_parity = check_parity(folder / "classify", model, probes, 96000)
             transient_parity = check_transient_parity(
@@ -222,8 +253,14 @@ def evaluate(binary, cache=None, report=None):
                     "decision window increased"
                 )
                 captured = check_capture(folder, samples, detected)
+                without = analyze(folder / "without_transient", samples, RATE)
                 cases.append(
-                    dict(gain=gain, score=score(detected, take), capture=captured)
+                    dict(
+                        gain=gain,
+                        score=score(detected, take),
+                        capture=captured,
+                        without_transient=score(without, take),
+                    )
                 )
             cut = len(audio) // 2
             changed = audio.copy()
@@ -242,6 +279,7 @@ def evaluate(binary, cache=None, report=None):
                 training_sources=[s for s in sources if s["source"] != take["source"]],
                 training_rows=int(keep.sum()),
                 native_model_sha256=model_hash,
+                ablation_source_sha256=ablation_hash,
                 primary_model_sha256=hashlib.sha256(header.encode()).hexdigest(),
                 transient_model_sha256=hashlib.sha256(
                     transient_header.encode()
