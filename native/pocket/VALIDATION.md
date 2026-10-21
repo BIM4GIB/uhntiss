@@ -25,8 +25,11 @@ not a count of independent test scenarios.
 A 512-event loop rendering ten seconds of audio consumed approximately 0.143 s
 of wall time in the native benchmark on this development Mac (1.43% of real
 time). That is a headless engine observation, not a CPU guarantee for other
-machines or a measured hardware round trip. Detection decisions arrive about
-8 ms after the stored threshold-crossing onset; audio buffers add latency.
+machines or a measured hardware round trip. Auto decisions arrive about
+8 ms after the stored threshold-crossing onset. Fixed voices sound on that onset
+sample and refine velocity without retriggering; synthetic-pulse tests measure
+less than 3 ms from pulse start to output at 44.1/48/96 kHz. Audio buffers add
+latency; this is not a microphone-to-speaker measurement.
 
 The host smoke test ran in a dedicated test track and used generated pad
 commands. It verifies capture duration, actual audio output on Live's meters,

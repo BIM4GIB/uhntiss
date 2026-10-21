@@ -63,8 +63,10 @@ outside this milestone. The onset detector has a 24 ms refractory period.
 
 ## Timing and recovery contract
 
-- Detection stores the threshold-crossing beat; classification finishes 8 ms
-  later. Loop playback uses the stored timestamp and velocity, not decision time.
+- Fixed voices sound on the threshold-crossing sample. The same synth voice
+  refines its velocity during the next 8 ms without retriggering. Auto waits for
+  that analysis window before sounding. Loop playback uses the original onset
+  timestamp and the refined velocity, not the later decision time.
 - Live's audio-rate `plugphasor~` provides phase. `plugsync~` PPQ anchors the beat
   number. A native unwrapper continues across delayed scheduler messages.
 - The loop is eight quarter notes. Tempo changes preserve beat-relative offsets;

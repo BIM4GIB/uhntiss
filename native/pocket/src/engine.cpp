@@ -109,9 +109,14 @@ void Detector::reset() noexcept {
       highEnergy_ = peak_ = 0.;
   collect_ = refractory_ = count_ = crossings_ = 0;
   released_ = true;
+  started_ = false;
+}
+float Detector::attackVelocity() const noexcept {
+  return float(clamp(std::pow(peak_, .55), .08, 1.));
 }
 bool Detector::process(double x, double beat, double threshold,
                        Detection &result) noexcept {
+  started_ = false;
   dc_ += dcCoeff_ * (x - dc_);
   hp_ = x - dc_;
   low_ += lowCoeff_ * (hp_ - low_);
@@ -125,6 +130,7 @@ bool Detector::process(double x, double beat, double threshold,
     released_ = true;
   if (!collect_ && !refractory_ && fast_ > threshold && fast_ > slow_ * 1.65 &&
       released_) {
+    started_ = true;
     collect_ = window_;
     count_ = crossings_ = 0;
     total_ = lowEnergy_ = highEnergy_ = peak_ = 0.;
@@ -170,9 +176,10 @@ void Kit::reset() noexcept {
   dcL_ = dcR_ = 0.;
   serial_ = 1;
 }
-void Kit::trigger(Drum drum, float velocity, const Settings &s) noexcept {
+std::uint64_t Kit::trigger(Drum drum, float velocity,
+                           const Settings &s) noexcept {
   if (int(drum) < 0 || int(drum) > 2 || !std::isfinite(velocity))
-    return;
+    return 0;
   auto *v = &voices_[0];
   for (auto &voice : voices_) {
     if (voice.env < 1e-5) {
@@ -186,8 +193,9 @@ void Kit::trigger(Drum drum, float velocity, const Settings &s) noexcept {
   v->drum = drum;
   v->env = 1.;
   v->body = 1.;
-  v->velocity = clamp(velocity, .02, 1.);
-  v->noise = (++serial_ * 747796405u) + 2891336453u;
+  v->velocity = v->targetVelocity = clamp(velocity, .02, 1.);
+  v->id = ++serial_;
+  v->noise = (std::uint32_t(v->id) * 747796405u) + 2891336453u;
   const auto length = .6 + clamp(s.decay, 0., 1.) * 1.2;
   if (drum == Drum::kick) {
     v->freq = 43. + s.tone * 22.;
@@ -205,6 +213,16 @@ void Kit::trigger(Drum drum, float velocity, const Settings &s) noexcept {
     v->decay = std::exp(-1. / (.017 * length * sr_));
     v->bodyDecay = std::exp(-1. / (.004 * sr_));
   }
+  return v->id;
+}
+void Kit::refine(std::uint64_t id, float velocity) noexcept {
+  if (!id || !std::isfinite(velocity))
+    return;
+  for (auto &v : voices_)
+    if (v.id == id) {
+      v.targetVelocity = clamp(velocity, .02, 1.);
+      return;
+    }
 }
 std::array<double, 2> Kit::process(const Settings &s) noexcept {
   double l = 0., r = 0.;
@@ -240,6 +258,7 @@ std::array<double, 2> Kit::process(const Settings &s) noexcept {
       v.phase -= 2. * pi;
     if (v.phase2 > 2. * pi)
       v.phase2 -= 2. * pi;
+    v.velocity += (v.targetVelocity - v.velocity) * .05;
     sample *= v.velocity;
     l += sample * (1. - pan);
     r += sample * (1. + pan);
@@ -254,6 +273,8 @@ std::array<double, 2> Kit::process(const Settings &s) noexcept {
 }
 void Engine::prepare(double sr) noexcept {
   sr_ = std::isfinite(sr) ? clamp(sr, 8000., 384000.) : 48000.;
+  earlyDrum_ = -1;
+  earlyVoice_ = 0;
   detector_.prepare(sr_);
   kit_.prepare(sr_);
   clockValid_ = scheduleValid_ = false;
@@ -266,6 +287,9 @@ void Engine::learn(int drum) noexcept {
   if (drum < 0 || drum > 2)
     return;
   cancel();
+  detector_.reset();
+  earlyDrum_ = -1;
+  earlyVoice_ = 0;
   learning_ = drum;
   profile_.count[drum] = 0;
   profile_.mean[drum] = {};
@@ -345,13 +369,13 @@ void Engine::restore(const Loop &loop) noexcept {
 void Engine::tap(Drum drum, float velocity) noexcept {
   hit(drum, velocity, clock_.beat);
 }
-void Engine::hit(Drum drum, float velocity, double beat) noexcept {
+void Engine::hit(Drum drum, float velocity, double beat, bool sound) noexcept {
   if (int(drum) < 0 || int(drum) > 2 || !std::isfinite(velocity) ||
       !std::isfinite(beat))
     return;
   lastDrum_ = int(drum);
   ++hitSerial_;
-  if (settings_.monitor)
+  if (settings_.monitor && sound)
     kit_.trigger(drum, velocity, settings_);
   if ((recording_ || tailOpen_) && beat >= captureStart_ &&
       beat < captureStart_ + loopBeats) {
@@ -480,19 +504,37 @@ void Engine::process(double input, Clock clock, double &left,
   inputSmooth_ += (settings_.inputGain - inputSmooth_) * .002;
   outputSmooth_ += (settings_.outputGain - outputSmooth_) * .002;
   Detection detection{};
-  if (detector_.process(clamp(input * inputSmooth_, -4., 4.), clock.beat,
-                        settings_.threshold, detection)) {
+  const bool complete =
+      detector_.process(clamp(input * inputSmooth_, -4., 4.), clock.beat,
+                        settings_.threshold, detection);
+  if (detector_.started()) {
+    earlyDrum_ = learning_ >= 0 ? learning_
+                                : (settings_.voice >= 0 && settings_.voice <= 2
+                                       ? settings_.voice
+                                       : -1);
+    earlyVoice_ = 0;
+    if (earlyDrum_ >= 0 && settings_.monitor)
+      earlyVoice_ =
+          kit_.trigger(Drum(earlyDrum_), detector_.attackVelocity(), settings_);
+  }
+  // A known voice sounds on the threshold-crossing sample. Refine the same
+  // voice's dynamics as its attack unfolds; never make a second transient.
+  if (earlyVoice_ && (detector_.pending() || complete))
+    kit_.refine(earlyVoice_, detector_.attackVelocity());
+  if (complete) {
     if (learning_ >= 0) {
       detection.drum = Drum(learning_);
       profile_.add(detection.drum, detection.features);
       ++revision_;
       if (profile_.count[learning_] >= 3)
         learning_ = -1;
-    } else if (settings_.voice >= 0 && settings_.voice <= 2)
-      detection.drum = Drum(settings_.voice);
+    } else if (earlyDrum_ >= 0)
+      detection.drum = Drum(earlyDrum_);
     else
       detection.drum = profile_.classify(detection);
-    hit(detection.drum, detection.velocity, detection.beat);
+    hit(detection.drum, detection.velocity, detection.beat, earlyDrum_ < 0);
+    earlyDrum_ = -1;
+    earlyVoice_ = 0;
   }
   if (tailOpen_ && --tailSamples_ <= 0) {
     if (!committed_)

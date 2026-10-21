@@ -81,6 +81,8 @@ public:
   void prepare(double sampleRate) noexcept;
   bool process(double input, double beat, double threshold,
                Detection &event) noexcept;
+  bool started() const noexcept { return started_; }
+  float attackVelocity() const noexcept;
   bool pending() const noexcept { return collect_ > 0; }
   double pendingBeat() const noexcept { return onsetBeat_; }
   double level() const noexcept { return fast_; }
@@ -93,12 +95,15 @@ private:
   double lowCoeff_ = 0., midCoeff_ = 0., dcCoeff_ = 0., attack_ = 0.,
          release_ = 0., slowCoeff_ = 0.;
   int collect_ = 0, window_ = 384, refractory_ = 0, count_ = 0, crossings_ = 0;
-  bool released_ = true;
+  bool released_ = true, started_ = false;
 };
 class Kit {
 public:
   void prepare(double sampleRate) noexcept;
-  void trigger(Drum drum, float velocity, const Settings &settings) noexcept;
+  std::uint64_t trigger(Drum drum, float velocity,
+                        const Settings &settings) noexcept;
+  void refine(std::uint64_t id, float velocity) noexcept;
+  std::uint64_t triggerCount() const noexcept { return serial_ - 1; }
   std::array<double, 2> process(const Settings &settings) noexcept;
   void reset() noexcept;
 
@@ -107,12 +112,13 @@ private:
     Drum drum = Drum::kick;
     double env = 0., body = 0., phase = 0., phase2 = 0., freq = 0., pitch = 0.,
            decay = 0., bodyDecay = 0., filter = 0., filterCoeff = 0.,
-           velocity = 0.;
+           velocity = 0., targetVelocity = 0.;
+    std::uint64_t id = 0;
     std::uint32_t noise = 1;
   };
   std::array<Voice, 24> voices_{};
   double sr_ = 48000., dcL_ = 0., dcR_ = 0.;
-  std::uint32_t serial_ = 1;
+  std::uint64_t serial_ = 1;
 };
 // Engine belongs exclusively to the audio thread. All memory has fixed bounds.
 class Engine {
@@ -139,7 +145,8 @@ public:
   }
   void process(double input, Clock clock, double &left, double &right) noexcept;
   // Timestamped trigger also makes MIDI/pad input follow the same capture path.
-  void hit(Drum drum, float velocity, double onsetBeat) noexcept;
+  void hit(Drum drum, float velocity, double onsetBeat,
+           bool sound = true) noexcept;
   const Loop &loop() const noexcept { return active_; }
   const Loop &capture() const noexcept { return take_; }
   State state() const noexcept { return state_; }
@@ -151,6 +158,9 @@ public:
   int lastDrum() const noexcept { return lastDrum_; }
   std::uint64_t playbackSerial() const noexcept { return playbackSerial_; }
   double lastPlaybackBeat() const noexcept { return lastPlaybackBeat_; }
+  std::uint64_t synthTriggerCount() const noexcept {
+    return kit_.triggerCount();
+  }
   std::uint64_t hitSerial() const noexcept { return hitSerial_; }
 
 private:
@@ -160,7 +170,8 @@ private:
   void schedule(double beat) noexcept;
   Settings settings_{};
   Profile profile_{};
-  int learning_ = -1;
+  int learning_ = -1, earlyDrum_ = -1;
+  std::uint64_t earlyVoice_ = 0;
   Clock clock_{};
   Detector detector_{};
   Kit kit_{};

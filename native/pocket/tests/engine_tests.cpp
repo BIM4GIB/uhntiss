@@ -41,6 +41,37 @@ struct Rig {
   }
 };
 int main() {
+  for (double sr : {44100., 48000., 96000.}) {
+    Engine e;
+    e.prepare(sr);
+    Settings settings;
+    settings.voice = 1;
+    e.setSettings(settings);
+    e.arm();
+    double first = -1.;
+    for (int i = 0; i < int(sr * 4.05); ++i) {
+      double t = i / sr;
+      double input =
+          t > .05 && t < .15
+              ? .7 * std::sin(2. * 3.141592653589793 * 95. * (t - .05)) *
+                    std::exp(-(t - .05) * 35.)
+              : 0.;
+      double l, r;
+      e.process(input, {t * 2., true, true}, l, r);
+      if (first < 0 && std::abs(l) > 1e-7)
+        first = t;
+      if (t > .1 && t < .1001)
+        check(e.synthTriggerCount() == 1,
+              "fixed input refines one voice without retriggering");
+    }
+    check(first >= .05 && first - .05 < .003,
+          "fixed-voice monitoring starts within 3ms of test pulse");
+    check(e.loop().count == 1 && e.loop().events[0].drum == Drum::snare,
+          "immediate fixed voice captures one correctly labelled event");
+    check(e.loop().events[0].velocity > .5f,
+          "loop keeps refined attack velocity");
+  }
+
   {
     Rig r;
     r.e.learn(1);
