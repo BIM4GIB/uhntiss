@@ -334,9 +334,26 @@ def evaluate(binary, cache=None, report=None):
     # Preserve the evidence even when a release gate fails on another host.
     if report:
         report.write_text(json.dumps(result, indent=2) + "\n")
-    baseline = json.loads(
-        (ROOT / "native/pocket/auto-heldout-pocket04.json").read_text()
-    )
+    return check_regression(result)
+
+
+def check_regression(result):
+    # Compare like models, not a fresh Linux fit to historical Mac predictions.
+    # These are frozen Pocket04 reports; select by actual model fingerprints,
+    # never by the observed scores or the OS name. Unknown fits require review.
+    baseline_paths = [
+        ROOT / "native/pocket/auto-heldout-pocket04.json",
+        ROOT / "native/pocket/auto-heldout-pocket04-linux.json",
+    ]
+    matches = []
+    for path in baseline_paths:
+        candidate = json.loads(path.read_text())
+        if [f["native_model_sha256"] for f in candidate["folds"]] == [
+            f["primary_model_sha256"] for f in result["folds"]
+        ]:
+            matches.append((path, candidate))
+    assert len(matches) == 1, "retrained primary models have no frozen baseline"
+    baseline_path, baseline = matches[0]
     for before_fold, after_fold in zip(baseline["folds"], result["folds"], strict=True):
         assert before_fold["test_take"] == after_fold["test_take"]
         for before_case, after_case in zip(
@@ -344,6 +361,10 @@ def evaluate(binary, cache=None, report=None):
         ):
             before, after = before_case["score"], after_case["score"]
             context = (after_fold["test_take"], after_case["gain"])
+            assert after_case["without_transient"] == before, (
+                context,
+                "paired ablation differs from the frozen Pocket04 result",
+            )
             assert after["correct"] >= before["correct"], "individual take regressed"
             assert all(e in before["missed"] for e in after["missed"]), (
                 context,
@@ -367,14 +388,16 @@ def evaluate(binary, cache=None, report=None):
         for metric in ("missed", "wrong", "extra"):
             assert after[metric] <= before[metric], f"held-out {metric} regressed"
     quiet = next(s for s in result["summaries"] if s["gain"] == 0.25)
-    assert quiet["correct"] >= 225 and quiet["missed"] <= 34 and quiet["extra"] <= 13, (
-        "Pocket05 quiet transient gains disappeared"
-    )
-    result["baseline_sha256"] = digest(
-        ROOT / "native/pocket/auto-heldout-pocket04.json"
-    )
+    quiet_before = next(s for s in baseline["summaries"] if s["gain"] == 0.25)
+    assert (
+        quiet["correct"] >= quiet_before["correct"] + 5
+        and quiet["missed"] <= quiet_before["missed"] - 5
+        and quiet["extra"] <= quiet_before["extra"] - 3
+    ), "Pocket05 quiet transient gains disappeared"
+    result["baseline_file"] = baseline_path.name
+    result["baseline_sha256"] = digest(baseline_path)
     result["release_gate"] = (
-        "pass: no per-take regression, newly missed reference attacks, or new wrong/extra events at any tested gain; existing wrong/extra events associated within 25ms"
+        "pass: fingerprint-matched frozen Pocket04 baseline equals the paired ablation; no per-take regression, newly missed references, or new wrong/extra events; five or more quiet references recovered and three or more extras removed"
     )
     return result
 

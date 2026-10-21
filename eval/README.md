@@ -105,8 +105,13 @@ up automatically on the next training run.
 rebuilds eight isolated native models, each excluding every derivative of its test
 source. Use scikit-learn 1.8.0. It checks the engine-embedded model fingerprint,
 Python/native parity, 72 capture windows, causality and unchanged 10 ms decisions.
-Frozen Pocket04 counts are in `native/pocket/auto-heldout-pocket04.json`; CI gates
-each take at gains 1, .5 and .25, including new missed/wrong/extra events. The new
+Frozen Pocket04 reports are `native/pocket/auto-heldout-pocket04.json` and
+`native/pocket/auto-heldout-pocket04-linux.json`. CI selects by the primary-model
+fingerprints, then requires the paired native ablation (new path disabled) to
+match that historical result exactly. Unknown fingerprints fail. It gates each
+take at gains 1, .5 and .25, including new missed/wrong/extra events, and requires
+five quiet references recovered and three fewer extras. Reports are retained
+even if a gate fails. The new
 transient model uses 23 causal features at 48 kHz and never reads the permanent
 uptempo holdout, including when other sources are held out. The older 17-feature
 primary/recovery models and persistent state are unchanged.

@@ -1,0 +1,3138 @@
+{
+  "scope": "Whole-source held-out development replay; not an untouched or unseen-performer benchmark.",
+  "sample_rate": 48000,
+  "audit_sha256": "130bd7f50c4f72549b6324adc22f7d135fdd5eb7ba8577b19d2c7b3ce335f1cf",
+  "engine_sha256": "8d628ca85c039c401dfa306ddb0fc1b912299bf0a16c4fc2cc3c243b317687f6",
+  "summaries": [
+    {
+      "gain": 1.0,
+      "reference_hits": 271,
+      "correct": 243,
+      "missed": 12,
+      "wrong": 16,
+      "extra": 14
+    },
+    {
+      "gain": 0.5,
+      "reference_hits": 271,
+      "correct": 228,
+      "missed": 26,
+      "wrong": 17,
+      "extra": 17
+    },
+    {
+      "gain": 0.25,
+      "reference_hits": 271,
+      "correct": 224,
+      "missed": 35,
+      "wrong": 12,
+      "extra": 13
+    }
+  ],
+  "folds": [
+    {
+      "test_take": "bb100",
+      "test_source": "mimic/bb100.mimic.wav",
+      "test_sha256": "1d6c2f38c06b77f000233f7a8486570e81f5fcd7b1c92385f752ef1135aa5bd6",
+      "training_groups": [
+        "bb84",
+        "isolated",
+        "isolated_context",
+        "live_1_boombap",
+        "live_2_fourfloor",
+        "live_3_snareheavy",
+        "live_4_kicksnare",
+        "live_5_sparse",
+        "live_6_uptempo"
+      ],
+      "training_sources": [
+        {
+          "source": "mimic/bb84.mimic.wav",
+          "sha256": "2aff08c01c151c47e2a963808baea64ed105d054b3b6a61a292f9aa568d7c98d"
+        },
+        {
+          "source": "mimic/live_1_boombap.mimic.wav",
+          "sha256": "171166eeb01de10631881262022cf7fe02aa673eac1db0d97cf880718b770bd0"
+        },
+        {
+          "source": "mimic/live_2_fourfloor.mimic.wav",
+          "sha256": "37aa735d9c81a8bcd40a29091272b68fe881c447dcf503a588c3c170c0e623b1"
+        },
+        {
+          "source": "mimic/live_3_snareheavy.mimic.wav",
+          "sha256": "844422f8923951e5df6c3852496118883c35fdb92846f0a24b258d111d87da4b"
+        },
+        {
+          "source": "mimic/live_4_kicksnare.mimic.wav",
+          "sha256": "e26533d28c29cc52354bd9edb218809842d0a1b4eae9e04daeb6e092c3b529eb"
+        },
+        {
+          "source": "mimic/live_5_sparse.mimic.wav",
+          "sha256": "4935720eb687962da86e3c3b7778e649ce9346f80a7bfc0b6f9c244867502abc"
+        },
+        {
+          "source": "mimic/live_6_uptempo.mimic.wav",
+          "sha256": "3b1720e13241b20ec70216ed60ea101d90467e36fe927c2d7c3f7cadd182d60f"
+        },
+        {
+          "source": "calibration/hat_closed.wav",
+          "sha256": "963dccce31b5a7bc387e0d5c414007d0ba82f01822277ad6d3dc8c5c595cd1c2"
+        },
+        {
+          "source": "calibration/hat_open.wav",
+          "sha256": "6dbac74d6e61c9e277a7ec09e7243bedda1dc1c24c15c4ed5ee35926265ed926"
+        },
+        {
+          "source": "calibration/kick.wav",
+          "sha256": "60be61611d62897a1c0ec63387ae5feaab0d7cf210190ff436cd7320db899e05"
+        },
+        {
+          "source": "calibration/snare.wav",
+          "sha256": "9f1988dc116a9bb3389639d1457916f10939fdcddea343819eb43ae6562f0cc9"
+        }
+      ],
+      "training_rows": 4941,
+      "native_model_sha256": "c382eabb9c43c22c80e8569d9617cd3c1acf0cf66a885752624fde65d5adb801",
+      "ablation_source_sha256": "a3e6b538ecc1c25e2c85ff121bf4019f9a613ad2d0a5e44eedb899b76ea9d94e",
+      "primary_model_sha256": "d30335671c7c471ffbe4abee046ec8eeab01b18b760eeedd4b070ea692a1fc3e",
+      "transient_model_sha256": "7809db8f03ef5690ff3bd1c18794756823b9b29091f7317844567b39eb1836d3",
+      "transient_training_groups": [
+        "bb84",
+        "isolated",
+        "isolated_context",
+        "live_1_boombap",
+        "live_2_fourfloor",
+        "live_3_snareheavy",
+        "live_4_kicksnare",
+        "live_5_sparse"
+      ],
+      "parity_rows": 18906,
+      "transient_parity_rows": 13466,
+      "highrate_parity_rows": 18906,
+      "causality": "pass",
+      "cases": [
+        {
+          "gain": 1.0,
+          "score": {
+            "take": "bb100",
+            "reference_hits": 31,
+            "detected": 32,
+            "correct": 26,
+            "wrong": [
+              {
+                "time": 11.74341667,
+                "expected": 1,
+                "actual": 2
+              },
+              {
+                "time": 5.450583333,
+                "expected": 2,
+                "actual": 1
+              },
+              {
+                "time": 3.982333333,
+                "expected": 0,
+                "actual": 1
+              }
+            ],
+            "missed": [
+              {
+                "time": 6.93224,
+                "drum": 1
+              },
+              {
+                "time": 9.32481,
+                "drum": 1
+              }
+            ],
+            "extra": [
+              {
+                "time": 5.380375,
+                "drum": 2
+              },
+              {
+                "time": 8.634979167,
+                "drum": 2
+              },
+              {
+                "time": 11.0726875,
+                "drum": 2
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 5,
+              "max_error_samples": 1.6128005597693118e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 16,
+              "max_error_samples": 1.6127984281411045e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 11,
+              "max_error_samples": 0.00016012799619602447
+            }
+          ],
+          "without_transient": {
+            "take": "bb100",
+            "reference_hits": 31,
+            "detected": 32,
+            "correct": 26,
+            "wrong": [
+              {
+                "time": 11.74341667,
+                "expected": 1,
+                "actual": 2
+              },
+              {
+                "time": 5.450583333,
+                "expected": 2,
+                "actual": 1
+              },
+              {
+                "time": 3.982333333,
+                "expected": 0,
+                "actual": 1
+              }
+            ],
+            "missed": [
+              {
+                "time": 6.93224,
+                "drum": 1
+              },
+              {
+                "time": 9.32481,
+                "drum": 1
+              }
+            ],
+            "extra": [
+              {
+                "time": 5.380375,
+                "drum": 2
+              },
+              {
+                "time": 8.634979167,
+                "drum": 2
+              },
+              {
+                "time": 11.0726875,
+                "drum": 2
+              }
+            ]
+          }
+        },
+        {
+          "gain": 0.5,
+          "score": {
+            "take": "bb100",
+            "reference_hits": 31,
+            "detected": 30,
+            "correct": 24,
+            "wrong": [
+              {
+                "time": 3.98375,
+                "expected": 0,
+                "actual": 1
+              }
+            ],
+            "missed": [
+              {
+                "time": 3.38032,
+                "drum": 1
+              },
+              {
+                "time": 6.93224,
+                "drum": 1
+              },
+              {
+                "time": 8.11256,
+                "drum": 1
+              },
+              {
+                "time": 9.32481,
+                "drum": 1
+              },
+              {
+                "time": 10.53605,
+                "drum": 1
+              },
+              {
+                "time": 11.74331,
+                "drum": 1
+              }
+            ],
+            "extra": [
+              {
+                "time": 5.382770833,
+                "drum": 2
+              },
+              {
+                "time": 8.635020833,
+                "drum": 2
+              },
+              {
+                "time": 9.821291667,
+                "drum": 1
+              },
+              {
+                "time": 11.03704167,
+                "drum": 2
+              },
+              {
+                "time": 12.2125,
+                "drum": 2
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 4,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 15,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 11,
+              "max_error_samples": 0.00016012808146115276
+            }
+          ],
+          "without_transient": {
+            "take": "bb100",
+            "reference_hits": 31,
+            "detected": 30,
+            "correct": 24,
+            "wrong": [
+              {
+                "time": 3.98375,
+                "expected": 0,
+                "actual": 1
+              }
+            ],
+            "missed": [
+              {
+                "time": 3.38032,
+                "drum": 1
+              },
+              {
+                "time": 6.93224,
+                "drum": 1
+              },
+              {
+                "time": 8.11256,
+                "drum": 1
+              },
+              {
+                "time": 9.32481,
+                "drum": 1
+              },
+              {
+                "time": 10.53605,
+                "drum": 1
+              },
+              {
+                "time": 11.74331,
+                "drum": 1
+              }
+            ],
+            "extra": [
+              {
+                "time": 5.382770833,
+                "drum": 2
+              },
+              {
+                "time": 8.635020833,
+                "drum": 2
+              },
+              {
+                "time": 9.821291667,
+                "drum": 1
+              },
+              {
+                "time": 11.03704167,
+                "drum": 2
+              },
+              {
+                "time": 12.2125,
+                "drum": 2
+              }
+            ]
+          }
+        },
+        {
+          "gain": 0.25,
+          "score": {
+            "take": "bb100",
+            "reference_hits": 31,
+            "detected": 25,
+            "correct": 23,
+            "wrong": [],
+            "missed": [
+              {
+                "time": 3.38032,
+                "drum": 1
+              },
+              {
+                "time": 4.53968,
+                "drum": 1
+              },
+              {
+                "time": 5.74195,
+                "drum": 1
+              },
+              {
+                "time": 6.93224,
+                "drum": 1
+              },
+              {
+                "time": 8.11256,
+                "drum": 1
+              },
+              {
+                "time": 9.32481,
+                "drum": 1
+              },
+              {
+                "time": 10.53605,
+                "drum": 1
+              },
+              {
+                "time": 11.74331,
+                "drum": 1
+              }
+            ],
+            "extra": [
+              {
+                "time": 4.116833333,
+                "drum": 2
+              },
+              {
+                "time": 5.38525,
+                "drum": 2
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 4,
+              "max_error_samples": 1.6128005597693118e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 13,
+              "max_error_samples": 1.6128069546539336e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 8,
+              "max_error_samples": 0.00016012799619602447
+            }
+          ],
+          "without_transient": {
+            "take": "bb100",
+            "reference_hits": 31,
+            "detected": 25,
+            "correct": 23,
+            "wrong": [],
+            "missed": [
+              {
+                "time": 3.38032,
+                "drum": 1
+              },
+              {
+                "time": 4.53968,
+                "drum": 1
+              },
+              {
+                "time": 5.74195,
+                "drum": 1
+              },
+              {
+                "time": 6.93224,
+                "drum": 1
+              },
+              {
+                "time": 8.11256,
+                "drum": 1
+              },
+              {
+                "time": 9.32481,
+                "drum": 1
+              },
+              {
+                "time": 10.53605,
+                "drum": 1
+              },
+              {
+                "time": 11.74331,
+                "drum": 1
+              }
+            ],
+            "extra": [
+              {
+                "time": 4.116833333,
+                "drum": 2
+              },
+              {
+                "time": 5.38525,
+                "drum": 2
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "test_take": "bb84",
+      "test_source": "mimic/bb84.mimic.wav",
+      "test_sha256": "2aff08c01c151c47e2a963808baea64ed105d054b3b6a61a292f9aa568d7c98d",
+      "training_groups": [
+        "bb100",
+        "isolated",
+        "isolated_context",
+        "live_1_boombap",
+        "live_2_fourfloor",
+        "live_3_snareheavy",
+        "live_4_kicksnare",
+        "live_5_sparse",
+        "live_6_uptempo"
+      ],
+      "training_sources": [
+        {
+          "source": "mimic/bb100.mimic.wav",
+          "sha256": "1d6c2f38c06b77f000233f7a8486570e81f5fcd7b1c92385f752ef1135aa5bd6"
+        },
+        {
+          "source": "mimic/live_1_boombap.mimic.wav",
+          "sha256": "171166eeb01de10631881262022cf7fe02aa673eac1db0d97cf880718b770bd0"
+        },
+        {
+          "source": "mimic/live_2_fourfloor.mimic.wav",
+          "sha256": "37aa735d9c81a8bcd40a29091272b68fe881c447dcf503a588c3c170c0e623b1"
+        },
+        {
+          "source": "mimic/live_3_snareheavy.mimic.wav",
+          "sha256": "844422f8923951e5df6c3852496118883c35fdb92846f0a24b258d111d87da4b"
+        },
+        {
+          "source": "mimic/live_4_kicksnare.mimic.wav",
+          "sha256": "e26533d28c29cc52354bd9edb218809842d0a1b4eae9e04daeb6e092c3b529eb"
+        },
+        {
+          "source": "mimic/live_5_sparse.mimic.wav",
+          "sha256": "4935720eb687962da86e3c3b7778e649ce9346f80a7bfc0b6f9c244867502abc"
+        },
+        {
+          "source": "mimic/live_6_uptempo.mimic.wav",
+          "sha256": "3b1720e13241b20ec70216ed60ea101d90467e36fe927c2d7c3f7cadd182d60f"
+        },
+        {
+          "source": "calibration/hat_closed.wav",
+          "sha256": "963dccce31b5a7bc387e0d5c414007d0ba82f01822277ad6d3dc8c5c595cd1c2"
+        },
+        {
+          "source": "calibration/hat_open.wav",
+          "sha256": "6dbac74d6e61c9e277a7ec09e7243bedda1dc1c24c15c4ed5ee35926265ed926"
+        },
+        {
+          "source": "calibration/kick.wav",
+          "sha256": "60be61611d62897a1c0ec63387ae5feaab0d7cf210190ff436cd7320db899e05"
+        },
+        {
+          "source": "calibration/snare.wav",
+          "sha256": "9f1988dc116a9bb3389639d1457916f10939fdcddea343819eb43ae6562f0cc9"
+        }
+      ],
+      "training_rows": 4948,
+      "native_model_sha256": "9cf051d5c89c9224879df86ba3f934fd24210b270b829056e0252d3d028527db",
+      "ablation_source_sha256": "a3e6b538ecc1c25e2c85ff121bf4019f9a613ad2d0a5e44eedb899b76ea9d94e",
+      "primary_model_sha256": "966a9b785b2ecca529379486b97cfc375b02b8f2f5e4317ea55e0e95d43f1214",
+      "transient_model_sha256": "a58eaf40352febaefd836ec6cbc15efbbcf8b85760426fb203c5e12ca7a6ed13",
+      "transient_training_groups": [
+        "bb100",
+        "isolated",
+        "isolated_context",
+        "live_1_boombap",
+        "live_2_fourfloor",
+        "live_3_snareheavy",
+        "live_4_kicksnare",
+        "live_5_sparse"
+      ],
+      "parity_rows": 18825,
+      "transient_parity_rows": 13176,
+      "highrate_parity_rows": 18825,
+      "causality": "pass",
+      "cases": [
+        {
+          "gain": 1.0,
+          "score": {
+            "take": "bb84",
+            "reference_hits": 31,
+            "detected": 34,
+            "correct": 28,
+            "wrong": [
+              {
+                "time": 9.624270833,
+                "expected": 1,
+                "actual": 2
+              },
+              {
+                "time": 9.281145833,
+                "expected": 2,
+                "actual": 1
+              },
+              {
+                "time": 12.43285417,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [],
+            "extra": [
+              {
+                "time": 10.8895,
+                "drum": 2
+              },
+              {
+                "time": 10.993375,
+                "drum": 1
+              },
+              {
+                "time": 12.99816667,
+                "drum": 2
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 3,
+              "max_error_samples": 1.6127984281411045e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 13,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 17,
+              "max_error_samples": 0.00016012799619602447
+            },
+            {
+              "start_seconds": 14.399999999999999,
+              "hits": 1,
+              "max_error_samples": 0.00016001280300770304
+            }
+          ],
+          "without_transient": {
+            "take": "bb84",
+            "reference_hits": 31,
+            "detected": 34,
+            "correct": 28,
+            "wrong": [
+              {
+                "time": 9.624270833,
+                "expected": 1,
+                "actual": 2
+              },
+              {
+                "time": 9.281145833,
+                "expected": 2,
+                "actual": 1
+              },
+              {
+                "time": 12.43285417,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [],
+            "extra": [
+              {
+                "time": 10.8895,
+                "drum": 2
+              },
+              {
+                "time": 10.993375,
+                "drum": 1
+              },
+              {
+                "time": 12.99816667,
+                "drum": 2
+              }
+            ]
+          }
+        },
+        {
+          "gain": 0.5,
+          "score": {
+            "take": "bb84",
+            "reference_hits": 31,
+            "detected": 32,
+            "correct": 28,
+            "wrong": [
+              {
+                "time": 9.622479167,
+                "expected": 1,
+                "actual": 2
+              },
+              {
+                "time": 9.281208333,
+                "expected": 2,
+                "actual": 1
+              },
+              {
+                "time": 12.43697917,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [],
+            "extra": [
+              {
+                "time": 10.99389583,
+                "drum": 1
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 3,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 13,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 15,
+              "max_error_samples": 0.00016012808146115276
+            },
+            {
+              "start_seconds": 14.399999999999999,
+              "hits": 1,
+              "max_error_samples": 0.00016001271774257475
+            }
+          ],
+          "without_transient": {
+            "take": "bb84",
+            "reference_hits": 31,
+            "detected": 32,
+            "correct": 28,
+            "wrong": [
+              {
+                "time": 9.281208333,
+                "expected": 2,
+                "actual": 1
+              },
+              {
+                "time": 9.633354167,
+                "expected": 1,
+                "actual": 2
+              },
+              {
+                "time": 12.43697917,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [],
+            "extra": [
+              {
+                "time": 10.99389583,
+                "drum": 1
+              }
+            ]
+          }
+        },
+        {
+          "gain": 0.25,
+          "score": {
+            "take": "bb84",
+            "reference_hits": 31,
+            "detected": 30,
+            "correct": 27,
+            "wrong": [
+              {
+                "time": 9.281291667,
+                "expected": 2,
+                "actual": 1
+              },
+              {
+                "time": 11.7564375,
+                "expected": 0,
+                "actual": 1
+              },
+              {
+                "time": 9.637625,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [
+              {
+                "time": 12.42676,
+                "drum": 1
+              }
+            ],
+            "extra": []
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 3,
+              "max_error_samples": 1.593600984506338e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 13,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 13,
+              "max_error_samples": 0.00016012799619602447
+            },
+            {
+              "start_seconds": 14.399999999999999,
+              "hits": 1,
+              "max_error_samples": 9.634959496906959e-09
+            }
+          ],
+          "without_transient": {
+            "take": "bb84",
+            "reference_hits": 31,
+            "detected": 29,
+            "correct": 25,
+            "wrong": [
+              {
+                "time": 9.281291667,
+                "expected": 2,
+                "actual": 1
+              },
+              {
+                "time": 11.7564375,
+                "expected": 0,
+                "actual": 1
+              },
+              {
+                "time": 9.637625,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [
+              {
+                "time": 10.67274,
+                "drum": 2
+              },
+              {
+                "time": 12.42676,
+                "drum": 1
+              },
+              {
+                "time": 13.2419,
+                "drum": 0
+              }
+            ],
+            "extra": [
+              {
+                "time": 10.69791667,
+                "drum": 2
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "test_take": "live_1_boombap",
+      "test_source": "mimic/live_1_boombap.mimic.wav",
+      "test_sha256": "171166eeb01de10631881262022cf7fe02aa673eac1db0d97cf880718b770bd0",
+      "training_groups": [
+        "bb100",
+        "bb84",
+        "isolated",
+        "isolated_context",
+        "live_2_fourfloor",
+        "live_3_snareheavy",
+        "live_4_kicksnare",
+        "live_5_sparse",
+        "live_6_uptempo"
+      ],
+      "training_sources": [
+        {
+          "source": "mimic/bb100.mimic.wav",
+          "sha256": "1d6c2f38c06b77f000233f7a8486570e81f5fcd7b1c92385f752ef1135aa5bd6"
+        },
+        {
+          "source": "mimic/bb84.mimic.wav",
+          "sha256": "2aff08c01c151c47e2a963808baea64ed105d054b3b6a61a292f9aa568d7c98d"
+        },
+        {
+          "source": "mimic/live_2_fourfloor.mimic.wav",
+          "sha256": "37aa735d9c81a8bcd40a29091272b68fe881c447dcf503a588c3c170c0e623b1"
+        },
+        {
+          "source": "mimic/live_3_snareheavy.mimic.wav",
+          "sha256": "844422f8923951e5df6c3852496118883c35fdb92846f0a24b258d111d87da4b"
+        },
+        {
+          "source": "mimic/live_4_kicksnare.mimic.wav",
+          "sha256": "e26533d28c29cc52354bd9edb218809842d0a1b4eae9e04daeb6e092c3b529eb"
+        },
+        {
+          "source": "mimic/live_5_sparse.mimic.wav",
+          "sha256": "4935720eb687962da86e3c3b7778e649ce9346f80a7bfc0b6f9c244867502abc"
+        },
+        {
+          "source": "mimic/live_6_uptempo.mimic.wav",
+          "sha256": "3b1720e13241b20ec70216ed60ea101d90467e36fe927c2d7c3f7cadd182d60f"
+        },
+        {
+          "source": "calibration/hat_closed.wav",
+          "sha256": "963dccce31b5a7bc387e0d5c414007d0ba82f01822277ad6d3dc8c5c595cd1c2"
+        },
+        {
+          "source": "calibration/hat_open.wav",
+          "sha256": "6dbac74d6e61c9e277a7ec09e7243bedda1dc1c24c15c4ed5ee35926265ed926"
+        },
+        {
+          "source": "calibration/kick.wav",
+          "sha256": "60be61611d62897a1c0ec63387ae5feaab0d7cf210190ff436cd7320db899e05"
+        },
+        {
+          "source": "calibration/snare.wav",
+          "sha256": "9f1988dc116a9bb3389639d1457916f10939fdcddea343819eb43ae6562f0cc9"
+        }
+      ],
+      "training_rows": 5002,
+      "native_model_sha256": "2a631c28c692a3bb56943a345e1ded66506b7fe90add0ef72f2f51e34380e98a",
+      "ablation_source_sha256": "a3e6b538ecc1c25e2c85ff121bf4019f9a613ad2d0a5e44eedb899b76ea9d94e",
+      "primary_model_sha256": "7ee7a966072521f8eaeb056c82d4fbee4cc8449383a8386c9a2b7fea3a5c466e",
+      "transient_model_sha256": "456d5c90df72e34867e0b90c9eda9694c1efe0c36aaf00a60827068ccd2a77b5",
+      "transient_training_groups": [
+        "bb100",
+        "bb84",
+        "isolated",
+        "isolated_context",
+        "live_2_fourfloor",
+        "live_3_snareheavy",
+        "live_4_kicksnare",
+        "live_5_sparse"
+      ],
+      "parity_rows": 19079,
+      "transient_parity_rows": 13265,
+      "highrate_parity_rows": 19079,
+      "causality": "pass",
+      "cases": [
+        {
+          "gain": 1.0,
+          "score": {
+            "take": "live_1_boombap",
+            "reference_hits": 21,
+            "detected": 22,
+            "correct": 16,
+            "wrong": [
+              {
+                "time": 4.644,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 3.4620625,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 1.3418125,
+                "expected": 2,
+                "actual": 1
+              }
+            ],
+            "missed": [
+              {
+                "time": 2.549,
+                "drum": 2
+              },
+              {
+                "time": 6.234,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 2.404229167,
+                "drum": 1
+              },
+              {
+                "time": 2.581125,
+                "drum": 2
+              },
+              {
+                "time": 5.8788125,
+                "drum": 1
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 17,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 5,
+              "max_error_samples": 1.612802691397519e-05
+            }
+          ],
+          "without_transient": {
+            "take": "live_1_boombap",
+            "reference_hits": 21,
+            "detected": 22,
+            "correct": 16,
+            "wrong": [
+              {
+                "time": 4.644,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 3.4620625,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 1.3418125,
+                "expected": 2,
+                "actual": 1
+              }
+            ],
+            "missed": [
+              {
+                "time": 2.549,
+                "drum": 2
+              },
+              {
+                "time": 6.234,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 2.404229167,
+                "drum": 1
+              },
+              {
+                "time": 2.581125,
+                "drum": 2
+              },
+              {
+                "time": 5.8788125,
+                "drum": 1
+              }
+            ]
+          }
+        },
+        {
+          "gain": 0.5,
+          "score": {
+            "take": "live_1_boombap",
+            "reference_hits": 21,
+            "detected": 19,
+            "correct": 10,
+            "wrong": [
+              {
+                "time": 4.644145833,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 3.462375,
+                "expected": 1,
+                "actual": 0
+              }
+            ],
+            "missed": [
+              {
+                "time": 0.149,
+                "drum": 2
+              },
+              {
+                "time": 1.342,
+                "drum": 2
+              },
+              {
+                "time": 1.97,
+                "drum": 2
+              },
+              {
+                "time": 2.549,
+                "drum": 2
+              },
+              {
+                "time": 3.77,
+                "drum": 2
+              },
+              {
+                "time": 4.349,
+                "drum": 2
+              },
+              {
+                "time": 4.931,
+                "drum": 2
+              },
+              {
+                "time": 5.518,
+                "drum": 2
+              },
+              {
+                "time": 6.234,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 0.17575,
+                "drum": 2
+              },
+              {
+                "time": 1.376875,
+                "drum": 2
+              },
+              {
+                "time": 1.996645833,
+                "drum": 2
+              },
+              {
+                "time": 2.6225,
+                "drum": 2
+              },
+              {
+                "time": 3.826020833,
+                "drum": 2
+              },
+              {
+                "time": 4.396125,
+                "drum": 2
+              },
+              {
+                "time": 5.878958333,
+                "drum": 1
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 16,
+              "max_error_samples": 1.612799493955208e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 3,
+              "max_error_samples": 1.603197574695514e-05
+            }
+          ],
+          "without_transient": {
+            "take": "live_1_boombap",
+            "reference_hits": 21,
+            "detected": 19,
+            "correct": 10,
+            "wrong": [
+              {
+                "time": 4.644145833,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 3.462375,
+                "expected": 1,
+                "actual": 0
+              }
+            ],
+            "missed": [
+              {
+                "time": 0.149,
+                "drum": 2
+              },
+              {
+                "time": 1.342,
+                "drum": 2
+              },
+              {
+                "time": 1.97,
+                "drum": 2
+              },
+              {
+                "time": 2.549,
+                "drum": 2
+              },
+              {
+                "time": 3.77,
+                "drum": 2
+              },
+              {
+                "time": 4.349,
+                "drum": 2
+              },
+              {
+                "time": 4.931,
+                "drum": 2
+              },
+              {
+                "time": 5.518,
+                "drum": 2
+              },
+              {
+                "time": 6.234,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 0.17575,
+                "drum": 2
+              },
+              {
+                "time": 1.376875,
+                "drum": 2
+              },
+              {
+                "time": 1.996645833,
+                "drum": 2
+              },
+              {
+                "time": 2.6225,
+                "drum": 2
+              },
+              {
+                "time": 3.826020833,
+                "drum": 2
+              },
+              {
+                "time": 4.396125,
+                "drum": 2
+              },
+              {
+                "time": 5.878958333,
+                "drum": 1
+              }
+            ]
+          }
+        },
+        {
+          "gain": 0.25,
+          "score": {
+            "take": "live_1_boombap",
+            "reference_hits": 21,
+            "detected": 15,
+            "correct": 12,
+            "wrong": [],
+            "missed": [
+              {
+                "time": 0.753,
+                "drum": 2
+              },
+              {
+                "time": 1.342,
+                "drum": 2
+              },
+              {
+                "time": 1.677,
+                "drum": 0
+              },
+              {
+                "time": 1.97,
+                "drum": 2
+              },
+              {
+                "time": 2.549,
+                "drum": 2
+              },
+              {
+                "time": 3.146,
+                "drum": 2
+              },
+              {
+                "time": 3.77,
+                "drum": 2
+              },
+              {
+                "time": 4.931,
+                "drum": 2
+              },
+              {
+                "time": 6.234,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 0.2295,
+                "drum": 2
+              },
+              {
+                "time": 2.581979167,
+                "drum": 2
+              },
+              {
+                "time": 4.965041667,
+                "drum": 2
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 11,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 4,
+              "max_error_samples": 1.612802691397519e-05
+            }
+          ],
+          "without_transient": {
+            "take": "live_1_boombap",
+            "reference_hits": 21,
+            "detected": 14,
+            "correct": 11,
+            "wrong": [],
+            "missed": [
+              {
+                "time": 0.753,
+                "drum": 2
+              },
+              {
+                "time": 1.342,
+                "drum": 2
+              },
+              {
+                "time": 1.677,
+                "drum": 0
+              },
+              {
+                "time": 1.97,
+                "drum": 2
+              },
+              {
+                "time": 2.549,
+                "drum": 2
+              },
+              {
+                "time": 3.146,
+                "drum": 2
+              },
+              {
+                "time": 3.77,
+                "drum": 2
+              },
+              {
+                "time": 4.931,
+                "drum": 2
+              },
+              {
+                "time": 5.838,
+                "drum": 1
+              },
+              {
+                "time": 6.234,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 0.2295,
+                "drum": 2
+              },
+              {
+                "time": 2.581979167,
+                "drum": 2
+              },
+              {
+                "time": 4.965041667,
+                "drum": 2
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "test_take": "live_2_fourfloor",
+      "test_source": "mimic/live_2_fourfloor.mimic.wav",
+      "test_sha256": "37aa735d9c81a8bcd40a29091272b68fe881c447dcf503a588c3c170c0e623b1",
+      "training_groups": [
+        "bb100",
+        "bb84",
+        "isolated",
+        "isolated_context",
+        "live_1_boombap",
+        "live_3_snareheavy",
+        "live_4_kicksnare",
+        "live_5_sparse",
+        "live_6_uptempo"
+      ],
+      "training_sources": [
+        {
+          "source": "mimic/bb100.mimic.wav",
+          "sha256": "1d6c2f38c06b77f000233f7a8486570e81f5fcd7b1c92385f752ef1135aa5bd6"
+        },
+        {
+          "source": "mimic/bb84.mimic.wav",
+          "sha256": "2aff08c01c151c47e2a963808baea64ed105d054b3b6a61a292f9aa568d7c98d"
+        },
+        {
+          "source": "mimic/live_1_boombap.mimic.wav",
+          "sha256": "171166eeb01de10631881262022cf7fe02aa673eac1db0d97cf880718b770bd0"
+        },
+        {
+          "source": "mimic/live_3_snareheavy.mimic.wav",
+          "sha256": "844422f8923951e5df6c3852496118883c35fdb92846f0a24b258d111d87da4b"
+        },
+        {
+          "source": "mimic/live_4_kicksnare.mimic.wav",
+          "sha256": "e26533d28c29cc52354bd9edb218809842d0a1b4eae9e04daeb6e092c3b529eb"
+        },
+        {
+          "source": "mimic/live_5_sparse.mimic.wav",
+          "sha256": "4935720eb687962da86e3c3b7778e649ce9346f80a7bfc0b6f9c244867502abc"
+        },
+        {
+          "source": "mimic/live_6_uptempo.mimic.wav",
+          "sha256": "3b1720e13241b20ec70216ed60ea101d90467e36fe927c2d7c3f7cadd182d60f"
+        },
+        {
+          "source": "calibration/hat_closed.wav",
+          "sha256": "963dccce31b5a7bc387e0d5c414007d0ba82f01822277ad6d3dc8c5c595cd1c2"
+        },
+        {
+          "source": "calibration/hat_open.wav",
+          "sha256": "6dbac74d6e61c9e277a7ec09e7243bedda1dc1c24c15c4ed5ee35926265ed926"
+        },
+        {
+          "source": "calibration/kick.wav",
+          "sha256": "60be61611d62897a1c0ec63387ae5feaab0d7cf210190ff436cd7320db899e05"
+        },
+        {
+          "source": "calibration/snare.wav",
+          "sha256": "9f1988dc116a9bb3389639d1457916f10939fdcddea343819eb43ae6562f0cc9"
+        }
+      ],
+      "training_rows": 4964,
+      "native_model_sha256": "efb4f69d8382606398c7c13353d7200cb27a0610d2c0c11daeec48a1cd1dbef9",
+      "ablation_source_sha256": "a3e6b538ecc1c25e2c85ff121bf4019f9a613ad2d0a5e44eedb899b76ea9d94e",
+      "primary_model_sha256": "a9f9fac71252af0be9c27a79fcd8cbffbafdcf14c080263d343a772163f4189e",
+      "transient_model_sha256": "4083c8f427cf1cf8f3694ab4dd630213a46df2b336faa99a850eecc907f06154",
+      "transient_training_groups": [
+        "bb100",
+        "bb84",
+        "isolated",
+        "isolated_context",
+        "live_1_boombap",
+        "live_3_snareheavy",
+        "live_4_kicksnare",
+        "live_5_sparse"
+      ],
+      "parity_rows": 19013,
+      "transient_parity_rows": 13346,
+      "highrate_parity_rows": 19013,
+      "causality": "pass",
+      "cases": [
+        {
+          "gain": 1.0,
+          "score": {
+            "take": "live_2_fourfloor",
+            "reference_hits": 29,
+            "detected": 29,
+            "correct": 26,
+            "wrong": [
+              {
+                "time": 0.067,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 0.667,
+                "expected": 1,
+                "actual": 0
+              }
+            ],
+            "missed": [
+              {
+                "time": 8.029,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 8.064604167,
+                "drum": 2
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 15,
+              "max_error_samples": 1.6128005597693118e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 14,
+              "max_error_samples": 1.6128069546539336e-05
+            }
+          ],
+          "without_transient": {
+            "take": "live_2_fourfloor",
+            "reference_hits": 29,
+            "detected": 29,
+            "correct": 26,
+            "wrong": [
+              {
+                "time": 0.067,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 0.667,
+                "expected": 1,
+                "actual": 0
+              }
+            ],
+            "missed": [
+              {
+                "time": 8.029,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 8.064604167,
+                "drum": 2
+              }
+            ]
+          }
+        },
+        {
+          "gain": 0.5,
+          "score": {
+            "take": "live_2_fourfloor",
+            "reference_hits": 29,
+            "detected": 29,
+            "correct": 26,
+            "wrong": [],
+            "missed": [
+              {
+                "time": 6.323,
+                "drum": 2
+              },
+              {
+                "time": 7.477,
+                "drum": 2
+              },
+              {
+                "time": 8.029,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 6.353416667,
+                "drum": 2
+              },
+              {
+                "time": 7.504041667,
+                "drum": 2
+              },
+              {
+                "time": 8.062229167,
+                "drum": 2
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 15,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 14,
+              "max_error_samples": 1.612802691397519e-05
+            }
+          ],
+          "without_transient": {
+            "take": "live_2_fourfloor",
+            "reference_hits": 29,
+            "detected": 29,
+            "correct": 26,
+            "wrong": [],
+            "missed": [
+              {
+                "time": 6.323,
+                "drum": 2
+              },
+              {
+                "time": 7.477,
+                "drum": 2
+              },
+              {
+                "time": 8.029,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 6.353416667,
+                "drum": 2
+              },
+              {
+                "time": 7.504041667,
+                "drum": 2
+              },
+              {
+                "time": 8.062229167,
+                "drum": 2
+              }
+            ]
+          }
+        },
+        {
+          "gain": 0.25,
+          "score": {
+            "take": "live_2_fourfloor",
+            "reference_hits": 29,
+            "detected": 29,
+            "correct": 25,
+            "wrong": [],
+            "missed": [
+              {
+                "time": 6.323,
+                "drum": 2
+              },
+              {
+                "time": 7.477,
+                "drum": 2
+              },
+              {
+                "time": 8.029,
+                "drum": 2
+              },
+              {
+                "time": 8.632,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 6.357333333,
+                "drum": 2
+              },
+              {
+                "time": 7.514083333,
+                "drum": 2
+              },
+              {
+                "time": 8.0723125,
+                "drum": 2
+              },
+              {
+                "time": 8.670708333,
+                "drum": 2
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 15,
+              "max_error_samples": 1.6128005597693118e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 14,
+              "max_error_samples": 1.6127984281411045e-05
+            }
+          ],
+          "without_transient": {
+            "take": "live_2_fourfloor",
+            "reference_hits": 29,
+            "detected": 29,
+            "correct": 25,
+            "wrong": [],
+            "missed": [
+              {
+                "time": 6.323,
+                "drum": 2
+              },
+              {
+                "time": 7.477,
+                "drum": 2
+              },
+              {
+                "time": 8.029,
+                "drum": 2
+              },
+              {
+                "time": 8.632,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 6.357333333,
+                "drum": 2
+              },
+              {
+                "time": 7.514083333,
+                "drum": 2
+              },
+              {
+                "time": 8.0723125,
+                "drum": 2
+              },
+              {
+                "time": 8.670708333,
+                "drum": 2
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "test_take": "live_3_snareheavy",
+      "test_source": "mimic/live_3_snareheavy.mimic.wav",
+      "test_sha256": "844422f8923951e5df6c3852496118883c35fdb92846f0a24b258d111d87da4b",
+      "training_groups": [
+        "bb100",
+        "bb84",
+        "isolated",
+        "isolated_context",
+        "live_1_boombap",
+        "live_2_fourfloor",
+        "live_4_kicksnare",
+        "live_5_sparse",
+        "live_6_uptempo"
+      ],
+      "training_sources": [
+        {
+          "source": "mimic/bb100.mimic.wav",
+          "sha256": "1d6c2f38c06b77f000233f7a8486570e81f5fcd7b1c92385f752ef1135aa5bd6"
+        },
+        {
+          "source": "mimic/bb84.mimic.wav",
+          "sha256": "2aff08c01c151c47e2a963808baea64ed105d054b3b6a61a292f9aa568d7c98d"
+        },
+        {
+          "source": "mimic/live_1_boombap.mimic.wav",
+          "sha256": "171166eeb01de10631881262022cf7fe02aa673eac1db0d97cf880718b770bd0"
+        },
+        {
+          "source": "mimic/live_2_fourfloor.mimic.wav",
+          "sha256": "37aa735d9c81a8bcd40a29091272b68fe881c447dcf503a588c3c170c0e623b1"
+        },
+        {
+          "source": "mimic/live_4_kicksnare.mimic.wav",
+          "sha256": "e26533d28c29cc52354bd9edb218809842d0a1b4eae9e04daeb6e092c3b529eb"
+        },
+        {
+          "source": "mimic/live_5_sparse.mimic.wav",
+          "sha256": "4935720eb687962da86e3c3b7778e649ce9346f80a7bfc0b6f9c244867502abc"
+        },
+        {
+          "source": "mimic/live_6_uptempo.mimic.wav",
+          "sha256": "3b1720e13241b20ec70216ed60ea101d90467e36fe927c2d7c3f7cadd182d60f"
+        },
+        {
+          "source": "calibration/hat_closed.wav",
+          "sha256": "963dccce31b5a7bc387e0d5c414007d0ba82f01822277ad6d3dc8c5c595cd1c2"
+        },
+        {
+          "source": "calibration/hat_open.wav",
+          "sha256": "6dbac74d6e61c9e277a7ec09e7243bedda1dc1c24c15c4ed5ee35926265ed926"
+        },
+        {
+          "source": "calibration/kick.wav",
+          "sha256": "60be61611d62897a1c0ec63387ae5feaab0d7cf210190ff436cd7320db899e05"
+        },
+        {
+          "source": "calibration/snare.wav",
+          "sha256": "9f1988dc116a9bb3389639d1457916f10939fdcddea343819eb43ae6562f0cc9"
+        }
+      ],
+      "training_rows": 4843,
+      "native_model_sha256": "4b11a9dae28f218070c1c35ceda3b0676d3e9a2026c8a8b3b4d1295a9ce86a0f",
+      "ablation_source_sha256": "a3e6b538ecc1c25e2c85ff121bf4019f9a613ad2d0a5e44eedb899b76ea9d94e",
+      "primary_model_sha256": "e0428274258e64956d25ab02c0189008955b6b026a7318227660cac8971460f6",
+      "transient_model_sha256": "1202b44d3d8817dd87c0cc5fd464885836cb261814aa17e5a6d0f4377e4b51db",
+      "transient_training_groups": [
+        "bb100",
+        "bb84",
+        "isolated",
+        "isolated_context",
+        "live_1_boombap",
+        "live_2_fourfloor",
+        "live_4_kicksnare",
+        "live_5_sparse"
+      ],
+      "parity_rows": 18552,
+      "transient_parity_rows": 12120,
+      "highrate_parity_rows": 18552,
+      "causality": "pass",
+      "cases": [
+        {
+          "gain": 1.0,
+          "score": {
+            "take": "live_3_snareheavy",
+            "reference_hits": 45,
+            "detected": 46,
+            "correct": 43,
+            "wrong": [
+              {
+                "time": 10.10535417,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 1.218354167,
+                "expected": 1,
+                "actual": 0
+              }
+            ],
+            "missed": [],
+            "extra": [
+              {
+                "time": 0.05529166667,
+                "drum": 1
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 15,
+              "max_error_samples": 1.612799493955208e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 16,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 15,
+              "max_error_samples": 0.00016012808146115276
+            }
+          ],
+          "without_transient": {
+            "take": "live_3_snareheavy",
+            "reference_hits": 45,
+            "detected": 46,
+            "correct": 43,
+            "wrong": [
+              {
+                "time": 10.10535417,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 1.218354167,
+                "expected": 1,
+                "actual": 0
+              }
+            ],
+            "missed": [],
+            "extra": [
+              {
+                "time": 0.05529166667,
+                "drum": 1
+              }
+            ]
+          }
+        },
+        {
+          "gain": 0.5,
+          "score": {
+            "take": "live_3_snareheavy",
+            "reference_hits": 45,
+            "detected": 45,
+            "correct": 41,
+            "wrong": [
+              {
+                "time": 11.06402083,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 2.443104167,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 9.806270833,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 1.2185625,
+                "expected": 1,
+                "actual": 0
+              }
+            ],
+            "missed": [],
+            "extra": []
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 14,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 16,
+              "max_error_samples": 1.6127984281411045e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 15,
+              "max_error_samples": 0.00016012799619602447
+            }
+          ],
+          "without_transient": {
+            "take": "live_3_snareheavy",
+            "reference_hits": 45,
+            "detected": 45,
+            "correct": 41,
+            "wrong": [
+              {
+                "time": 11.06402083,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 2.443104167,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 9.806270833,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 1.2185625,
+                "expected": 1,
+                "actual": 0
+              }
+            ],
+            "missed": [],
+            "extra": []
+          }
+        },
+        {
+          "gain": 0.25,
+          "score": {
+            "take": "live_3_snareheavy",
+            "reference_hits": 45,
+            "detected": 45,
+            "correct": 40,
+            "wrong": [
+              {
+                "time": 2.4431875,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 11.065125,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 9.806416667,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 5.1965,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 1.2186875,
+                "expected": 1,
+                "actual": 0
+              }
+            ],
+            "missed": [],
+            "extra": []
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 14,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 16,
+              "max_error_samples": 1.6128069546539336e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 15,
+              "max_error_samples": 0.00016012799619602447
+            }
+          ],
+          "without_transient": {
+            "take": "live_3_snareheavy",
+            "reference_hits": 45,
+            "detected": 45,
+            "correct": 40,
+            "wrong": [
+              {
+                "time": 2.4431875,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 11.065125,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 9.806416667,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 5.1965,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 1.2186875,
+                "expected": 1,
+                "actual": 0
+              }
+            ],
+            "missed": [],
+            "extra": []
+          }
+        }
+      ]
+    },
+    {
+      "test_take": "live_4_kicksnare",
+      "test_source": "mimic/live_4_kicksnare.mimic.wav",
+      "test_sha256": "e26533d28c29cc52354bd9edb218809842d0a1b4eae9e04daeb6e092c3b529eb",
+      "training_groups": [
+        "bb100",
+        "bb84",
+        "isolated",
+        "isolated_context",
+        "live_1_boombap",
+        "live_2_fourfloor",
+        "live_3_snareheavy",
+        "live_5_sparse",
+        "live_6_uptempo"
+      ],
+      "training_sources": [
+        {
+          "source": "mimic/bb100.mimic.wav",
+          "sha256": "1d6c2f38c06b77f000233f7a8486570e81f5fcd7b1c92385f752ef1135aa5bd6"
+        },
+        {
+          "source": "mimic/bb84.mimic.wav",
+          "sha256": "2aff08c01c151c47e2a963808baea64ed105d054b3b6a61a292f9aa568d7c98d"
+        },
+        {
+          "source": "mimic/live_1_boombap.mimic.wav",
+          "sha256": "171166eeb01de10631881262022cf7fe02aa673eac1db0d97cf880718b770bd0"
+        },
+        {
+          "source": "mimic/live_2_fourfloor.mimic.wav",
+          "sha256": "37aa735d9c81a8bcd40a29091272b68fe881c447dcf503a588c3c170c0e623b1"
+        },
+        {
+          "source": "mimic/live_3_snareheavy.mimic.wav",
+          "sha256": "844422f8923951e5df6c3852496118883c35fdb92846f0a24b258d111d87da4b"
+        },
+        {
+          "source": "mimic/live_5_sparse.mimic.wav",
+          "sha256": "4935720eb687962da86e3c3b7778e649ce9346f80a7bfc0b6f9c244867502abc"
+        },
+        {
+          "source": "mimic/live_6_uptempo.mimic.wav",
+          "sha256": "3b1720e13241b20ec70216ed60ea101d90467e36fe927c2d7c3f7cadd182d60f"
+        },
+        {
+          "source": "calibration/hat_closed.wav",
+          "sha256": "963dccce31b5a7bc387e0d5c414007d0ba82f01822277ad6d3dc8c5c595cd1c2"
+        },
+        {
+          "source": "calibration/hat_open.wav",
+          "sha256": "6dbac74d6e61c9e277a7ec09e7243bedda1dc1c24c15c4ed5ee35926265ed926"
+        },
+        {
+          "source": "calibration/kick.wav",
+          "sha256": "60be61611d62897a1c0ec63387ae5feaab0d7cf210190ff436cd7320db899e05"
+        },
+        {
+          "source": "calibration/snare.wav",
+          "sha256": "9f1988dc116a9bb3389639d1457916f10939fdcddea343819eb43ae6562f0cc9"
+        }
+      ],
+      "training_rows": 4917,
+      "native_model_sha256": "b0ec49071d7043863f7d2eb59ed38d04443a3ed6479df64a712e8afba50fe36e",
+      "ablation_source_sha256": "a3e6b538ecc1c25e2c85ff121bf4019f9a613ad2d0a5e44eedb899b76ea9d94e",
+      "primary_model_sha256": "c87a3f20ace72fd441ef90c1bc929301bbf61023fe976a7c640c3b9f0f5e09ee",
+      "transient_model_sha256": "fe1ba1f0cb6cb0b3fd72577ed8abdca3e2aa008173f3dc0a9d3d96aa15835fea",
+      "transient_training_groups": [
+        "bb100",
+        "bb84",
+        "isolated",
+        "isolated_context",
+        "live_1_boombap",
+        "live_2_fourfloor",
+        "live_3_snareheavy",
+        "live_5_sparse"
+      ],
+      "parity_rows": 18841,
+      "transient_parity_rows": 12585,
+      "highrate_parity_rows": 18841,
+      "causality": "pass",
+      "cases": [
+        {
+          "gain": 1.0,
+          "score": {
+            "take": "live_4_kicksnare",
+            "reference_hits": 33,
+            "detected": 34,
+            "correct": 32,
+            "wrong": [
+              {
+                "time": 5.081291667,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [],
+            "extra": [
+              {
+                "time": 0.273375,
+                "drum": 0
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 15,
+              "max_error_samples": 1.6128005597693118e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 14,
+              "max_error_samples": 1.6127984281411045e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 5,
+              "max_error_samples": 0.00016003198766156856
+            }
+          ],
+          "without_transient": {
+            "take": "live_4_kicksnare",
+            "reference_hits": 33,
+            "detected": 34,
+            "correct": 32,
+            "wrong": [
+              {
+                "time": 5.081291667,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [],
+            "extra": [
+              {
+                "time": 0.273375,
+                "drum": 0
+              }
+            ]
+          }
+        },
+        {
+          "gain": 0.5,
+          "score": {
+            "take": "live_4_kicksnare",
+            "reference_hits": 33,
+            "detected": 33,
+            "correct": 32,
+            "wrong": [
+              {
+                "time": 5.081541667,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [],
+            "extra": []
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 14,
+              "max_error_samples": 1.612799493955208e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 14,
+              "max_error_samples": 1.6128069546539336e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 5,
+              "max_error_samples": 0.00016012791093089618
+            }
+          ],
+          "without_transient": {
+            "take": "live_4_kicksnare",
+            "reference_hits": 33,
+            "detected": 33,
+            "correct": 32,
+            "wrong": [
+              {
+                "time": 5.081541667,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [],
+            "extra": []
+          }
+        },
+        {
+          "gain": 0.25,
+          "score": {
+            "take": "live_4_kicksnare",
+            "reference_hits": 33,
+            "detected": 33,
+            "correct": 30,
+            "wrong": [
+              {
+                "time": 4.790520833,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 5.087833333,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [
+              {
+                "time": 10.5181,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 10.5750625,
+                "drum": 2
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 14,
+              "max_error_samples": 1.6128005597693118e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 14,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 5,
+              "max_error_samples": 0.00016003198766156856
+            }
+          ],
+          "without_transient": {
+            "take": "live_4_kicksnare",
+            "reference_hits": 33,
+            "detected": 33,
+            "correct": 30,
+            "wrong": [
+              {
+                "time": 4.790520833,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 5.087833333,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [
+              {
+                "time": 10.5181,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 10.5750625,
+                "drum": 2
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "test_take": "live_5_sparse",
+      "test_source": "mimic/live_5_sparse.mimic.wav",
+      "test_sha256": "4935720eb687962da86e3c3b7778e649ce9346f80a7bfc0b6f9c244867502abc",
+      "training_groups": [
+        "bb100",
+        "bb84",
+        "isolated",
+        "isolated_context",
+        "live_1_boombap",
+        "live_2_fourfloor",
+        "live_3_snareheavy",
+        "live_4_kicksnare",
+        "live_6_uptempo"
+      ],
+      "training_sources": [
+        {
+          "source": "mimic/bb100.mimic.wav",
+          "sha256": "1d6c2f38c06b77f000233f7a8486570e81f5fcd7b1c92385f752ef1135aa5bd6"
+        },
+        {
+          "source": "mimic/bb84.mimic.wav",
+          "sha256": "2aff08c01c151c47e2a963808baea64ed105d054b3b6a61a292f9aa568d7c98d"
+        },
+        {
+          "source": "mimic/live_1_boombap.mimic.wav",
+          "sha256": "171166eeb01de10631881262022cf7fe02aa673eac1db0d97cf880718b770bd0"
+        },
+        {
+          "source": "mimic/live_2_fourfloor.mimic.wav",
+          "sha256": "37aa735d9c81a8bcd40a29091272b68fe881c447dcf503a588c3c170c0e623b1"
+        },
+        {
+          "source": "mimic/live_3_snareheavy.mimic.wav",
+          "sha256": "844422f8923951e5df6c3852496118883c35fdb92846f0a24b258d111d87da4b"
+        },
+        {
+          "source": "mimic/live_4_kicksnare.mimic.wav",
+          "sha256": "e26533d28c29cc52354bd9edb218809842d0a1b4eae9e04daeb6e092c3b529eb"
+        },
+        {
+          "source": "mimic/live_6_uptempo.mimic.wav",
+          "sha256": "3b1720e13241b20ec70216ed60ea101d90467e36fe927c2d7c3f7cadd182d60f"
+        },
+        {
+          "source": "calibration/hat_closed.wav",
+          "sha256": "963dccce31b5a7bc387e0d5c414007d0ba82f01822277ad6d3dc8c5c595cd1c2"
+        },
+        {
+          "source": "calibration/hat_open.wav",
+          "sha256": "6dbac74d6e61c9e277a7ec09e7243bedda1dc1c24c15c4ed5ee35926265ed926"
+        },
+        {
+          "source": "calibration/kick.wav",
+          "sha256": "60be61611d62897a1c0ec63387ae5feaab0d7cf210190ff436cd7320db899e05"
+        },
+        {
+          "source": "calibration/snare.wav",
+          "sha256": "9f1988dc116a9bb3389639d1457916f10939fdcddea343819eb43ae6562f0cc9"
+        }
+      ],
+      "training_rows": 4853,
+      "native_model_sha256": "63ff40fda1d461fdede7dbf5cd00097f4eb3dbc1eb47fcaa5cd77389370b9598",
+      "ablation_source_sha256": "a3e6b538ecc1c25e2c85ff121bf4019f9a613ad2d0a5e44eedb899b76ea9d94e",
+      "primary_model_sha256": "ff773089e4d4db58c835417c2af04acf7d7b930fd395009a3caeeffa936b43d2",
+      "transient_model_sha256": "114a5207526926fea9d2e63776a38a1e66d783b59660c1e08660552af3f4e89d",
+      "transient_training_groups": [
+        "bb100",
+        "bb84",
+        "isolated",
+        "isolated_context",
+        "live_1_boombap",
+        "live_2_fourfloor",
+        "live_3_snareheavy",
+        "live_4_kicksnare"
+      ],
+      "parity_rows": 18478,
+      "transient_parity_rows": 12133,
+      "highrate_parity_rows": 18478,
+      "causality": "pass",
+      "cases": [
+        {
+          "gain": 1.0,
+          "score": {
+            "take": "live_5_sparse",
+            "reference_hits": 44,
+            "detected": 45,
+            "correct": 42,
+            "wrong": [
+              {
+                "time": 14.609875,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 7.908583333,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [],
+            "extra": [
+              {
+                "time": 8.587520833,
+                "drum": 2
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 7,
+              "max_error_samples": 1.6127984281411045e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 14,
+              "max_error_samples": 1.603197574695514e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 12,
+              "max_error_samples": 0.00016012799619602447
+            },
+            {
+              "start_seconds": 14.399999999999999,
+              "hits": 12,
+              "max_error_samples": 0.00016012808146115276
+            }
+          ],
+          "without_transient": {
+            "take": "live_5_sparse",
+            "reference_hits": 44,
+            "detected": 45,
+            "correct": 42,
+            "wrong": [
+              {
+                "time": 14.609875,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 7.908583333,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [],
+            "extra": [
+              {
+                "time": 8.587520833,
+                "drum": 2
+              }
+            ]
+          }
+        },
+        {
+          "gain": 0.5,
+          "score": {
+            "take": "live_5_sparse",
+            "reference_hits": 44,
+            "detected": 44,
+            "correct": 39,
+            "wrong": [
+              {
+                "time": 14.61008333,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 5.183083333,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 7.9109375,
+                "expected": 1,
+                "actual": 2
+              },
+              {
+                "time": 7.767,
+                "expected": 1,
+                "actual": 2
+              },
+              {
+                "time": 5.391458333,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [],
+            "extra": []
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 7,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 13,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 12,
+              "max_error_samples": 0.00016012799619602447
+            },
+            {
+              "start_seconds": 14.399999999999999,
+              "hits": 12,
+              "max_error_samples": 0.00016012791093089618
+            }
+          ],
+          "without_transient": {
+            "take": "live_5_sparse",
+            "reference_hits": 44,
+            "detected": 44,
+            "correct": 39,
+            "wrong": [
+              {
+                "time": 14.61008333,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 5.183083333,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 7.9109375,
+                "expected": 1,
+                "actual": 2
+              },
+              {
+                "time": 7.767,
+                "expected": 1,
+                "actual": 2
+              },
+              {
+                "time": 5.391458333,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [],
+            "extra": []
+          }
+        },
+        {
+          "gain": 0.25,
+          "score": {
+            "take": "live_5_sparse",
+            "reference_hits": 44,
+            "detected": 42,
+            "correct": 41,
+            "wrong": [
+              {
+                "time": 7.765291667,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [
+              {
+                "time": 7.908,
+                "drum": 1
+              },
+              {
+                "time": 11.715,
+                "drum": 0
+              }
+            ],
+            "extra": []
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 7,
+              "max_error_samples": 1.6127984281411045e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 12,
+              "max_error_samples": 1.603197574695514e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 11,
+              "max_error_samples": 0.00016012799619602447
+            },
+            {
+              "start_seconds": 14.399999999999999,
+              "hits": 12,
+              "max_error_samples": 0.00016003207292669686
+            }
+          ],
+          "without_transient": {
+            "take": "live_5_sparse",
+            "reference_hits": 44,
+            "detected": 42,
+            "correct": 41,
+            "wrong": [
+              {
+                "time": 7.765291667,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [
+              {
+                "time": 7.908,
+                "drum": 1
+              },
+              {
+                "time": 11.715,
+                "drum": 0
+              }
+            ],
+            "extra": []
+          }
+        }
+      ]
+    },
+    {
+      "test_take": "live_6_uptempo",
+      "test_source": "mimic/live_6_uptempo.mimic.wav",
+      "test_sha256": "3b1720e13241b20ec70216ed60ea101d90467e36fe927c2d7c3f7cadd182d60f",
+      "training_groups": [
+        "bb100",
+        "bb84",
+        "isolated",
+        "isolated_context",
+        "live_1_boombap",
+        "live_2_fourfloor",
+        "live_3_snareheavy",
+        "live_4_kicksnare",
+        "live_5_sparse"
+      ],
+      "training_sources": [
+        {
+          "source": "mimic/bb100.mimic.wav",
+          "sha256": "1d6c2f38c06b77f000233f7a8486570e81f5fcd7b1c92385f752ef1135aa5bd6"
+        },
+        {
+          "source": "mimic/bb84.mimic.wav",
+          "sha256": "2aff08c01c151c47e2a963808baea64ed105d054b3b6a61a292f9aa568d7c98d"
+        },
+        {
+          "source": "mimic/live_1_boombap.mimic.wav",
+          "sha256": "171166eeb01de10631881262022cf7fe02aa673eac1db0d97cf880718b770bd0"
+        },
+        {
+          "source": "mimic/live_2_fourfloor.mimic.wav",
+          "sha256": "37aa735d9c81a8bcd40a29091272b68fe881c447dcf503a588c3c170c0e623b1"
+        },
+        {
+          "source": "mimic/live_3_snareheavy.mimic.wav",
+          "sha256": "844422f8923951e5df6c3852496118883c35fdb92846f0a24b258d111d87da4b"
+        },
+        {
+          "source": "mimic/live_4_kicksnare.mimic.wav",
+          "sha256": "e26533d28c29cc52354bd9edb218809842d0a1b4eae9e04daeb6e092c3b529eb"
+        },
+        {
+          "source": "mimic/live_5_sparse.mimic.wav",
+          "sha256": "4935720eb687962da86e3c3b7778e649ce9346f80a7bfc0b6f9c244867502abc"
+        },
+        {
+          "source": "calibration/hat_closed.wav",
+          "sha256": "963dccce31b5a7bc387e0d5c414007d0ba82f01822277ad6d3dc8c5c595cd1c2"
+        },
+        {
+          "source": "calibration/hat_open.wav",
+          "sha256": "6dbac74d6e61c9e277a7ec09e7243bedda1dc1c24c15c4ed5ee35926265ed926"
+        },
+        {
+          "source": "calibration/kick.wav",
+          "sha256": "60be61611d62897a1c0ec63387ae5feaab0d7cf210190ff436cd7320db899e05"
+        },
+        {
+          "source": "calibration/snare.wav",
+          "sha256": "9f1988dc116a9bb3389639d1457916f10939fdcddea343819eb43ae6562f0cc9"
+        }
+      ],
+      "training_rows": 4906,
+      "native_model_sha256": "d81656b7e0ca5f347d2ec8e2586718b86aa05e61a5edbe26962581b86fcd360d",
+      "ablation_source_sha256": "a3e6b538ecc1c25e2c85ff121bf4019f9a613ad2d0a5e44eedb899b76ea9d94e",
+      "primary_model_sha256": "2d9d9ee2522de586faa41ce264fdb1593eb7840aa63052239242b44ac36cd2c1",
+      "transient_model_sha256": "9ac0c8407cb618b045b7c4c46b73253c3423cddf204222578ddbc528b787e95b",
+      "transient_training_groups": [
+        "bb100",
+        "bb84",
+        "isolated",
+        "isolated_context",
+        "live_1_boombap",
+        "live_2_fourfloor",
+        "live_3_snareheavy",
+        "live_4_kicksnare",
+        "live_5_sparse"
+      ],
+      "parity_rows": 18750,
+      "transient_parity_rows": 14034,
+      "highrate_parity_rows": 18750,
+      "causality": "pass",
+      "cases": [
+        {
+          "gain": 1.0,
+          "score": {
+            "take": "live_6_uptempo",
+            "reference_hits": 37,
+            "detected": 31,
+            "correct": 30,
+            "wrong": [],
+            "missed": [
+              {
+                "time": 2.313,
+                "drum": 0
+              },
+              {
+                "time": 4.604,
+                "drum": 1
+              },
+              {
+                "time": 7.148,
+                "drum": 1
+              },
+              {
+                "time": 7.242,
+                "drum": 0
+              },
+              {
+                "time": 7.564,
+                "drum": 2
+              },
+              {
+                "time": 9.573,
+                "drum": 1
+              },
+              {
+                "time": 9.671,
+                "drum": 0
+              }
+            ],
+            "extra": [
+              {
+                "time": 7.5891875,
+                "drum": 2
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 14,
+              "max_error_samples": 1.6128005597693118e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 13,
+              "max_error_samples": 1.6032061012083432e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 4,
+              "max_error_samples": 0.00016000316804820613
+            }
+          ],
+          "without_transient": {
+            "take": "live_6_uptempo",
+            "reference_hits": 37,
+            "detected": 31,
+            "correct": 30,
+            "wrong": [],
+            "missed": [
+              {
+                "time": 2.313,
+                "drum": 0
+              },
+              {
+                "time": 4.604,
+                "drum": 1
+              },
+              {
+                "time": 7.148,
+                "drum": 1
+              },
+              {
+                "time": 7.242,
+                "drum": 0
+              },
+              {
+                "time": 7.564,
+                "drum": 2
+              },
+              {
+                "time": 9.573,
+                "drum": 1
+              },
+              {
+                "time": 9.671,
+                "drum": 0
+              }
+            ],
+            "extra": [
+              {
+                "time": 7.5891875,
+                "drum": 2
+              }
+            ]
+          }
+        },
+        {
+          "gain": 0.5,
+          "score": {
+            "take": "live_6_uptempo",
+            "reference_hits": 37,
+            "detected": 30,
+            "correct": 28,
+            "wrong": [
+              {
+                "time": 4.4623125,
+                "expected": 1,
+                "actual": 0
+              }
+            ],
+            "missed": [
+              {
+                "time": 2.313,
+                "drum": 0
+              },
+              {
+                "time": 4.604,
+                "drum": 1
+              },
+              {
+                "time": 5.714,
+                "drum": 2
+              },
+              {
+                "time": 6.694,
+                "drum": 2
+              },
+              {
+                "time": 7.148,
+                "drum": 1
+              },
+              {
+                "time": 7.242,
+                "drum": 0
+              },
+              {
+                "time": 9.573,
+                "drum": 1
+              },
+              {
+                "time": 9.671,
+                "drum": 0
+              }
+            ],
+            "extra": [
+              {
+                "time": 5.7441875,
+                "drum": 2
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 14,
+              "max_error_samples": 1.6128005597693118e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 12,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 4,
+              "max_error_samples": 0.00016012799619602447
+            }
+          ],
+          "without_transient": {
+            "take": "live_6_uptempo",
+            "reference_hits": 37,
+            "detected": 30,
+            "correct": 28,
+            "wrong": [
+              {
+                "time": 4.4623125,
+                "expected": 1,
+                "actual": 0
+              }
+            ],
+            "missed": [
+              {
+                "time": 2.313,
+                "drum": 0
+              },
+              {
+                "time": 4.604,
+                "drum": 1
+              },
+              {
+                "time": 5.714,
+                "drum": 2
+              },
+              {
+                "time": 6.694,
+                "drum": 2
+              },
+              {
+                "time": 7.148,
+                "drum": 1
+              },
+              {
+                "time": 7.242,
+                "drum": 0
+              },
+              {
+                "time": 9.573,
+                "drum": 1
+              },
+              {
+                "time": 9.671,
+                "drum": 0
+              }
+            ],
+            "extra": [
+              {
+                "time": 5.7441875,
+                "drum": 2
+              }
+            ]
+          }
+        },
+        {
+          "gain": 0.25,
+          "score": {
+            "take": "live_6_uptempo",
+            "reference_hits": 37,
+            "detected": 30,
+            "correct": 26,
+            "wrong": [
+              {
+                "time": 1.971854167,
+                "expected": 1,
+                "actual": 0
+              }
+            ],
+            "missed": [
+              {
+                "time": 2.156,
+                "drum": 0
+              },
+              {
+                "time": 2.313,
+                "drum": 0
+              },
+              {
+                "time": 4.604,
+                "drum": 1
+              },
+              {
+                "time": 5.714,
+                "drum": 2
+              },
+              {
+                "time": 6.694,
+                "drum": 2
+              },
+              {
+                "time": 7.148,
+                "drum": 1
+              },
+              {
+                "time": 7.242,
+                "drum": 0
+              },
+              {
+                "time": 9.573,
+                "drum": 1
+              },
+              {
+                "time": 9.671,
+                "drum": 0
+              },
+              {
+                "time": 10.676,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 5.7475,
+                "drum": 2
+              },
+              {
+                "time": 6.726645833,
+                "drum": 2
+              },
+              {
+                "time": 10.70491667,
+                "drum": 2
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 13,
+              "max_error_samples": 1.6128005597693118e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 13,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 4,
+              "max_error_samples": 0.00016003198766156856
+            }
+          ],
+          "without_transient": {
+            "take": "live_6_uptempo",
+            "reference_hits": 37,
+            "detected": 30,
+            "correct": 24,
+            "wrong": [
+              {
+                "time": 1.971854167,
+                "expected": 1,
+                "actual": 0
+              }
+            ],
+            "missed": [
+              {
+                "time": 2.156,
+                "drum": 0
+              },
+              {
+                "time": 2.313,
+                "drum": 0
+              },
+              {
+                "time": 4.604,
+                "drum": 1
+              },
+              {
+                "time": 5.714,
+                "drum": 2
+              },
+              {
+                "time": 6.694,
+                "drum": 2
+              },
+              {
+                "time": 7.148,
+                "drum": 1
+              },
+              {
+                "time": 7.242,
+                "drum": 0
+              },
+              {
+                "time": 7.564,
+                "drum": 2
+              },
+              {
+                "time": 9.098,
+                "drum": 2
+              },
+              {
+                "time": 9.573,
+                "drum": 1
+              },
+              {
+                "time": 9.671,
+                "drum": 0
+              },
+              {
+                "time": 10.676,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 5.7475,
+                "drum": 2
+              },
+              {
+                "time": 6.726645833,
+                "drum": 2
+              },
+              {
+                "time": 7.589041667,
+                "drum": 2
+              },
+              {
+                "time": 9.12575,
+                "drum": 2
+              },
+              {
+                "time": 10.70491667,
+                "drum": 2
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "deployment_model_matches_reserved_fold": false,
+  "baseline_file": "auto-heldout-pocket04-linux.json",
+  "baseline_sha256": "6238daedc44e1929744ccd361683103e8ce5cf9fdb39acacd06b69c9f95edc51",
+  "release_gate": "pass: fingerprint-matched frozen Pocket04 baseline equals the paired ablation; no per-take regression, newly missed references, or new wrong/extra events; five or more quiet references recovered and three or more extras removed"
+}

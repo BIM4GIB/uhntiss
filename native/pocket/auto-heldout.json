@@ -93,6 +93,7 @@
       ],
       "training_rows": 4941,
       "native_model_sha256": "030c1989ca4a4f5743f9919aa22763026d74b6c1d74e75c20ed3e3c4b5ba8055",
+      "ablation_source_sha256": "a3e6b538ecc1c25e2c85ff121bf4019f9a613ad2d0a5e44eedb899b76ea9d94e",
       "primary_model_sha256": "2d0795894e7acb16fb85c94966fa226df75da8efe96e6614dc6e1fdf0d145085",
       "transient_model_sha256": "b77a3e31cea280fbc01fcf69577056c19d26fb331b2e5eb669d7a6dbda5d33d2",
       "transient_training_groups": [
@@ -175,7 +176,54 @@
               "hits": 11,
               "max_error_samples": 0.00016012799619602447
             }
-          ]
+          ],
+          "without_transient": {
+            "take": "bb100",
+            "reference_hits": 31,
+            "detected": 32,
+            "correct": 26,
+            "wrong": [
+              {
+                "time": 11.74341667,
+                "expected": 1,
+                "actual": 2
+              },
+              {
+                "time": 5.450583333,
+                "expected": 2,
+                "actual": 1
+              },
+              {
+                "time": 3.982333333,
+                "expected": 0,
+                "actual": 1
+              }
+            ],
+            "missed": [
+              {
+                "time": 6.93224,
+                "drum": 1
+              },
+              {
+                "time": 9.32481,
+                "drum": 1
+              }
+            ],
+            "extra": [
+              {
+                "time": 5.380375,
+                "drum": 2
+              },
+              {
+                "time": 8.634979167,
+                "drum": 2
+              },
+              {
+                "time": 11.0726875,
+                "drum": 2
+              }
+            ]
+          }
         },
         {
           "gain": 0.5,
@@ -256,7 +304,68 @@
               "hits": 11,
               "max_error_samples": 0.00016012808146115276
             }
-          ]
+          ],
+          "without_transient": {
+            "take": "bb100",
+            "reference_hits": 31,
+            "detected": 30,
+            "correct": 24,
+            "wrong": [
+              {
+                "time": 3.98375,
+                "expected": 0,
+                "actual": 1
+              }
+            ],
+            "missed": [
+              {
+                "time": 3.38032,
+                "drum": 1
+              },
+              {
+                "time": 6.93224,
+                "drum": 1
+              },
+              {
+                "time": 8.11256,
+                "drum": 1
+              },
+              {
+                "time": 9.32481,
+                "drum": 1
+              },
+              {
+                "time": 10.53605,
+                "drum": 1
+              },
+              {
+                "time": 11.74331,
+                "drum": 1
+              }
+            ],
+            "extra": [
+              {
+                "time": 5.382770833,
+                "drum": 2
+              },
+              {
+                "time": 8.635020833,
+                "drum": 2
+              },
+              {
+                "time": 9.821291667,
+                "drum": 1
+              },
+              {
+                "time": 11.03704167,
+                "drum": 2
+              },
+              {
+                "time": 12.2125,
+                "drum": 2
+              }
+            ]
+          }
         },
         {
           "gain": 0.25,
@@ -327,7 +436,58 @@
               "hits": 8,
               "max_error_samples": 0.00016012799619602447
             }
-          ]
+          ],
+          "without_transient": {
+            "take": "bb100",
+            "reference_hits": 31,
+            "detected": 25,
+            "correct": 23,
+            "wrong": [],
+            "missed": [
+              {
+                "time": 3.38032,
+                "drum": 1
+              },
+              {
+                "time": 4.53968,
+                "drum": 1
+              },
+              {
+                "time": 5.74195,
+                "drum": 1
+              },
+              {
+                "time": 6.93224,
+                "drum": 1
+              },
+              {
+                "time": 8.11256,
+                "drum": 1
+              },
+              {
+                "time": 9.32481,
+                "drum": 1
+              },
+              {
+                "time": 10.53605,
+                "drum": 1
+              },
+              {
+                "time": 11.74331,
+                "drum": 1
+              }
+            ],
+            "extra": [
+              {
+                "time": 4.116833333,
+                "drum": 2
+              },
+              {
+                "time": 5.38525,
+                "drum": 2
+              }
+            ]
+          }
         }
       ]
     },
@@ -394,6 +554,7 @@
       ],
       "training_rows": 4948,
       "native_model_sha256": "23ad577ae5562bab0211555b6ebead9b06e1c1f2c45dd89d4e5fc00b9a0fbc43",
+      "ablation_source_sha256": "a3e6b538ecc1c25e2c85ff121bf4019f9a613ad2d0a5e44eedb899b76ea9d94e",
       "primary_model_sha256": "dc28d41086897ba5b1956ade7573f26b609ecd44229d5479d1f05db2ee30a2f1",
       "transient_model_sha256": "6b5bddab6e70b3c77297d0c0864316d5d547cedeec94714d6da0227b20eb8ab8",
       "transient_training_groups": [
@@ -472,7 +633,45 @@
               "hits": 1,
               "max_error_samples": 0.00016001280300770304
             }
-          ]
+          ],
+          "without_transient": {
+            "take": "bb84",
+            "reference_hits": 31,
+            "detected": 34,
+            "correct": 28,
+            "wrong": [
+              {
+                "time": 9.624270833,
+                "expected": 1,
+                "actual": 2
+              },
+              {
+                "time": 9.281145833,
+                "expected": 2,
+                "actual": 1
+              },
+              {
+                "time": 12.43285417,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [],
+            "extra": [
+              {
+                "time": 10.8895,
+                "drum": 2
+              },
+              {
+                "time": 10.993375,
+                "drum": 1
+              },
+              {
+                "time": 12.99816667,
+                "drum": 2
+              }
+            ]
+          }
         },
         {
           "gain": 0.5,
@@ -527,7 +726,37 @@
               "hits": 1,
               "max_error_samples": 0.00016001271774257475
             }
-          ]
+          ],
+          "without_transient": {
+            "take": "bb84",
+            "reference_hits": 31,
+            "detected": 32,
+            "correct": 28,
+            "wrong": [
+              {
+                "time": 9.281208333,
+                "expected": 2,
+                "actual": 1
+              },
+              {
+                "time": 9.633354167,
+                "expected": 1,
+                "actual": 2
+              },
+              {
+                "time": 12.43697917,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [],
+            "extra": [
+              {
+                "time": 10.99389583,
+                "drum": 1
+              }
+            ]
+          }
         },
         {
           "gain": 0.25,
@@ -582,7 +811,50 @@
               "hits": 1,
               "max_error_samples": 9.634959496906959e-09
             }
-          ]
+          ],
+          "without_transient": {
+            "take": "bb84",
+            "reference_hits": 31,
+            "detected": 29,
+            "correct": 25,
+            "wrong": [
+              {
+                "time": 9.281291667,
+                "expected": 2,
+                "actual": 1
+              },
+              {
+                "time": 11.7564375,
+                "expected": 0,
+                "actual": 1
+              },
+              {
+                "time": 9.637625,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [
+              {
+                "time": 10.67274,
+                "drum": 2
+              },
+              {
+                "time": 12.42676,
+                "drum": 1
+              },
+              {
+                "time": 13.2419,
+                "drum": 0
+              }
+            ],
+            "extra": [
+              {
+                "time": 10.69791667,
+                "drum": 2
+              }
+            ]
+          }
         }
       ]
     },
@@ -649,6 +921,7 @@
       ],
       "training_rows": 5002,
       "native_model_sha256": "0c3ab79219e232e5391fcbe73cb67dbb20324f9bda1bcc05271756a6980b27ce",
+      "ablation_source_sha256": "a3e6b538ecc1c25e2c85ff121bf4019f9a613ad2d0a5e44eedb899b76ea9d94e",
       "primary_model_sha256": "5eccd640261ecff736aee5e391d35035e1fa739cf418774c16f671e4afddd925",
       "transient_model_sha256": "6ef8395193da9ed678f738c1645b8c98026007f1c89360ce239865d8bc0bde78",
       "transient_training_groups": [
@@ -726,7 +999,54 @@
               "hits": 5,
               "max_error_samples": 1.612802691397519e-05
             }
-          ]
+          ],
+          "without_transient": {
+            "take": "live_1_boombap",
+            "reference_hits": 21,
+            "detected": 22,
+            "correct": 16,
+            "wrong": [
+              {
+                "time": 4.644,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 3.4620625,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 1.3418125,
+                "expected": 2,
+                "actual": 1
+              }
+            ],
+            "missed": [
+              {
+                "time": 2.549,
+                "drum": 2
+              },
+              {
+                "time": 6.234,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 2.404229167,
+                "drum": 1
+              },
+              {
+                "time": 2.581125,
+                "drum": 2
+              },
+              {
+                "time": 5.8788125,
+                "drum": 1
+              }
+            ]
+          }
         },
         {
           "gain": 0.5,
@@ -827,7 +1147,93 @@
               "hits": 3,
               "max_error_samples": 1.603197574695514e-05
             }
-          ]
+          ],
+          "without_transient": {
+            "take": "live_1_boombap",
+            "reference_hits": 21,
+            "detected": 19,
+            "correct": 10,
+            "wrong": [
+              {
+                "time": 4.644145833,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 3.462375,
+                "expected": 1,
+                "actual": 0
+              }
+            ],
+            "missed": [
+              {
+                "time": 0.149,
+                "drum": 2
+              },
+              {
+                "time": 1.342,
+                "drum": 2
+              },
+              {
+                "time": 1.97,
+                "drum": 2
+              },
+              {
+                "time": 2.549,
+                "drum": 2
+              },
+              {
+                "time": 3.77,
+                "drum": 2
+              },
+              {
+                "time": 4.349,
+                "drum": 2
+              },
+              {
+                "time": 4.931,
+                "drum": 2
+              },
+              {
+                "time": 5.518,
+                "drum": 2
+              },
+              {
+                "time": 6.234,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 0.17575,
+                "drum": 2
+              },
+              {
+                "time": 1.376875,
+                "drum": 2
+              },
+              {
+                "time": 1.996645833,
+                "drum": 2
+              },
+              {
+                "time": 2.6225,
+                "drum": 2
+              },
+              {
+                "time": 3.826020833,
+                "drum": 2
+              },
+              {
+                "time": 4.396125,
+                "drum": 2
+              },
+              {
+                "time": 5.878958333,
+                "drum": 1
+              }
+            ]
+          }
         },
         {
           "gain": 0.25,
@@ -901,7 +1307,70 @@
               "hits": 4,
               "max_error_samples": 1.612802691397519e-05
             }
-          ]
+          ],
+          "without_transient": {
+            "take": "live_1_boombap",
+            "reference_hits": 21,
+            "detected": 14,
+            "correct": 11,
+            "wrong": [],
+            "missed": [
+              {
+                "time": 0.753,
+                "drum": 2
+              },
+              {
+                "time": 1.342,
+                "drum": 2
+              },
+              {
+                "time": 1.677,
+                "drum": 0
+              },
+              {
+                "time": 1.97,
+                "drum": 2
+              },
+              {
+                "time": 2.549,
+                "drum": 2
+              },
+              {
+                "time": 3.146,
+                "drum": 2
+              },
+              {
+                "time": 3.77,
+                "drum": 2
+              },
+              {
+                "time": 4.931,
+                "drum": 2
+              },
+              {
+                "time": 5.838,
+                "drum": 1
+              },
+              {
+                "time": 6.234,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 0.2295,
+                "drum": 2
+              },
+              {
+                "time": 2.581979167,
+                "drum": 2
+              },
+              {
+                "time": 4.965041667,
+                "drum": 2
+              }
+            ]
+          }
         }
       ]
     },
@@ -968,6 +1437,7 @@
       ],
       "training_rows": 4964,
       "native_model_sha256": "9a506efcba06771c9f8fb1966d640c5f4159ed6af75370977f4c0ca461e03ed3",
+      "ablation_source_sha256": "a3e6b538ecc1c25e2c85ff121bf4019f9a613ad2d0a5e44eedb899b76ea9d94e",
       "primary_model_sha256": "0576f68772150fcd71d95c2446967149b8059b34b4b08c119862c89f64161004",
       "transient_model_sha256": "9b21de02dea7f31eb49eb47f1f2adc32f03fb4e8efafaaf180c6ef16502c03c2",
       "transient_training_groups": [
@@ -1028,7 +1498,37 @@
               "hits": 14,
               "max_error_samples": 1.6128069546539336e-05
             }
-          ]
+          ],
+          "without_transient": {
+            "take": "live_2_fourfloor",
+            "reference_hits": 29,
+            "detected": 29,
+            "correct": 26,
+            "wrong": [
+              {
+                "time": 0.067,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 0.667,
+                "expected": 1,
+                "actual": 0
+              }
+            ],
+            "missed": [
+              {
+                "time": 8.029,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 8.064604167,
+                "drum": 2
+              }
+            ]
+          }
         },
         {
           "gain": 0.5,
@@ -1078,7 +1578,42 @@
               "hits": 14,
               "max_error_samples": 1.612802691397519e-05
             }
-          ]
+          ],
+          "without_transient": {
+            "take": "live_2_fourfloor",
+            "reference_hits": 29,
+            "detected": 29,
+            "correct": 26,
+            "wrong": [],
+            "missed": [
+              {
+                "time": 6.323,
+                "drum": 2
+              },
+              {
+                "time": 7.477,
+                "drum": 2
+              },
+              {
+                "time": 8.029,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 6.353416667,
+                "drum": 2
+              },
+              {
+                "time": 7.504041667,
+                "drum": 2
+              },
+              {
+                "time": 8.062229167,
+                "drum": 2
+              }
+            ]
+          }
         },
         {
           "gain": 0.25,
@@ -1136,7 +1671,50 @@
               "hits": 14,
               "max_error_samples": 1.6127984281411045e-05
             }
-          ]
+          ],
+          "without_transient": {
+            "take": "live_2_fourfloor",
+            "reference_hits": 29,
+            "detected": 29,
+            "correct": 25,
+            "wrong": [],
+            "missed": [
+              {
+                "time": 6.323,
+                "drum": 2
+              },
+              {
+                "time": 7.477,
+                "drum": 2
+              },
+              {
+                "time": 8.029,
+                "drum": 2
+              },
+              {
+                "time": 8.632,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 6.357333333,
+                "drum": 2
+              },
+              {
+                "time": 7.514083333,
+                "drum": 2
+              },
+              {
+                "time": 8.0723125,
+                "drum": 2
+              },
+              {
+                "time": 8.670708333,
+                "drum": 2
+              }
+            ]
+          }
         }
       ]
     },
@@ -1203,6 +1781,7 @@
       ],
       "training_rows": 4843,
       "native_model_sha256": "503239f5e3622fde9f7dbf68ba11f028c717a047524151ae3faf3f7a8e2988da",
+      "ablation_source_sha256": "a3e6b538ecc1c25e2c85ff121bf4019f9a613ad2d0a5e44eedb899b76ea9d94e",
       "primary_model_sha256": "64d76a1dfdb9fc615d5c8d1eee570ac5d903db7a22eef728620fbb4d5e4d2f59",
       "transient_model_sha256": "b257304afa9914dec0c63f9aa149d31eb81d40023fd568c870c1f950efe2b83d",
       "transient_training_groups": [
@@ -1263,7 +1842,32 @@
               "hits": 15,
               "max_error_samples": 0.00016012808146115276
             }
-          ]
+          ],
+          "without_transient": {
+            "take": "live_3_snareheavy",
+            "reference_hits": 45,
+            "detected": 46,
+            "correct": 43,
+            "wrong": [
+              {
+                "time": 10.10535417,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 1.218354167,
+                "expected": 1,
+                "actual": 0
+              }
+            ],
+            "missed": [],
+            "extra": [
+              {
+                "time": 0.05529166667,
+                "drum": 1
+              }
+            ]
+          }
         },
         {
           "gain": 0.5,
@@ -1313,7 +1917,37 @@
               "hits": 15,
               "max_error_samples": 0.00016012799619602447
             }
-          ]
+          ],
+          "without_transient": {
+            "take": "live_3_snareheavy",
+            "reference_hits": 45,
+            "detected": 45,
+            "correct": 41,
+            "wrong": [
+              {
+                "time": 11.06402083,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 2.443104167,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 9.806270833,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 1.2185625,
+                "expected": 1,
+                "actual": 0
+              }
+            ],
+            "missed": [],
+            "extra": []
+          }
         },
         {
           "gain": 0.25,
@@ -1368,7 +2002,42 @@
               "hits": 15,
               "max_error_samples": 0.00016012799619602447
             }
-          ]
+          ],
+          "without_transient": {
+            "take": "live_3_snareheavy",
+            "reference_hits": 45,
+            "detected": 45,
+            "correct": 40,
+            "wrong": [
+              {
+                "time": 2.4431875,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 11.065125,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 9.806416667,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 5.1965,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 1.2186875,
+                "expected": 1,
+                "actual": 0
+              }
+            ],
+            "missed": [],
+            "extra": []
+          }
         }
       ]
     },
@@ -1435,6 +2104,7 @@
       ],
       "training_rows": 4917,
       "native_model_sha256": "fa5ae633cb9b3a079b74315a86c7c34f1282146badd4d5caa82da2c5b48d5a78",
+      "ablation_source_sha256": "a3e6b538ecc1c25e2c85ff121bf4019f9a613ad2d0a5e44eedb899b76ea9d94e",
       "primary_model_sha256": "5d8c201ae3b56c90703423032455d7cc8bd84e6ab79bbcbfa2b16cd6dc71854b",
       "transient_model_sha256": "864e313cab177f179da1ff3fabf4f7c1668cd50bb4f1cb488213dcdb0d9636ba",
       "transient_training_groups": [
@@ -1490,7 +2160,27 @@
               "hits": 5,
               "max_error_samples": 0.00016003198766156856
             }
-          ]
+          ],
+          "without_transient": {
+            "take": "live_4_kicksnare",
+            "reference_hits": 33,
+            "detected": 34,
+            "correct": 32,
+            "wrong": [
+              {
+                "time": 5.081291667,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [],
+            "extra": [
+              {
+                "time": 0.273375,
+                "drum": 0
+              }
+            ]
+          }
         },
         {
           "gain": 0.5,
@@ -1525,7 +2215,22 @@
               "hits": 5,
               "max_error_samples": 0.00016012791093089618
             }
-          ]
+          ],
+          "without_transient": {
+            "take": "live_4_kicksnare",
+            "reference_hits": 33,
+            "detected": 33,
+            "correct": 32,
+            "wrong": [
+              {
+                "time": 5.081541667,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [],
+            "extra": []
+          }
         },
         {
           "gain": 0.25,
@@ -1575,7 +2280,37 @@
               "hits": 5,
               "max_error_samples": 0.00016003198766156856
             }
-          ]
+          ],
+          "without_transient": {
+            "take": "live_4_kicksnare",
+            "reference_hits": 33,
+            "detected": 33,
+            "correct": 30,
+            "wrong": [
+              {
+                "time": 4.790520833,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 5.087833333,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [
+              {
+                "time": 10.5181,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 10.5750625,
+                "drum": 2
+              }
+            ]
+          }
         }
       ]
     },
@@ -1642,6 +2377,7 @@
       ],
       "training_rows": 4853,
       "native_model_sha256": "75ce9c1fdcb3611e065436a27cff14bd493492d72c5e39f6f0f5e1dcded16af8",
+      "ablation_source_sha256": "a3e6b538ecc1c25e2c85ff121bf4019f9a613ad2d0a5e44eedb899b76ea9d94e",
       "primary_model_sha256": "f3005372de26df14a4836d4b7dcde83d927b61d2bd25f31ed4f60440d0e04f6a",
       "transient_model_sha256": "8e811f62006c33ea3e1ea0a66fa9220fa3a309e8d8c3e2af85c246eccc8af6bc",
       "transient_training_groups": [
@@ -1707,7 +2443,32 @@
               "hits": 12,
               "max_error_samples": 0.00016012808146115276
             }
-          ]
+          ],
+          "without_transient": {
+            "take": "live_5_sparse",
+            "reference_hits": 44,
+            "detected": 45,
+            "correct": 42,
+            "wrong": [
+              {
+                "time": 14.609875,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 7.908583333,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [],
+            "extra": [
+              {
+                "time": 8.587520833,
+                "drum": 2
+              }
+            ]
+          }
         },
         {
           "gain": 0.5,
@@ -1767,7 +2528,42 @@
               "hits": 12,
               "max_error_samples": 0.00016012791093089618
             }
-          ]
+          ],
+          "without_transient": {
+            "take": "live_5_sparse",
+            "reference_hits": 44,
+            "detected": 44,
+            "correct": 39,
+            "wrong": [
+              {
+                "time": 14.61008333,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 5.183083333,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 7.9109375,
+                "expected": 1,
+                "actual": 2
+              },
+              {
+                "time": 7.767,
+                "expected": 1,
+                "actual": 2
+              },
+              {
+                "time": 5.391458333,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [],
+            "extra": []
+          }
         },
         {
           "gain": 0.25,
@@ -1816,7 +2612,31 @@
               "hits": 12,
               "max_error_samples": 0.00016003207292669686
             }
-          ]
+          ],
+          "without_transient": {
+            "take": "live_5_sparse",
+            "reference_hits": 44,
+            "detected": 42,
+            "correct": 41,
+            "wrong": [
+              {
+                "time": 7.765291667,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [
+              {
+                "time": 7.908,
+                "drum": 1
+              },
+              {
+                "time": 11.715,
+                "drum": 0
+              }
+            ],
+            "extra": []
+          }
         }
       ]
     },
@@ -1883,6 +2703,7 @@
       ],
       "training_rows": 4906,
       "native_model_sha256": "2ecb4aaf05ab811413fe5ff23eb642e8333e266462919074592d0b9c3d0da479",
+      "ablation_source_sha256": "a3e6b538ecc1c25e2c85ff121bf4019f9a613ad2d0a5e44eedb899b76ea9d94e",
       "primary_model_sha256": "6a3397b336cfd2a941c0ce92819588fafec6b41414d1fffcfc0c8d403112b5b9",
       "transient_model_sha256": "bfedf36abf7c527a141cf23bd3d0cfc25accd9ac8ed7e11aa62bbf542001d504",
       "transient_training_groups": [
@@ -1962,7 +2783,50 @@
               "hits": 4,
               "max_error_samples": 0.00016000316804820613
             }
-          ]
+          ],
+          "without_transient": {
+            "take": "live_6_uptempo",
+            "reference_hits": 37,
+            "detected": 31,
+            "correct": 30,
+            "wrong": [],
+            "missed": [
+              {
+                "time": 2.313,
+                "drum": 0
+              },
+              {
+                "time": 4.604,
+                "drum": 1
+              },
+              {
+                "time": 7.148,
+                "drum": 1
+              },
+              {
+                "time": 7.242,
+                "drum": 0
+              },
+              {
+                "time": 7.564,
+                "drum": 2
+              },
+              {
+                "time": 9.573,
+                "drum": 1
+              },
+              {
+                "time": 9.671,
+                "drum": 0
+              }
+            ],
+            "extra": [
+              {
+                "time": 7.5891875,
+                "drum": 2
+              }
+            ]
+          }
         },
         {
           "gain": 0.5,
@@ -2035,7 +2899,60 @@
               "hits": 4,
               "max_error_samples": 0.00016012799619602447
             }
-          ]
+          ],
+          "without_transient": {
+            "take": "live_6_uptempo",
+            "reference_hits": 37,
+            "detected": 30,
+            "correct": 28,
+            "wrong": [
+              {
+                "time": 4.4623125,
+                "expected": 1,
+                "actual": 0
+              }
+            ],
+            "missed": [
+              {
+                "time": 2.313,
+                "drum": 0
+              },
+              {
+                "time": 4.604,
+                "drum": 1
+              },
+              {
+                "time": 5.714,
+                "drum": 2
+              },
+              {
+                "time": 6.694,
+                "drum": 2
+              },
+              {
+                "time": 7.148,
+                "drum": 1
+              },
+              {
+                "time": 7.242,
+                "drum": 0
+              },
+              {
+                "time": 9.573,
+                "drum": 1
+              },
+              {
+                "time": 9.671,
+                "drum": 0
+              }
+            ],
+            "extra": [
+              {
+                "time": 5.7441875,
+                "drum": 2
+              }
+            ]
+          }
         },
         {
           "gain": 0.25,
@@ -2120,12 +3037,94 @@
               "hits": 4,
               "max_error_samples": 0.00016003198766156856
             }
-          ]
+          ],
+          "without_transient": {
+            "take": "live_6_uptempo",
+            "reference_hits": 37,
+            "detected": 31,
+            "correct": 25,
+            "wrong": [
+              {
+                "time": 1.971854167,
+                "expected": 1,
+                "actual": 0
+              }
+            ],
+            "missed": [
+              {
+                "time": 2.313,
+                "drum": 0
+              },
+              {
+                "time": 4.604,
+                "drum": 1
+              },
+              {
+                "time": 5.714,
+                "drum": 2
+              },
+              {
+                "time": 6.694,
+                "drum": 2
+              },
+              {
+                "time": 7.148,
+                "drum": 1
+              },
+              {
+                "time": 7.242,
+                "drum": 0
+              },
+              {
+                "time": 7.564,
+                "drum": 2
+              },
+              {
+                "time": 9.098,
+                "drum": 2
+              },
+              {
+                "time": 9.573,
+                "drum": 1
+              },
+              {
+                "time": 9.671,
+                "drum": 0
+              },
+              {
+                "time": 10.676,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 5.7475,
+                "drum": 2
+              },
+              {
+                "time": 6.726645833,
+                "drum": 2
+              },
+              {
+                "time": 7.589041667,
+                "drum": 2
+              },
+              {
+                "time": 9.12575,
+                "drum": 2
+              },
+              {
+                "time": 10.70491667,
+                "drum": 2
+              }
+            ]
+          }
         }
       ]
     }
   ],
   "deployment_model_matches_reserved_fold": true,
   "baseline_sha256": "e9a33b6dedd1659d59ced1bf5709bf3dbbdf23d336d5eac0cb6b57ad91e3c14a",
-  "release_gate": "pass: no per-take regression, newly missed reference attacks, or new wrong/extra events at any tested gain; existing wrong/extra events associated within 25ms"
+  "release_gate": "pass: fingerprint-matched frozen Pocket04 baseline equals the paired ablation; no per-take regression, newly missed references, or new wrong/extra events; five or more quiet references recovered and three or more extras removed",
+  "baseline_file": "auto-heldout-pocket04.json"
 }

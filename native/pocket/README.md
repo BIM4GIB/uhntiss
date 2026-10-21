@@ -164,13 +164,16 @@ Random context augmentation uses only the remaining isolated clips.
 1 / 0.5 / 0.25 gain**. Each compiled engine identifies its exact model and must
 agree with Python on training descriptors and interpolated probes. Capture tests
 cover 72 successive two-bar windows with raw velocity and onset error below one
-sample. CI fails on per-take regressions, newly missed reference attacks, and new
-wrong/extra events against Pocket04. The shipped models match the uptempo-excluded
+sample. CI selects its frozen Pocket04 baseline by model fingerprints and verifies
+it with a paired run that disables only the new path. It fails on unknown models,
+per-take regressions, newly missed references and new wrong/extra events, and
+requires five recovered quiet hits and three fewer extras. The shipped models match the uptempo-excluded
 fold on the development host; every platform independently verifies export parity
 and compiled fingerprints. The transient trainer never reads uptempo in any fold.
 
 Results are modest: normal/half-level held-out results remain **243/271** and
-**228/271**. Quarter-level correct hits improve **220→225** across K/S/H; extras
+**228/271**. On the Mac, quarter-level correct hits improve **220→225** across K/S/H
+(Linux retraining: **219→224**); extras
 fall **16→13**, with no new wrong hits. The permanent uptempo holdout improves
 **25→27/37** at quarter level, but remains **30/37** at normal level: the hard
 kick/snare roll misses are unresolved. A frozen set of 27 breath-shaped noise

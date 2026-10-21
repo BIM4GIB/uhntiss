@@ -15,6 +15,8 @@ from Pocket04. The shipped combined model matches the uptempo-excluded fold on
 the development Mac; export parity and embedded fingerprints are checked on each
 platform, without assuming training is bit-identical across platforms.
 
+Development Mac results:
+
 | 48 kHz input gain | Correct 04 → 05 | Missed 04 → 05 | Wrong 04 → 05 | Extra 04 → 05 |
 | --- | --- | --- | --- | --- |
 | 1 | 243 → 243 | 12 → 12 | 16 → 16 | 14 → 14 |
@@ -23,10 +25,22 @@ platform, without assuming training is bit-identical across platforms.
 
 The five newly recovered quarter-level references are bb84 hat 10.67274s and
 kick 13.2419s, live_1_boombap snare 5.838s, and uptempo hats 7.564s and 9.098s.
-CI gates each take separately, rejects newly missed references, and checks that
-every remaining wrong/extra event corresponds to an existing one within 25 ms.
-`auto-heldout-pocket04.json` freezes the baseline; `auto-heldout.json` retains
-all errors, source hashes, model identities and capture checks.
+Linux retraining recovers the same five references, from 219 to 224 correct;
+misses fall 40 to 35 and extras 16 to 13. Its historical Pocket04 model already
+missed the quiet uptempo kick at 2.156s. Normal and half-level totals match the
+Mac. These are platform-dependent training results, not a changed release model.
+
+CI selects a frozen Pocket04 baseline by the eight primary-model fingerprints,
+then requires an identical score from a paired native run with only the new
+transient path disabled. Unknown model fingerprints fail. It gates each take,
+rejects newly missed references, checks that every remaining wrong/extra event
+corresponds to an existing one within 25 ms, and requires five recovered quiet
+references and three fewer extras. Both historical reports are retained in
+`auto-heldout-pocket04.json` and `auto-heldout-pocket04-linux.json`; the latter
+comes from [Pocket04 CI run 39541793161](https://github.com/BIM4GIB/uhntiss/actions/runs/39541793161).
+`auto-heldout.json` and `auto-heldout-linux.json` retain each host’s errors, source
+hashes, model identities, paired scores and capture checks. Failed CI runs also
+retain their evidence.
 
 The permanent uptempo holdout remains **30/37 correct at normal level**, with
 7 misses and 1 extra. At quarter level it improves **25 → 27/37**, with misses
