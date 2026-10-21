@@ -132,6 +132,40 @@ int main() {
           "loop keeps refined attack velocity");
   }
 
+  // The quiet Auto path must never alter manual/Teach or the research
+  // candidate stream, including after a policy change mid-performance.
+  for (auto policy :
+       {Detector::Policy::fixedVoice, Detector::Policy::candidates}) {
+    Detector detector;
+    AttackTracker reference;
+    detector.prepare(48000.);
+    reference.prepare(48000.);
+    int completions = 0;
+    for (int i = 0; i < 48000; ++i) {
+      const double t = i / 48000.;
+      const double within = std::fmod(t, .13);
+      const double input =
+          within < .04
+              ? .03 * std::sin(within * 2. * 3.141592653589793 * 3100.) *
+                    std::exp(-within * 80.)
+              : 0.;
+      Detection actual{}, expected{};
+      const bool a = detector.process(input, t, .010, actual, policy);
+      const bool b = reference.process(input, t, .010, expected, policy);
+      if (a != b || detector.started() != reference.started())
+        check(false, "Auto recovery leaked into single-tracker policy");
+      if (a) {
+        ++completions;
+        if (actual.beat != expected.beat ||
+            actual.velocity != expected.velocity ||
+            actual.features != expected.features)
+          check(false, "single-tracker timing/dynamics changed");
+      }
+    }
+    check(completions >= 6,
+          "single-tracker test exercised real attack windows");
+  }
+
   {
     Rig r;
     r.e.learn(1);

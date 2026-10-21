@@ -1,12 +1,12 @@
 // Test-only real-audio host check. Excluded from the performance device.
 inlets=1;outlets=0;
 var stage=0,notes=[],saved=null,tasks=[],expected=[],liveExpected=[],liveSeen=[];
-var duration=0,sourceDone=true,lastSerial=0,skipped=false,beatSeconds=.5;
+var duration=0,sourceDone=true,lastSerial=0,skipped=false,beatSeconds=.5,sampleRate=48000;
 function later(ms,fn){var t=new Task(fn,this);tasks.push(t);t.schedule(ms);}
 function command(name){this.patcher.getnamed('pocket_engine').message(name);}
 function loadbang(){
  var f=new File(jsarguments[1],'read');if(f.isopen){var config=JSON.parse(f.readstring(f.eof));f.close();
-  expected=config.capture||config;liveExpected=config.live||[];duration=config.duration_ms||0;sourceDone=!duration;beatSeconds=config.beat_seconds||.5;
+  expected=config.capture||config;liveExpected=config.live||[];duration=config.duration_ms||0;sourceDone=!duration;beatSeconds=config.beat_seconds||.5;sampleRate=config.sample_rate||48000;
  }
 }
 function report(ok,detail){
@@ -19,8 +19,9 @@ function checkNotes(){
  if(notes.length!==expected.length*3)return false;
  for(var i=0;i<expected.length;i++){
   if(notes[i*3+2]!==expected[i][1])return false;
+  if(expected[i].length>2&&Math.abs(notes[i*3+1]-expected[i][2])>1e-6)return false;
   // Actual host beat duration: relative times follow the source, not a grid.
-  if(Math.abs((notes[i*3]-notes[0])*beatSeconds-(expected[i][0]-expected[0][0]))>.001)return false;
+  if(Math.abs((notes[i*3]-notes[0])*beatSeconds-(expected[i][0]-expected[0][0]))>1.01/sampleRate)return false;
  }
  return true;
 }
@@ -38,5 +39,5 @@ function status(s,run,p,l,u,d,h,n){
   if(!checkNotes()){report(false,'Undo changed audio take');return;}command('clear');
  });}
  if(stage===5&&n===0){stage=6;later(100,function(){this.patcher.getnamed('loop_state').setvalueof(saved);});}
- if(stage===6&&n===expected.length){stage=7;later(100,function(){report(checkNotes(),'Real vocal audio: full live voices, two-bar relative pocket, Clear, Undo and v4 blob restore checked.');});}
+ if(stage===6&&n===expected.length){stage=7;later(100,function(){report(checkNotes(),'Real vocal audio: complete captured voice sequence, raw dynamics, relative pocket, Clear, Undo and v4 blob restore checked.');});}
 }

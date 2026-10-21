@@ -1,4 +1,4 @@
-# UHNTISS Pocket 03 · Auto drums
+# UHNTISS Pocket 04 · Auto drums
 
 A local voice-to-drum instrument and two-bar looper for Ableton Live. Native C++
 handles detection, synthesis, transport and recording. Max for Live supplies the
@@ -6,7 +6,8 @@ host connection and controls. Python remains an offline research tool.
 
 **Playable performance alpha.** Auto now uses a native, trained attack classifier
 and captures mixed kick/snare/hat performances without changing voices. The
-factory model uses the isolated recordings and eight full takes you confirmed. Different
+factory model uses non-reserved isolated recordings and seven full takes. The
+entire uptempo take stays outside training, including all derived audio. Different
 voices, mic positions and snare articulations can still need a short soundcheck.
 This is not a claim of stage reliability or performer endorsement.
 
@@ -16,7 +17,7 @@ Requires macOS 11+, Ableton Live with Max for Live, and a mono mic input. The
 provided external is universal Apple Silicon/Intel. The portable core also builds
 on Linux; there is no Windows Max external in this release.
 
-1. Keep `UHNTISS Pocket.amxd`, `pocket-ui.js` and `uhntiss.pocket03~.mxo` together.
+1. Keep `UHNTISS Pocket.amxd`, `pocket-ui.js` and `uhntiss.pocket04~.mxo` together.
    Drag the `.amxd` onto an **audio track**. No API key, bridge, Python, Node server,
    network connection or downloaded kit is needed to play.
 2. Select your mono mic channel in Live; set the track's Monitor to **In**. The
@@ -60,13 +61,18 @@ Live device/set via a `pattr` blob.
 
 Auto measures six log-energy bands in the early and late halves of a **10 ms**
 attack window, zero crossings, crest shape, and three power/context descriptors.
-The context uses the **preceding** 30 ms; it adds no lookahead. A compiled forest
-of 300 trees (maximum depth 12) chooses kick, snare, hat or rejection. Its two
-training weightings balance in-context articulation with isolated timbre. Inference
-is bounded C++; no audio samples, model download, rhythm prediction or grid enters
-this path. Low rumble is attenuated in the onset envelope while the timbre and
-velocity path retains the lower-frequency body. A rejected precursor cannot lock
-out a subsequent fresh attack.
+The context uses the **preceding** 30 ms; it adds no lookahead. The primary
+300-tree model chooses a voice or rejection. A second model may recover a rejected
+window only when its voice and attack evidence are strong. A parallel, quieter
+tracker accepts only low-level hats, with primary attacks taking priority and a
+shared 35 ms minimum separation. Both paths retain raw dynamics and original
+onset timestamps. Neither path boosts the audible input or changes the 10 ms
+classification deadline. Fixed voices and Teach retain their single-track path.
+
+Above 48 kHz, a separately calibrated primary forest replaces the normal-rate
+forest; it uses additional resampled, non-reserved isolated calibration hits.
+Only one primary forest runs per attack. All trees have depth at most 12. The
+runtime remains fixed-storage C++ with no model download or rhythm grid.
 
 The optional personal profile keeps all **nine examples** and uses three nearest
 examples to choose among accepted drums. It preserves factory noise rejection.
@@ -139,33 +145,35 @@ For native Auto regression and research (Python is development-only):
 uv run python -m eval.test_native_auto
 uv run python -m eval.test_real_auto --build native/pocket/build --report native/pocket/build/real-takes.json
 uv run python -m eval.real_auto report --binary native/pocket/build/pocket_analyze
-uv run python -m eval.real_auto train --binary native/pocket/build/pocket_analyze
+uv run --with scikit-learn==1.8.0 python -m eval.heldout_auto --binary native/pocket/build/pocket_analyze --report native/pocket/build/heldout.json
+uv run --with scikit-learn==1.8.0 python -m eval.transfer_auto --binary native/pocket/build/pocket_analyze
 # Rebuild after regenerating the compiled model, then repeat both regressions.
 ```
 
-`auto-model.json` records source hashes, reserved attacks, the acoustic audit hash,
-model parameters, scikit-learn version and native whole-take cross-validation.
-Training uses all eight personal takes plus isolated examples in varied preceding
-contexts. Every fourth isolated primary attack and candidates within 200 ms are
-excluded before augmentation. The constructed regression is never training audio.
-Its reserved attacks have been used during development; it is a regression, not
-an untouched test set. Model extraction uses the actual C++ detector. The offline
-candidate policy is independent of the current classifier, preventing training
-or validation from borrowing the all-data model's rejection decisions.
+`auto-model.json` records source hashes, exclusions and model configuration.
+Training excludes `live_6_uptempo` before reading audio or generating variants.
+Every reserved isolated attack and its 200 ms neighbourhood also stays excluded.
+Random context augmentation uses only the remaining isolated clips.
 
-The new `eval/data/pocket-real-takes.json` audit records distinct acoustic bursts,
-including ghost hits and multipart phrases, without imposing a beat grid. These
-are **signal-assisted waveform/spectral labels, not independent human listening
-annotations**. Full-take matching is one-to-one with a 25 ms association tolerance.
-`auto-real-takes.json` includes every before/after error, rate/gain stress case,
-24 capture windows covering the complete recordings, and a causality check.
+`auto-heldout.json` rebuilds a model for each omitted whole take at **48 kHz ×
+1 / 0.5 / 0.25 gain**. Each compiled engine identifies its exact model and must
+agree with Python on training descriptors and interpolated probes. Capture tests
+cover 72 successive two-bar windows with raw velocity and onset error below one
+sample. CI fails if any aggregate correct/missed/wrong/extra count worsens against
+Pocket03 at a tested gain. The shipped model is exactly the uptempo-excluded fold.
 
-Scores on the supplied takes are **personal-corpus regressions** because those
-takes now train the model. The separate leave-one-whole-take-out estimate rebuilds
-and replays a native model excluding every gain variant of that take. All folds,
-including misses, wrong voices and extra triggers, remain in `auto-model.json`.
-It is a development estimate from the same performer, not proof of stage or
-unseen-performer reliability. Read `VALIDATION.md` for current results and limits.
+Results are modest: correct held-out hits improve **241→243**, **226→228** and
+**213→220** out of 271, respectively. Wrong voices do not increase; quarter-level
+extras fall **18→16**. This does not establish stage or unseen-performer reliability.
+The recordings informed development; the labels are signal-assisted rather than
+independent listening annotations. The 25 ms scoring tolerance is separate from
+the sub-sample capture check. Every remaining error is retained in the reports.
+
+The old 271/271 all-data score is no longer the deployment target: keeping the
+uptempo source out of training produces 264/271 at the original rate/level and
+263/271 at 48 kHz. Full deployed-model regressions at three rates and four gains
+are in `auto-real-takes.json`. Read `VALIDATION.md` before treating this as a live
+performance instrument.
 
 ## Architecture decision
 

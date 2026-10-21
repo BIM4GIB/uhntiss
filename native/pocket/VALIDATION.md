@@ -1,77 +1,88 @@
-# Pocket 03 · full real-take validation — 2026-10-21
+# Pocket 04 · held-out and quiet-hit recovery — 2026-10-21
 
-The eight original, untrimmed personal takes contain **271 audited attacks**.
-Pocket 02 matched 169 voices correctly, missed 8, chose 94 wrong voices and added
-118 triggers. Pocket 03 matches **271/271**, with **0 missed, wrong or extra hits**
-at the original recording rate and level. Every error timestamp from the earlier
-engine is retained in `auto-real-takes.json`.
+This is a **modest transfer improvement**, not a claim that fresh-take reliability
+or stage performance is solved. Quiet hats gain a conservative recovery path;
+confident primary voices retain priority. Python remains research-only.
 
-These takes now train the personal factory model. This is a corpus regression,
-not unseen-performance accuracy. Labels came from signal-assisted waveform and
-spectral inspection, not independent human listening. They retain distinct
-bursts and ghost hits and omit repeated triggers inside a continuous sound. The
-reference is not a quantized beat grid. One-to-one association allows 25 ms.
+## Whole-source held-out replay at 48 kHz
 
-## Transfer and limits
+All 271 fixed reference attacks in eight untrimmed recordings are scored with
+one-to-one matching within 25 ms. Each take is replayed through a separately
+trained native model that excludes that source and every gain/resampling variant.
 
-Native leave-one-whole-take-out development replay excludes every variant of
-the evaluated take: **239/271 correct**, 14 missed, 18 wrong voices and 16 extra
-triggers. Each fold compiles and runs its own model, including its own onset
-recovery decisions. Hyperparameters were developed against this same collection;
-this is not an untouched benchmark or an unseen-performer test.
+| Input gain | Correct before → after | Missed before → after | Wrong before → after | Extra before → after |
+| --- | --- | --- | --- | --- |
+| 1 | 241 → 243 | 14 → 12 | 16 → 16 | 14 → 14 |
+| 0.5 | 226 → 228 | 28 → 26 | 17 → 17 | 17 → 17 |
+| 0.25 | 213 → 220 | 46 → 39 | 12 → 12 | 18 → 16 |
 
-At the same level after resampling, the full-corpus score is **269/271 at 48 kHz**
-(1 miss, 1 wrong voice, 1 extra) and **266/271 at 96 kHz** (3 misses, 2 wrong voices,
-3 extras). Halving input level produces 253–256 correct hits, with 14–16 misses;
-the fixed gate can lose quiet attacks. Doubling it produces 263–268 correct hits.
-All nine rate/gain cases and their individual errors remain in the report.
-Adjust Input/Gate during soundcheck; this release does not claim gain invariance,
-speaker-bleed cancellation, speech rejection or stage reliability.
+The baseline is the exact Pocket03 source/model-training policy, recomputed at
+48 kHz. `auto-heldout-pocket03.json` and `auto-heldout.json` retain every error,
+source hash and model identity. CI gates correct, missed, wrong and extra counts
+separately at each level. Existing reference labels were not changed to fit output.
 
-## Timing, state and build checks
+The recovery rules were selected using these development recordings. Whole-source
+training exclusion prevents waveform leakage; it does **not** make repeatedly
+inspected recordings an untouched benchmark. Labels are signal-assisted acoustic
+annotations, not independent listening ground truth. Quarter-level replay tests
+amplitude robustness; naturally quiet articulation, new mic positions and voices
+still need independent validation.
 
-| Check | Result |
-| --- | --- |
-| C++ core / ASan / UBSan | Pass; 100095 assertions, including 100000 queue messages |
-| Existing Python suite | 136 passed; local TCP fixtures require loopback access |
-| Reserved constructed groove | 32/32 voices, no missing/extra hits at 44.1/48/96 kHz × 0.5/1/2 gain |
-| Full-take capture | 24 successive two-bar windows cover all eight takes; detected onset to loop error < one sample; velocity unchanged |
-| Causality | Replacing every sample after a cut leaves earlier completed decisions and features identical |
-| Decision window | 10 ms, unchanged; preceding 30 ms contributes context without lookahead |
-| Model export | All 5135 development feature rows match Python/native decisions exactly, including lossless shared-tree export |
-| State | v4 round trip; v2/v3 loops preserve timing while incompatible profiles reset |
-| Device build | Universal arm64/x86_64; ad-hoc signature and container checks pass |
+The entire `live_6_uptempo` source is excluded before deployment training or
+augmentation. The shipped model hash equals that excluded fold's hash. Its fast
+roll misses remain: at normal 48 kHz it gets 30/37 correct, with 7 misses and one
+extra; at quarter level it gets 25/37 correct. Do not present the 271/271 old
+all-data regression as this model's transfer accuracy.
 
-Reserved isolated attacks and every candidate within 200 ms are excluded at all
-training gains. Random context augmentation uses only the remaining isolated
-attacks. Constructed tests were used during development and remain regressions,
-not independent validation. Python is absent from the running device.
+## Runtime and timing
 
-The model has 300 trees with maximum depth 12. Identical leaves and subtrees are
-shared without rounding thresholds or probabilities. Runtime inference, detector
-history, synthesis and loop storage have fixed bounds, with no heap allocation,
-locks, network or file access in the audio callback.
+The primary model may recover a rejected attack using a separate voice/rejection
+model. A second detector runs at 0.3 × Gate and accepts only hats with low noise
+probability and raw velocity at most 0.22. Primary pending windows have priority;
+a shared sample counter enforces 35 ms onset separation. No rhythm grid, gain
+boost, added lookahead or deferred voice correction enters the audio path.
 
-The real-audio benchmark with a full 512-event loop processed 14.4 seconds of
-snare-heavy audio in 0.198 seconds and accepted 45 live hits. The 99th-percentile
-64-sample block was 0.049 ms; the observed maximum was 3.037 ms, exceeding that
-block's 1.451 ms budget on this desktop run. This is not a hard real-time or
+Both paths decide after the same **10 ms** window and retain the detected onset
+and raw velocity. Context comes from the preceding 30 ms. Fixed voices and Teach
+use their original single detector. The 17-feature state remains v4-compatible.
+
+900 trees are stored: 300 normal-rate primary, 300 high-rate primary, and 300
+recovery. Exactly one primary forest runs per attack. Above 48 kHz the primary
+uses additional non-reserved calibration at 48/96 kHz; quiet and rejected-attack
+recovery remain bounded. All trees have depth at most 12. The audio callback has
+fixed storage and no heap allocation, locks, files, network or Python.
+
+## Verification
+
+- 100097 core assertions; AddressSanitizer and UndefinedBehaviorSanitizer pass.
+- 136 existing Python tests and the Max packaging test pass.
+- 300888 native/Python parity decisions across both rate models and all folds;
+  the compiled engine returns a fingerprint of its actual exported header.
+- 72 held-out capture windows preserve voices and velocities, with detected
+  onset-to-loop error below 1.01 samples. Future-audio mutation leaves completed
+  decisions identical. Decision windows never exceed 10 ms.
+- Reserved 32-hit constructed groove passes at 44.1/48/96 kHz × .5/1/2 gain;
+  silence, DC and quiet-room-noise regressions pass.
+- Deployed model: 12 full-take rate/level cases, 24 original-rate capture windows,
+  causality, and frozen per-metric regression gates pass. Normal-rate totals are
+  264/271 at 44.1 kHz and 263/271 at 48 kHz because uptempo remains excluded.
+- Universal arm64/x86_64 build, ad-hoc code signature and container checks pass.
+
+The four 48 kHz desktop benchmarks have 64-sample p99 times of 0.055–0.063 ms.
+One observed maximum is 3.079 ms, above the 1.333 ms block budget. CPU time has
+increased; an unchanged analysis window is not a hard real-time scheduling or
 hardware round-trip latency guarantee. See `auto-benchmark.json`.
 
-## Live host check
+## Live host validation
 
-Pocket 03 passed the full-take check in Live at 48 kHz: all 45 voices in the
-14.4-second snare-heavy take matched, with relative onset error below one sample.
-The harness captures the whole take in two bars at a 30 BPM host; the source
-plays at its original speed. Clear, Undo and v4 saved-state restore also passed.
-`auto-host-smoke.json` records the actual events, expected events and source,
-model and binary hashes. This verifies host capture, not hardware round-trip latency.
+Pocket04 passed in Live at 48 kHz on the entire 14.4-second uptempo source at
+quarter level. A 30 BPM host supplies a 16-second capture window; the source
+plays at its original speed. All 31 native detections captured with matching
+voices and velocities; relative onset error was 0.000160 samples. Clear, Undo and
+v4 state restore passed. These are 31 native predictions, **not** 31 correct
+reference attacks. `auto-host-smoke.json` retains events and source/model/binary
+hashes. Pocket03's historical result is in `auto-host-smoke-pocket03.json`.
 
-An earlier attempt reported a mismatch while collecting per-hit UI status. The
-final check verifies the captured event list instead; its status collector also
-reported no skipped messages. The historical Pocket 02 host check remains in
-`auto-host-smoke-pocket02.json`.
-
-Hardware latency, physical footswitches, long sessions, new microphones/voices,
-and attacks closer than 35 ms remain unverified. No performer endorsement is
-implied.
+Hardware round-trip latency, sustained stage sessions, speech/bleed rejection,
+new performers and overlapping vocal classes remain unverified. No performer
+endorsement is implied.

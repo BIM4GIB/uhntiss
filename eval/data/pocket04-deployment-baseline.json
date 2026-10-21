@@ -1,0 +1,145 @@
+{
+  "scope": "Frozen Pocket04 regression, including one source excluded from training; not a test-set accuracy claim.",
+  "model_sha256": "6a3397b336cfd2a941c0ce92819588fafec6b41414d1fffcfc0c8d403112b5b9",
+  "original_summary": {
+    "reference_hits": 271,
+    "correct": 264,
+    "missed": 7,
+    "wrong": 0,
+    "extra": 2
+  },
+  "cases": [
+    {
+      "sample_rate": 44100,
+      "gain": 0.25,
+      "summary": {
+        "reference_hits": 271,
+        "correct": 239,
+        "missed": 26,
+        "wrong": 6,
+        "extra": 9
+      }
+    },
+    {
+      "sample_rate": 44100,
+      "gain": 0.5,
+      "summary": {
+        "reference_hits": 271,
+        "correct": 254,
+        "missed": 16,
+        "wrong": 1,
+        "extra": 2
+      }
+    },
+    {
+      "sample_rate": 44100,
+      "gain": 1,
+      "summary": {
+        "reference_hits": 271,
+        "correct": 264,
+        "missed": 7,
+        "wrong": 0,
+        "extra": 2
+      }
+    },
+    {
+      "sample_rate": 44100,
+      "gain": 2,
+      "summary": {
+        "reference_hits": 271,
+        "correct": 261,
+        "missed": 10,
+        "wrong": 0,
+        "extra": 3
+      }
+    },
+    {
+      "sample_rate": 48000,
+      "gain": 0.25,
+      "summary": {
+        "reference_hits": 271,
+        "correct": 239,
+        "missed": 25,
+        "wrong": 7,
+        "extra": 9
+      }
+    },
+    {
+      "sample_rate": 48000,
+      "gain": 0.5,
+      "summary": {
+        "reference_hits": 271,
+        "correct": 254,
+        "missed": 15,
+        "wrong": 2,
+        "extra": 2
+      }
+    },
+    {
+      "sample_rate": 48000,
+      "gain": 1,
+      "summary": {
+        "reference_hits": 271,
+        "correct": 263,
+        "missed": 7,
+        "wrong": 1,
+        "extra": 2
+      }
+    },
+    {
+      "sample_rate": 48000,
+      "gain": 2,
+      "summary": {
+        "reference_hits": 271,
+        "correct": 260,
+        "missed": 10,
+        "wrong": 1,
+        "extra": 2
+      }
+    },
+    {
+      "sample_rate": 96000,
+      "gain": 0.25,
+      "summary": {
+        "reference_hits": 271,
+        "correct": 229,
+        "missed": 32,
+        "wrong": 10,
+        "extra": 7
+      }
+    },
+    {
+      "sample_rate": 96000,
+      "gain": 0.5,
+      "summary": {
+        "reference_hits": 271,
+        "correct": 247,
+        "missed": 18,
+        "wrong": 6,
+        "extra": 4
+      }
+    },
+    {
+      "sample_rate": 96000,
+      "gain": 1,
+      "summary": {
+        "reference_hits": 271,
+        "correct": 263,
+        "missed": 6,
+        "wrong": 2,
+        "extra": 2
+      }
+    },
+    {
+      "sample_rate": 96000,
+      "gain": 2,
+      "summary": {
+        "reference_hits": 271,
+        "correct": 259,
+        "missed": 10,
+        "wrong": 2,
+        "extra": 6
+      }
+    }
+  ]
+}

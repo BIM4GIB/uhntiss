@@ -1,7 +1,7 @@
 {
   "reference": "Signal-assisted audit of full waveforms, 256-sample spectrograms and 80-100 ms spectral bodies, inspected before model changes. Approximate acoustic onset times; no snapping or grid-derived timestamps. Labels infer acoustic drum intent; not independent human listening annotations. Every distinct burst retained; within-body retriggers and steady rumble excluded.",
   "tolerance_ms": 25,
-  "scope": "Full untrimmed personal recordings used for deployment training. Regression, not unseen-performance accuracy.",
+  "scope": "Full untrimmed recordings: seven training sources and the reserved uptempo source. Development regression, not untouched-test accuracy.",
   "before": {
     "commit": "e51f75fdbea879527a5ab6f120ae8ae1ddd9c62d",
     "summary": {
@@ -1084,10 +1084,10 @@
   "after": {
     "summary": {
       "reference_hits": 271,
-      "correct": 271,
-      "missed": 0,
+      "correct": 264,
+      "missed": 7,
       "wrong": 0,
-      "extra": 0
+      "extra": 2
     },
     "takes": [
       {
@@ -1111,11 +1111,16 @@
       {
         "take": "live_1_boombap",
         "reference_hits": 21,
-        "detected": 21,
+        "detected": 22,
         "correct": 21,
         "wrong": [],
         "missed": [],
-        "extra": []
+        "extra": [
+          {
+            "time": 5.878820862,
+            "drum": 1
+          }
+        ]
       },
       {
         "take": "live_2_fourfloor",
@@ -1156,64 +1161,121 @@
       {
         "take": "live_6_uptempo",
         "reference_hits": 37,
-        "detected": 37,
-        "correct": 37,
+        "detected": 31,
+        "correct": 30,
         "wrong": [],
-        "missed": [],
-        "extra": []
+        "missed": [
+          {
+            "time": 2.313,
+            "drum": 0
+          },
+          {
+            "time": 4.604,
+            "drum": 1
+          },
+          {
+            "time": 7.148,
+            "drum": 1
+          },
+          {
+            "time": 7.242,
+            "drum": 0
+          },
+          {
+            "time": 7.564,
+            "drum": 2
+          },
+          {
+            "time": 9.573,
+            "drum": 1
+          },
+          {
+            "time": 9.671,
+            "drum": 0
+          }
+        ],
+        "extra": [
+          {
+            "time": 7.590521542,
+            "drum": 2
+          }
+        ]
       }
     ]
   },
   "rate_gain_cases": [
     {
       "sample_rate": 44100,
-      "gain": 0.5,
+      "gain": 0.25,
       "summary": {
         "reference_hits": 271,
-        "correct": 256,
-        "missed": 14,
-        "wrong": 1,
-        "extra": 1
+        "correct": 239,
+        "missed": 26,
+        "wrong": 6,
+        "extra": 9
       },
       "takes": [
         {
           "take": "bb100",
           "reference_hits": 31,
-          "detected": 31,
-          "correct": 31,
+          "detected": 32,
+          "correct": 30,
           "wrong": [],
-          "missed": [],
-          "extra": []
+          "missed": [
+            {
+              "time": 9.32481,
+              "drum": 1
+            }
+          ],
+          "extra": [
+            {
+              "time": 4.116825397,
+              "drum": 2
+            },
+            {
+              "time": 5.385238095,
+              "drum": 2
+            }
+          ]
         },
         {
           "take": "bb84",
           "reference_hits": 31,
-          "detected": 31,
-          "correct": 30,
+          "detected": 29,
+          "correct": 28,
           "wrong": [
             {
-              "time": 9.633356009,
+              "time": 9.637619048,
               "expected": 1,
               "actual": 2
             }
           ],
-          "missed": [],
+          "missed": [
+            {
+              "time": 12.42676,
+              "drum": 1
+            },
+            {
+              "time": 13.2419,
+              "drum": 0
+            }
+          ],
           "extra": []
         },
         {
           "take": "live_1_boombap",
           "reference_hits": 21,
-          "detected": 12,
+          "detected": 13,
           "correct": 12,
           "wrong": [],
           "missed": [
             {
-              "time": 0.149,
+              "time": 1.342,
               "drum": 2
             },
             {
-              "time": 1.342,
-              "drum": 2
+              "time": 1.677,
+              "drum": 0
             },
             {
               "time": 1.97,
@@ -1240,23 +1302,254 @@
               "drum": 2
             },
             {
-              "time": 6.234,
+              "time": 5.838,
+              "drum": 1
+            }
+          ],
+          "extra": [
+            {
+              "time": 0.229478458,
+              "drum": 2
+            }
+          ]
+        },
+        {
+          "take": "live_2_fourfloor",
+          "reference_hits": 29,
+          "detected": 30,
+          "correct": 28,
+          "wrong": [],
+          "missed": [
+            {
+              "time": 7.477,
+              "drum": 2
+            }
+          ],
+          "extra": [
+            {
+              "time": 5.785736961,
+              "drum": 2
+            },
+            {
+              "time": 7.514081633,
+              "drum": 2
+            }
+          ]
+        },
+        {
+          "take": "live_3_snareheavy",
+          "reference_hits": 45,
+          "detected": 45,
+          "correct": 44,
+          "wrong": [
+            {
+              "time": 5.196507937,
+              "expected": 1,
+              "actual": 0
+            }
+          ],
+          "missed": [],
+          "extra": []
+        },
+        {
+          "take": "live_4_kicksnare",
+          "reference_hits": 33,
+          "detected": 32,
+          "correct": 31,
+          "wrong": [
+            {
+              "time": 5.087845805,
+              "expected": 1,
+              "actual": 2
+            }
+          ],
+          "missed": [
+            {
+              "time": 10.5181,
               "drum": 2
             }
           ],
           "extra": []
         },
         {
-          "take": "live_2_fourfloor",
-          "reference_hits": 29,
-          "detected": 27,
+          "take": "live_5_sparse",
+          "reference_hits": 44,
+          "detected": 42,
+          "correct": 40,
+          "wrong": [
+            {
+              "time": 5.184444444,
+              "expected": 1,
+              "actual": 0
+            },
+            {
+              "time": 7.774739229,
+              "expected": 1,
+              "actual": 2
+            }
+          ],
+          "missed": [
+            {
+              "time": 7.908,
+              "drum": 1
+            },
+            {
+              "time": 11.715,
+              "drum": 0
+            }
+          ],
+          "extra": []
+        },
+        {
+          "take": "live_6_uptempo",
+          "reference_hits": 37,
+          "detected": 31,
           "correct": 26,
+          "wrong": [
+            {
+              "time": 1.97185941,
+              "expected": 1,
+              "actual": 0
+            }
+          ],
+          "missed": [
+            {
+              "time": 2.313,
+              "drum": 0
+            },
+            {
+              "time": 4.604,
+              "drum": 1
+            },
+            {
+              "time": 5.714,
+              "drum": 2
+            },
+            {
+              "time": 6.694,
+              "drum": 2
+            },
+            {
+              "time": 7.148,
+              "drum": 1
+            },
+            {
+              "time": 7.242,
+              "drum": 0
+            },
+            {
+              "time": 7.564,
+              "drum": 2
+            },
+            {
+              "time": 9.573,
+              "drum": 1
+            },
+            {
+              "time": 9.671,
+              "drum": 0
+            },
+            {
+              "time": 10.676,
+              "drum": 2
+            }
+          ],
+          "extra": [
+            {
+              "time": 5.747505669,
+              "drum": 2
+            },
+            {
+              "time": 6.726712018,
+              "drum": 2
+            },
+            {
+              "time": 7.589092971,
+              "drum": 2
+            },
+            {
+              "time": 10.70492063,
+              "drum": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sample_rate": 44100,
+      "gain": 0.5,
+      "summary": {
+        "reference_hits": 271,
+        "correct": 254,
+        "missed": 16,
+        "wrong": 1,
+        "extra": 2
+      },
+      "takes": [
+        {
+          "take": "bb100",
+          "reference_hits": 31,
+          "detected": 31,
+          "correct": 31,
+          "wrong": [],
+          "missed": [],
+          "extra": []
+        },
+        {
+          "take": "bb84",
+          "reference_hits": 31,
+          "detected": 31,
+          "correct": 31,
+          "wrong": [],
+          "missed": [],
+          "extra": []
+        },
+        {
+          "take": "live_1_boombap",
+          "reference_hits": 21,
+          "detected": 16,
+          "correct": 15,
           "wrong": [],
           "missed": [
             {
-              "time": 6.323,
+              "time": 0.149,
               "drum": 2
             },
+            {
+              "time": 2.549,
+              "drum": 2
+            },
+            {
+              "time": 3.77,
+              "drum": 2
+            },
+            {
+              "time": 4.349,
+              "drum": 2
+            },
+            {
+              "time": 4.931,
+              "drum": 2
+            },
+            {
+              "time": 5.518,
+              "drum": 2
+            }
+          ],
+          "extra": [
+            {
+              "time": 5.878956916,
+              "drum": 1
+            }
+          ]
+        },
+        {
+          "take": "live_2_fourfloor",
+          "reference_hits": 29,
+          "detected": 27,
+          "correct": 27,
+          "wrong": [],
+          "missed": [
             {
               "time": 7.477,
               "drum": 2
@@ -1266,12 +1559,7 @@
               "drum": 2
             }
           ],
-          "extra": [
-            {
-              "time": 6.353401361,
-              "drum": 2
-            }
-          ]
+          "extra": []
         },
         {
           "take": "live_3_snareheavy",
@@ -1303,20 +1591,55 @@
         {
           "take": "live_6_uptempo",
           "reference_hits": 37,
-          "detected": 35,
-          "correct": 35,
-          "wrong": [],
+          "detected": 30,
+          "correct": 28,
+          "wrong": [
+            {
+              "time": 4.462312925,
+              "expected": 1,
+              "actual": 0
+            }
+          ],
           "missed": [
+            {
+              "time": 2.313,
+              "drum": 0
+            },
+            {
+              "time": 4.604,
+              "drum": 1
+            },
             {
               "time": 5.714,
               "drum": 2
+            },
+            {
+              "time": 6.694,
+              "drum": 2
+            },
+            {
+              "time": 7.148,
+              "drum": 1
+            },
+            {
+              "time": 7.242,
+              "drum": 0
+            },
+            {
+              "time": 9.573,
+              "drum": 1
             },
             {
               "time": 9.671,
               "drum": 0
             }
           ],
-          "extra": []
+          "extra": [
+            {
+              "time": 5.744172336,
+              "drum": 2
+            }
+          ]
         }
       ]
     },
@@ -1325,10 +1648,10 @@
       "gain": 1.0,
       "summary": {
         "reference_hits": 271,
-        "correct": 271,
-        "missed": 0,
+        "correct": 264,
+        "missed": 7,
         "wrong": 0,
-        "extra": 0
+        "extra": 2
       },
       "takes": [
         {
@@ -1352,11 +1675,16 @@
         {
           "take": "live_1_boombap",
           "reference_hits": 21,
-          "detected": 21,
+          "detected": 22,
           "correct": 21,
           "wrong": [],
           "missed": [],
-          "extra": []
+          "extra": [
+            {
+              "time": 5.878820862,
+              "drum": 1
+            }
+          ]
         },
         {
           "take": "live_2_fourfloor",
@@ -1397,11 +1725,45 @@
         {
           "take": "live_6_uptempo",
           "reference_hits": 37,
-          "detected": 37,
-          "correct": 37,
+          "detected": 31,
+          "correct": 30,
           "wrong": [],
-          "missed": [],
-          "extra": []
+          "missed": [
+            {
+              "time": 2.313,
+              "drum": 0
+            },
+            {
+              "time": 4.604,
+              "drum": 1
+            },
+            {
+              "time": 7.148,
+              "drum": 1
+            },
+            {
+              "time": 7.242,
+              "drum": 0
+            },
+            {
+              "time": 7.564,
+              "drum": 2
+            },
+            {
+              "time": 9.573,
+              "drum": 1
+            },
+            {
+              "time": 9.671,
+              "drum": 0
+            }
+          ],
+          "extra": [
+            {
+              "time": 7.590521542,
+              "drum": 2
+            }
+          ]
         }
       ]
     },
@@ -1410,10 +1772,10 @@
       "gain": 2.0,
       "summary": {
         "reference_hits": 271,
-        "correct": 268,
-        "missed": 3,
+        "correct": 261,
+        "missed": 10,
         "wrong": 0,
-        "extra": 0
+        "extra": 3
       },
       "takes": [
         {
@@ -1487,20 +1849,334 @@
         {
           "take": "live_5_sparse",
           "reference_hits": 44,
-          "detected": 44,
+          "detected": 45,
           "correct": 44,
           "wrong": [],
           "missed": [],
+          "extra": [
+            {
+              "time": 4.389455782,
+              "drum": 0
+            }
+          ]
+        },
+        {
+          "take": "live_6_uptempo",
+          "reference_hits": 37,
+          "detected": 32,
+          "correct": 30,
+          "wrong": [],
+          "missed": [
+            {
+              "time": 2.313,
+              "drum": 0
+            },
+            {
+              "time": 4.604,
+              "drum": 1
+            },
+            {
+              "time": 7.148,
+              "drum": 1
+            },
+            {
+              "time": 7.242,
+              "drum": 0
+            },
+            {
+              "time": 7.564,
+              "drum": 2
+            },
+            {
+              "time": 9.573,
+              "drum": 1
+            },
+            {
+              "time": 9.671,
+              "drum": 0
+            }
+          ],
+          "extra": [
+            {
+              "time": 6.425646259,
+              "drum": 1
+            },
+            {
+              "time": 7.590521542,
+              "drum": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sample_rate": 48000,
+      "gain": 0.25,
+      "summary": {
+        "reference_hits": 271,
+        "correct": 239,
+        "missed": 25,
+        "wrong": 7,
+        "extra": 9
+      },
+      "takes": [
+        {
+          "take": "bb100",
+          "reference_hits": 31,
+          "detected": 32,
+          "correct": 30,
+          "wrong": [],
+          "missed": [
+            {
+              "time": 9.32481,
+              "drum": 1
+            }
+          ],
+          "extra": [
+            {
+              "time": 4.116833333,
+              "drum": 2
+            },
+            {
+              "time": 5.38525,
+              "drum": 2
+            }
+          ]
+        },
+        {
+          "take": "bb84",
+          "reference_hits": 31,
+          "detected": 29,
+          "correct": 27,
+          "wrong": [
+            {
+              "time": 11.7564375,
+              "expected": 0,
+              "actual": 1
+            },
+            {
+              "time": 9.637625,
+              "expected": 1,
+              "actual": 2
+            }
+          ],
+          "missed": [
+            {
+              "time": 12.42676,
+              "drum": 1
+            },
+            {
+              "time": 13.2419,
+              "drum": 0
+            }
+          ],
+          "extra": []
+        },
+        {
+          "take": "live_1_boombap",
+          "reference_hits": 21,
+          "detected": 14,
+          "correct": 13,
+          "wrong": [],
+          "missed": [
+            {
+              "time": 1.342,
+              "drum": 2
+            },
+            {
+              "time": 1.677,
+              "drum": 0
+            },
+            {
+              "time": 1.97,
+              "drum": 2
+            },
+            {
+              "time": 2.549,
+              "drum": 2
+            },
+            {
+              "time": 4.349,
+              "drum": 2
+            },
+            {
+              "time": 4.931,
+              "drum": 2
+            },
+            {
+              "time": 5.518,
+              "drum": 2
+            },
+            {
+              "time": 5.838,
+              "drum": 1
+            }
+          ],
+          "extra": [
+            {
+              "time": 0.2295,
+              "drum": 2
+            }
+          ]
+        },
+        {
+          "take": "live_2_fourfloor",
+          "reference_hits": 29,
+          "detected": 30,
+          "correct": 29,
+          "wrong": [],
+          "missed": [],
+          "extra": [
+            {
+              "time": 5.78575,
+              "drum": 2
+            }
+          ]
+        },
+        {
+          "take": "live_3_snareheavy",
+          "reference_hits": 45,
+          "detected": 45,
+          "correct": 44,
+          "wrong": [
+            {
+              "time": 5.1965,
+              "expected": 1,
+              "actual": 0
+            }
+          ],
+          "missed": [],
+          "extra": []
+        },
+        {
+          "take": "live_4_kicksnare",
+          "reference_hits": 33,
+          "detected": 32,
+          "correct": 31,
+          "wrong": [
+            {
+              "time": 5.087833333,
+              "expected": 1,
+              "actual": 2
+            }
+          ],
+          "missed": [
+            {
+              "time": 10.5181,
+              "drum": 2
+            }
+          ],
+          "extra": []
+        },
+        {
+          "take": "live_5_sparse",
+          "reference_hits": 44,
+          "detected": 42,
+          "correct": 40,
+          "wrong": [
+            {
+              "time": 5.1844375,
+              "expected": 1,
+              "actual": 0
+            },
+            {
+              "time": 7.781458333,
+              "expected": 1,
+              "actual": 2
+            }
+          ],
+          "missed": [
+            {
+              "time": 7.908,
+              "drum": 1
+            },
+            {
+              "time": 11.715,
+              "drum": 0
+            }
+          ],
           "extra": []
         },
         {
           "take": "live_6_uptempo",
           "reference_hits": 37,
-          "detected": 37,
-          "correct": 37,
-          "wrong": [],
-          "missed": [],
-          "extra": []
+          "detected": 31,
+          "correct": 25,
+          "wrong": [
+            {
+              "time": 1.971854167,
+              "expected": 1,
+              "actual": 0
+            }
+          ],
+          "missed": [
+            {
+              "time": 2.313,
+              "drum": 0
+            },
+            {
+              "time": 4.604,
+              "drum": 1
+            },
+            {
+              "time": 5.714,
+              "drum": 2
+            },
+            {
+              "time": 6.694,
+              "drum": 2
+            },
+            {
+              "time": 7.148,
+              "drum": 1
+            },
+            {
+              "time": 7.242,
+              "drum": 0
+            },
+            {
+              "time": 7.564,
+              "drum": 2
+            },
+            {
+              "time": 9.098,
+              "drum": 2
+            },
+            {
+              "time": 9.573,
+              "drum": 1
+            },
+            {
+              "time": 9.671,
+              "drum": 0
+            },
+            {
+              "time": 10.676,
+              "drum": 2
+            }
+          ],
+          "extra": [
+            {
+              "time": 5.7475,
+              "drum": 2
+            },
+            {
+              "time": 6.726645833,
+              "drum": 2
+            },
+            {
+              "time": 7.589041667,
+              "drum": 2
+            },
+            {
+              "time": 9.12575,
+              "drum": 2
+            },
+            {
+              "time": 10.70491667,
+              "drum": 2
+            }
+          ]
         }
       ]
     },
@@ -1509,9 +2185,9 @@
       "gain": 0.5,
       "summary": {
         "reference_hits": 271,
-        "correct": 256,
-        "missed": 14,
-        "wrong": 1,
+        "correct": 254,
+        "missed": 15,
+        "wrong": 2,
         "extra": 2
       },
       "takes": [
@@ -1542,22 +2218,10 @@
         {
           "take": "live_1_boombap",
           "reference_hits": 21,
-          "detected": 12,
-          "correct": 12,
+          "detected": 17,
+          "correct": 16,
           "wrong": [],
           "missed": [
-            {
-              "time": 0.149,
-              "drum": 2
-            },
-            {
-              "time": 1.342,
-              "drum": 2
-            },
-            {
-              "time": 1.97,
-              "drum": 2
-            },
             {
               "time": 2.549,
               "drum": 2
@@ -1577,25 +2241,22 @@
             {
               "time": 5.518,
               "drum": 2
-            },
-            {
-              "time": 6.234,
-              "drum": 2
             }
           ],
-          "extra": []
+          "extra": [
+            {
+              "time": 5.878958333,
+              "drum": 1
+            }
+          ]
         },
         {
           "take": "live_2_fourfloor",
           "reference_hits": 29,
           "detected": 27,
-          "correct": 26,
+          "correct": 27,
           "wrong": [],
           "missed": [
-            {
-              "time": 6.323,
-              "drum": 2
-            },
             {
               "time": 7.477,
               "drum": 2
@@ -1605,12 +2266,7 @@
               "drum": 2
             }
           ],
-          "extra": [
-            {
-              "time": 6.353416667,
-              "drum": 2
-            }
-          ]
+          "extra": []
         },
         {
           "take": "live_3_snareheavy",
@@ -1642,13 +2298,43 @@
         {
           "take": "live_6_uptempo",
           "reference_hits": 37,
-          "detected": 36,
-          "correct": 35,
-          "wrong": [],
+          "detected": 30,
+          "correct": 28,
+          "wrong": [
+            {
+              "time": 4.4623125,
+              "expected": 1,
+              "actual": 0
+            }
+          ],
           "missed": [
+            {
+              "time": 2.313,
+              "drum": 0
+            },
+            {
+              "time": 4.604,
+              "drum": 1
+            },
             {
               "time": 5.714,
               "drum": 2
+            },
+            {
+              "time": 6.694,
+              "drum": 2
+            },
+            {
+              "time": 7.148,
+              "drum": 1
+            },
+            {
+              "time": 7.242,
+              "drum": 0
+            },
+            {
+              "time": 9.573,
+              "drum": 1
             },
             {
               "time": 9.671,
@@ -1669,109 +2355,8 @@
       "gain": 1.0,
       "summary": {
         "reference_hits": 271,
-        "correct": 269,
-        "missed": 1,
-        "wrong": 1,
-        "extra": 1
-      },
-      "takes": [
-        {
-          "take": "bb100",
-          "reference_hits": 31,
-          "detected": 32,
-          "correct": 31,
-          "wrong": [],
-          "missed": [],
-          "extra": [
-            {
-              "time": 5.380375,
-              "drum": 2
-            }
-          ]
-        },
-        {
-          "take": "bb84",
-          "reference_hits": 31,
-          "detected": 31,
-          "correct": 30,
-          "wrong": [
-            {
-              "time": 9.624270833,
-              "expected": 1,
-              "actual": 2
-            }
-          ],
-          "missed": [],
-          "extra": []
-        },
-        {
-          "take": "live_1_boombap",
-          "reference_hits": 21,
-          "detected": 21,
-          "correct": 21,
-          "wrong": [],
-          "missed": [],
-          "extra": []
-        },
-        {
-          "take": "live_2_fourfloor",
-          "reference_hits": 29,
-          "detected": 29,
-          "correct": 29,
-          "wrong": [],
-          "missed": [],
-          "extra": []
-        },
-        {
-          "take": "live_3_snareheavy",
-          "reference_hits": 45,
-          "detected": 45,
-          "correct": 45,
-          "wrong": [],
-          "missed": [],
-          "extra": []
-        },
-        {
-          "take": "live_4_kicksnare",
-          "reference_hits": 33,
-          "detected": 33,
-          "correct": 33,
-          "wrong": [],
-          "missed": [],
-          "extra": []
-        },
-        {
-          "take": "live_5_sparse",
-          "reference_hits": 44,
-          "detected": 44,
-          "correct": 44,
-          "wrong": [],
-          "missed": [],
-          "extra": []
-        },
-        {
-          "take": "live_6_uptempo",
-          "reference_hits": 37,
-          "detected": 36,
-          "correct": 36,
-          "wrong": [],
-          "missed": [
-            {
-              "time": 9.671,
-              "drum": 0
-            }
-          ],
-          "extra": []
-        }
-      ]
-    },
-    {
-      "sample_rate": 48000,
-      "gain": 2.0,
-      "summary": {
-        "reference_hits": 271,
-        "correct": 266,
-        "missed": 4,
+        "correct": 263,
+        "missed": 7,
         "wrong": 1,
         "extra": 2
       },
@@ -1779,352 +2364,22 @@
         {
           "take": "bb100",
           "reference_hits": 31,
-          "detected": 32,
+          "detected": 31,
           "correct": 31,
           "wrong": [],
           "missed": [],
-          "extra": [
-            {
-              "time": 5.37725,
-              "drum": 2
-            }
-          ]
+          "extra": []
         },
         {
           "take": "bb84",
           "reference_hits": 31,
           "detected": 31,
           "correct": 30,
-          "wrong": [
-            {
-              "time": 9.620604167,
-              "expected": 1,
-              "actual": 2
-            }
-          ],
-          "missed": [],
-          "extra": []
-        },
-        {
-          "take": "live_1_boombap",
-          "reference_hits": 21,
-          "detected": 19,
-          "correct": 19,
-          "wrong": [],
-          "missed": [
-            {
-              "time": 4.931,
-              "drum": 2
-            },
-            {
-              "time": 5.518,
-              "drum": 2
-            }
-          ],
-          "extra": []
-        },
-        {
-          "take": "live_2_fourfloor",
-          "reference_hits": 29,
-          "detected": 29,
-          "correct": 28,
-          "wrong": [],
-          "missed": [
-            {
-              "time": 7.477,
-              "drum": 2
-            }
-          ],
-          "extra": [
-            {
-              "time": 7.517916667,
-              "drum": 2
-            }
-          ]
-        },
-        {
-          "take": "live_3_snareheavy",
-          "reference_hits": 45,
-          "detected": 45,
-          "correct": 45,
-          "wrong": [],
-          "missed": [],
-          "extra": []
-        },
-        {
-          "take": "live_4_kicksnare",
-          "reference_hits": 33,
-          "detected": 33,
-          "correct": 33,
-          "wrong": [],
-          "missed": [],
-          "extra": []
-        },
-        {
-          "take": "live_5_sparse",
-          "reference_hits": 44,
-          "detected": 44,
-          "correct": 44,
-          "wrong": [],
-          "missed": [],
-          "extra": []
-        },
-        {
-          "take": "live_6_uptempo",
-          "reference_hits": 37,
-          "detected": 36,
-          "correct": 36,
-          "wrong": [],
-          "missed": [
-            {
-              "time": 9.671,
-              "drum": 0
-            }
-          ],
-          "extra": []
-        }
-      ]
-    },
-    {
-      "sample_rate": 96000,
-      "gain": 0.5,
-      "summary": {
-        "reference_hits": 271,
-        "correct": 253,
-        "missed": 16,
-        "wrong": 2,
-        "extra": 8
-      },
-      "takes": [
-        {
-          "take": "bb100",
-          "reference_hits": 31,
-          "detected": 32,
-          "correct": 31,
-          "wrong": [],
-          "missed": [],
-          "extra": [
-            {
-              "time": 5.38275,
-              "drum": 2
-            }
-          ]
-        },
-        {
-          "take": "bb84",
-          "reference_hits": 31,
-          "detected": 31,
-          "correct": 30,
-          "wrong": [
-            {
-              "time": 9.633364583,
-              "expected": 1,
-              "actual": 2
-            }
-          ],
-          "missed": [],
-          "extra": []
-        },
-        {
-          "take": "live_1_boombap",
-          "reference_hits": 21,
-          "detected": 15,
-          "correct": 12,
-          "wrong": [],
-          "missed": [
-            {
-              "time": 0.149,
-              "drum": 2
-            },
-            {
-              "time": 1.342,
-              "drum": 2
-            },
-            {
-              "time": 1.97,
-              "drum": 2
-            },
-            {
-              "time": 2.549,
-              "drum": 2
-            },
-            {
-              "time": 3.77,
-              "drum": 2
-            },
-            {
-              "time": 4.349,
-              "drum": 2
-            },
-            {
-              "time": 4.931,
-              "drum": 2
-            },
-            {
-              "time": 5.518,
-              "drum": 2
-            },
-            {
-              "time": 6.234,
-              "drum": 2
-            }
-          ],
-          "extra": [
-            {
-              "time": 0.17575,
-              "drum": 2
-            },
-            {
-              "time": 1.376875,
-              "drum": 2
-            },
-            {
-              "time": 2.622489583,
-              "drum": 2
-            }
-          ]
-        },
-        {
-          "take": "live_2_fourfloor",
-          "reference_hits": 29,
-          "detected": 29,
-          "correct": 26,
-          "wrong": [],
-          "missed": [
-            {
-              "time": 6.323,
-              "drum": 2
-            },
-            {
-              "time": 7.477,
-              "drum": 2
-            },
-            {
-              "time": 8.029,
-              "drum": 2
-            }
-          ],
-          "extra": [
-            {
-              "time": 6.35340625,
-              "drum": 2
-            },
-            {
-              "time": 7.504041667,
-              "drum": 2
-            },
-            {
-              "time": 8.061979167,
-              "drum": 2
-            }
-          ]
-        },
-        {
-          "take": "live_3_snareheavy",
-          "reference_hits": 45,
-          "detected": 45,
-          "correct": 45,
-          "wrong": [],
-          "missed": [],
-          "extra": []
-        },
-        {
-          "take": "live_4_kicksnare",
-          "reference_hits": 33,
-          "detected": 33,
-          "correct": 33,
-          "wrong": [],
-          "missed": [],
-          "extra": []
-        },
-        {
-          "take": "live_5_sparse",
-          "reference_hits": 44,
-          "detected": 44,
-          "correct": 43,
-          "wrong": [
-            {
-              "time": 7.767010417,
-              "expected": 1,
-              "actual": 2
-            }
-          ],
-          "missed": [],
-          "extra": []
-        },
-        {
-          "take": "live_6_uptempo",
-          "reference_hits": 37,
-          "detected": 34,
-          "correct": 33,
-          "wrong": [],
-          "missed": [
-            {
-              "time": 2.313,
-              "drum": 0
-            },
-            {
-              "time": 5.714,
-              "drum": 2
-            },
-            {
-              "time": 7.242,
-              "drum": 0
-            },
-            {
-              "time": 9.671,
-              "drum": 0
-            }
-          ],
-          "extra": [
-            {
-              "time": 5.744177083,
-              "drum": 2
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "sample_rate": 96000,
-      "gain": 1.0,
-      "summary": {
-        "reference_hits": 271,
-        "correct": 266,
-        "missed": 3,
-        "wrong": 2,
-        "extra": 3
-      },
-      "takes": [
-        {
-          "take": "bb100",
-          "reference_hits": 31,
-          "detected": 32,
-          "correct": 31,
-          "wrong": [],
-          "missed": [],
-          "extra": [
-            {
-              "time": 5.380375,
-              "drum": 2
-            }
-          ]
-        },
-        {
-          "take": "bb84",
-          "reference_hits": 31,
-          "detected": 31,
-          "correct": 29,
           "wrong": [
             {
               "time": 9.624270833,
               "expected": 1,
               "actual": 2
-            },
-            {
-              "time": 12.43285417,
-              "expected": 1,
-              "actual": 2
             }
           ],
           "missed": [],
@@ -2133,15 +2388,11 @@
         {
           "take": "live_1_boombap",
           "reference_hits": 21,
-          "detected": 23,
+          "detected": 22,
           "correct": 21,
           "wrong": [],
           "missed": [],
           "extra": [
-            {
-              "time": 2.583635417,
-              "drum": 2
-            },
             {
               "time": 5.8788125,
               "drum": 1
@@ -2187,8 +2438,8 @@
         {
           "take": "live_6_uptempo",
           "reference_hits": 37,
-          "detected": 34,
-          "correct": 34,
+          "detected": 31,
+          "correct": 30,
           "wrong": [],
           "missed": [
             {
@@ -2196,8 +2447,824 @@
               "drum": 0
             },
             {
+              "time": 4.604,
+              "drum": 1
+            },
+            {
+              "time": 7.148,
+              "drum": 1
+            },
+            {
               "time": 7.242,
               "drum": 0
+            },
+            {
+              "time": 7.564,
+              "drum": 2
+            },
+            {
+              "time": 9.573,
+              "drum": 1
+            },
+            {
+              "time": 9.671,
+              "drum": 0
+            }
+          ],
+          "extra": [
+            {
+              "time": 7.5891875,
+              "drum": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sample_rate": 48000,
+      "gain": 2.0,
+      "summary": {
+        "reference_hits": 271,
+        "correct": 260,
+        "missed": 10,
+        "wrong": 1,
+        "extra": 2
+      },
+      "takes": [
+        {
+          "take": "bb100",
+          "reference_hits": 31,
+          "detected": 31,
+          "correct": 31,
+          "wrong": [],
+          "missed": [],
+          "extra": []
+        },
+        {
+          "take": "bb84",
+          "reference_hits": 31,
+          "detected": 31,
+          "correct": 30,
+          "wrong": [
+            {
+              "time": 9.620604167,
+              "expected": 1,
+              "actual": 2
+            }
+          ],
+          "missed": [],
+          "extra": []
+        },
+        {
+          "take": "live_1_boombap",
+          "reference_hits": 21,
+          "detected": 19,
+          "correct": 19,
+          "wrong": [],
+          "missed": [
+            {
+              "time": 4.931,
+              "drum": 2
+            },
+            {
+              "time": 5.518,
+              "drum": 2
+            }
+          ],
+          "extra": []
+        },
+        {
+          "take": "live_2_fourfloor",
+          "reference_hits": 29,
+          "detected": 28,
+          "correct": 28,
+          "wrong": [],
+          "missed": [
+            {
+              "time": 7.477,
+              "drum": 2
+            }
+          ],
+          "extra": []
+        },
+        {
+          "take": "live_3_snareheavy",
+          "reference_hits": 45,
+          "detected": 45,
+          "correct": 45,
+          "wrong": [],
+          "missed": [],
+          "extra": []
+        },
+        {
+          "take": "live_4_kicksnare",
+          "reference_hits": 33,
+          "detected": 33,
+          "correct": 33,
+          "wrong": [],
+          "missed": [],
+          "extra": []
+        },
+        {
+          "take": "live_5_sparse",
+          "reference_hits": 44,
+          "detected": 45,
+          "correct": 44,
+          "wrong": [],
+          "missed": [],
+          "extra": [
+            {
+              "time": 4.389458333,
+              "drum": 0
+            }
+          ]
+        },
+        {
+          "take": "live_6_uptempo",
+          "reference_hits": 37,
+          "detected": 31,
+          "correct": 30,
+          "wrong": [],
+          "missed": [
+            {
+              "time": 2.313,
+              "drum": 0
+            },
+            {
+              "time": 4.604,
+              "drum": 1
+            },
+            {
+              "time": 7.148,
+              "drum": 1
+            },
+            {
+              "time": 7.242,
+              "drum": 0
+            },
+            {
+              "time": 7.564,
+              "drum": 2
+            },
+            {
+              "time": 9.573,
+              "drum": 1
+            },
+            {
+              "time": 9.671,
+              "drum": 0
+            }
+          ],
+          "extra": [
+            {
+              "time": 7.5891875,
+              "drum": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sample_rate": 96000,
+      "gain": 0.25,
+      "summary": {
+        "reference_hits": 271,
+        "correct": 229,
+        "missed": 32,
+        "wrong": 10,
+        "extra": 7
+      },
+      "takes": [
+        {
+          "take": "bb100",
+          "reference_hits": 31,
+          "detected": 31,
+          "correct": 30,
+          "wrong": [],
+          "missed": [
+            {
+              "time": 9.32481,
+              "drum": 1
+            }
+          ],
+          "extra": [
+            {
+              "time": 5.385239583,
+              "drum": 2
+            }
+          ]
+        },
+        {
+          "take": "bb84",
+          "reference_hits": 31,
+          "detected": 26,
+          "correct": 24,
+          "wrong": [
+            {
+              "time": 11.75642708,
+              "expected": 0,
+              "actual": 1
+            },
+            {
+              "time": 9.637625,
+              "expected": 1,
+              "actual": 2
+            }
+          ],
+          "missed": [
+            {
+              "time": 8.17243,
+              "drum": 1
+            },
+            {
+              "time": 10.31456,
+              "drum": 0
+            },
+            {
+              "time": 12.42676,
+              "drum": 1
+            },
+            {
+              "time": 13.2419,
+              "drum": 0
+            },
+            {
+              "time": 14.57687,
+              "drum": 0
+            }
+          ],
+          "extra": []
+        },
+        {
+          "take": "live_1_boombap",
+          "reference_hits": 21,
+          "detected": 12,
+          "correct": 11,
+          "wrong": [],
+          "missed": [
+            {
+              "time": 1.342,
+              "drum": 2
+            },
+            {
+              "time": 1.677,
+              "drum": 0
+            },
+            {
+              "time": 1.97,
+              "drum": 2
+            },
+            {
+              "time": 2.549,
+              "drum": 2
+            },
+            {
+              "time": 3.77,
+              "drum": 2
+            },
+            {
+              "time": 4.349,
+              "drum": 2
+            },
+            {
+              "time": 4.931,
+              "drum": 2
+            },
+            {
+              "time": 5.518,
+              "drum": 2
+            },
+            {
+              "time": 5.838,
+              "drum": 1
+            },
+            {
+              "time": 6.234,
+              "drum": 2
+            }
+          ],
+          "extra": [
+            {
+              "time": 0.2294895833,
+              "drum": 2
+            }
+          ]
+        },
+        {
+          "take": "live_2_fourfloor",
+          "reference_hits": 29,
+          "detected": 30,
+          "correct": 29,
+          "wrong": [],
+          "missed": [],
+          "extra": [
+            {
+              "time": 5.785739583,
+              "drum": 2
+            }
+          ]
+        },
+        {
+          "take": "live_3_snareheavy",
+          "reference_hits": 45,
+          "detected": 44,
+          "correct": 41,
+          "wrong": [
+            {
+              "time": 11.06511458,
+              "expected": 1,
+              "actual": 0
+            },
+            {
+              "time": 9.806427083,
+              "expected": 1,
+              "actual": 0
+            },
+            {
+              "time": 5.196489583,
+              "expected": 1,
+              "actual": 0
+            }
+          ],
+          "missed": [
+            {
+              "time": 9.1961,
+              "drum": 0
+            }
+          ],
+          "extra": []
+        },
+        {
+          "take": "live_4_kicksnare",
+          "reference_hits": 33,
+          "detected": 32,
+          "correct": 31,
+          "wrong": [
+            {
+              "time": 5.08784375,
+              "expected": 1,
+              "actual": 2
+            }
+          ],
+          "missed": [
+            {
+              "time": 10.5181,
+              "drum": 2
+            }
+          ],
+          "extra": []
+        },
+        {
+          "take": "live_5_sparse",
+          "reference_hits": 44,
+          "detected": 41,
+          "correct": 39,
+          "wrong": [
+            {
+              "time": 5.1844375,
+              "expected": 1,
+              "actual": 0
+            },
+            {
+              "time": 18.7516875,
+              "expected": 0,
+              "actual": 1
+            }
+          ],
+          "missed": [
+            {
+              "time": 7.773,
+              "drum": 1
+            },
+            {
+              "time": 7.908,
+              "drum": 1
+            },
+            {
+              "time": 11.715,
+              "drum": 0
+            }
+          ],
+          "extra": []
+        },
+        {
+          "take": "live_6_uptempo",
+          "reference_hits": 37,
+          "detected": 30,
+          "correct": 24,
+          "wrong": [
+            {
+              "time": 1.971864583,
+              "expected": 1,
+              "actual": 0
+            },
+            {
+              "time": 4.464666667,
+              "expected": 1,
+              "actual": 0
+            }
+          ],
+          "missed": [
+            {
+              "time": 2.156,
+              "drum": 0
+            },
+            {
+              "time": 2.313,
+              "drum": 0
+            },
+            {
+              "time": 4.604,
+              "drum": 1
+            },
+            {
+              "time": 5.714,
+              "drum": 2
+            },
+            {
+              "time": 6.694,
+              "drum": 2
+            },
+            {
+              "time": 7.148,
+              "drum": 1
+            },
+            {
+              "time": 7.242,
+              "drum": 0
+            },
+            {
+              "time": 7.564,
+              "drum": 2
+            },
+            {
+              "time": 9.573,
+              "drum": 1
+            },
+            {
+              "time": 9.671,
+              "drum": 0
+            },
+            {
+              "time": 10.676,
+              "drum": 2
+            }
+          ],
+          "extra": [
+            {
+              "time": 5.7475,
+              "drum": 2
+            },
+            {
+              "time": 6.72665625,
+              "drum": 2
+            },
+            {
+              "time": 7.589083333,
+              "drum": 2
+            },
+            {
+              "time": 10.70492708,
+              "drum": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sample_rate": 96000,
+      "gain": 0.5,
+      "summary": {
+        "reference_hits": 271,
+        "correct": 247,
+        "missed": 18,
+        "wrong": 6,
+        "extra": 4
+      },
+      "takes": [
+        {
+          "take": "bb100",
+          "reference_hits": 31,
+          "detected": 31,
+          "correct": 31,
+          "wrong": [],
+          "missed": [],
+          "extra": []
+        },
+        {
+          "take": "bb84",
+          "reference_hits": 31,
+          "detected": 31,
+          "correct": 29,
+          "wrong": [
+            {
+              "time": 9.620666667,
+              "expected": 1,
+              "actual": 2
+            },
+            {
+              "time": 11.75497917,
+              "expected": 0,
+              "actual": 1
+            }
+          ],
+          "missed": [],
+          "extra": []
+        },
+        {
+          "take": "live_1_boombap",
+          "reference_hits": 21,
+          "detected": 15,
+          "correct": 14,
+          "wrong": [],
+          "missed": [
+            {
+              "time": 0.149,
+              "drum": 2
+            },
+            {
+              "time": 2.549,
+              "drum": 2
+            },
+            {
+              "time": 3.77,
+              "drum": 2
+            },
+            {
+              "time": 4.349,
+              "drum": 2
+            },
+            {
+              "time": 4.931,
+              "drum": 2
+            },
+            {
+              "time": 5.518,
+              "drum": 2
+            },
+            {
+              "time": 6.234,
+              "drum": 2
+            }
+          ],
+          "extra": [
+            {
+              "time": 5.878947917,
+              "drum": 1
+            }
+          ]
+        },
+        {
+          "take": "live_2_fourfloor",
+          "reference_hits": 29,
+          "detected": 29,
+          "correct": 27,
+          "wrong": [],
+          "missed": [
+            {
+              "time": 7.477,
+              "drum": 2
+            },
+            {
+              "time": 8.029,
+              "drum": 2
+            }
+          ],
+          "extra": [
+            {
+              "time": 7.51953125,
+              "drum": 2
+            },
+            {
+              "time": 8.061979167,
+              "drum": 2
+            }
+          ]
+        },
+        {
+          "take": "live_3_snareheavy",
+          "reference_hits": 45,
+          "detected": 45,
+          "correct": 44,
+          "wrong": [
+            {
+              "time": 11.06402083,
+              "expected": 1,
+              "actual": 0
+            }
+          ],
+          "missed": [],
+          "extra": []
+        },
+        {
+          "take": "live_4_kicksnare",
+          "reference_hits": 33,
+          "detected": 33,
+          "correct": 33,
+          "wrong": [],
+          "missed": [],
+          "extra": []
+        },
+        {
+          "take": "live_5_sparse",
+          "reference_hits": 44,
+          "detected": 44,
+          "correct": 42,
+          "wrong": [
+            {
+              "time": 14.61007292,
+              "expected": 1,
+              "actual": 0
+            },
+            {
+              "time": 7.767010417,
+              "expected": 1,
+              "actual": 2
+            }
+          ],
+          "missed": [],
+          "extra": []
+        },
+        {
+          "take": "live_6_uptempo",
+          "reference_hits": 37,
+          "detected": 29,
+          "correct": 27,
+          "wrong": [
+            {
+              "time": 4.462302083,
+              "expected": 1,
+              "actual": 0
+            }
+          ],
+          "missed": [
+            {
+              "time": 2.156,
+              "drum": 0
+            },
+            {
+              "time": 2.313,
+              "drum": 0
+            },
+            {
+              "time": 4.604,
+              "drum": 1
+            },
+            {
+              "time": 5.714,
+              "drum": 2
+            },
+            {
+              "time": 6.694,
+              "drum": 2
+            },
+            {
+              "time": 7.148,
+              "drum": 1
+            },
+            {
+              "time": 7.242,
+              "drum": 0
+            },
+            {
+              "time": 9.573,
+              "drum": 1
+            },
+            {
+              "time": 9.671,
+              "drum": 0
+            }
+          ],
+          "extra": [
+            {
+              "time": 5.744177083,
+              "drum": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sample_rate": 96000,
+      "gain": 1.0,
+      "summary": {
+        "reference_hits": 271,
+        "correct": 263,
+        "missed": 6,
+        "wrong": 2,
+        "extra": 2
+      },
+      "takes": [
+        {
+          "take": "bb100",
+          "reference_hits": 31,
+          "detected": 32,
+          "correct": 31,
+          "wrong": [],
+          "missed": [],
+          "extra": [
+            {
+              "time": 5.380375,
+              "drum": 2
+            }
+          ]
+        },
+        {
+          "take": "bb84",
+          "reference_hits": 31,
+          "detected": 31,
+          "correct": 29,
+          "wrong": [
+            {
+              "time": 9.624270833,
+              "expected": 1,
+              "actual": 2
+            },
+            {
+              "time": 12.43285417,
+              "expected": 1,
+              "actual": 2
+            }
+          ],
+          "missed": [],
+          "extra": []
+        },
+        {
+          "take": "live_1_boombap",
+          "reference_hits": 21,
+          "detected": 22,
+          "correct": 21,
+          "wrong": [],
+          "missed": [],
+          "extra": [
+            {
+              "time": 5.8788125,
+              "drum": 1
+            }
+          ]
+        },
+        {
+          "take": "live_2_fourfloor",
+          "reference_hits": 29,
+          "detected": 29,
+          "correct": 29,
+          "wrong": [],
+          "missed": [],
+          "extra": []
+        },
+        {
+          "take": "live_3_snareheavy",
+          "reference_hits": 45,
+          "detected": 45,
+          "correct": 45,
+          "wrong": [],
+          "missed": [],
+          "extra": []
+        },
+        {
+          "take": "live_4_kicksnare",
+          "reference_hits": 33,
+          "detected": 33,
+          "correct": 33,
+          "wrong": [],
+          "missed": [],
+          "extra": []
+        },
+        {
+          "take": "live_5_sparse",
+          "reference_hits": 44,
+          "detected": 44,
+          "correct": 44,
+          "wrong": [],
+          "missed": [],
+          "extra": []
+        },
+        {
+          "take": "live_6_uptempo",
+          "reference_hits": 37,
+          "detected": 31,
+          "correct": 31,
+          "wrong": [],
+          "missed": [
+            {
+              "time": 2.313,
+              "drum": 0
+            },
+            {
+              "time": 4.604,
+              "drum": 1
+            },
+            {
+              "time": 7.148,
+              "drum": 1
+            },
+            {
+              "time": 7.242,
+              "drum": 0
+            },
+            {
+              "time": 9.573,
+              "drum": 1
             },
             {
               "time": 9.671,
@@ -2213,10 +3280,10 @@
       "gain": 2.0,
       "summary": {
         "reference_hits": 271,
-        "correct": 263,
-        "missed": 6,
+        "correct": 259,
+        "missed": 10,
         "wrong": 2,
-        "extra": 4
+        "extra": 6
       },
       "takes": [
         {
@@ -2254,8 +3321,8 @@
           "missed": [],
           "extra": [
             {
-              "time": 10.88817708,
-              "drum": 2
+              "time": 10.99278125,
+              "drum": 1
             }
           ]
         },
@@ -2285,7 +3352,7 @@
         {
           "take": "live_2_fourfloor",
           "reference_hits": 29,
-          "detected": 29,
+          "detected": 30,
           "correct": 28,
           "wrong": [],
           "missed": [
@@ -2295,6 +3362,10 @@
             }
           ],
           "extra": [
+            {
+              "time": 0.5746875,
+              "drum": 1
+            },
             {
               "time": 7.50375,
               "drum": 2
@@ -2331,8 +3402,8 @@
         {
           "take": "live_6_uptempo",
           "reference_hits": 37,
-          "detected": 34,
-          "correct": 34,
+          "detected": 31,
+          "correct": 30,
           "wrong": [],
           "missed": [
             {
@@ -2340,15 +3411,36 @@
               "drum": 0
             },
             {
+              "time": 4.604,
+              "drum": 1
+            },
+            {
+              "time": 7.148,
+              "drum": 1
+            },
+            {
               "time": 7.242,
               "drum": 0
+            },
+            {
+              "time": 7.564,
+              "drum": 2
+            },
+            {
+              "time": 9.573,
+              "drum": 1
             },
             {
               "time": 9.671,
               "drum": 0
             }
           ],
-          "extra": []
+          "extra": [
+            {
+              "time": 7.590520833,
+              "drum": 2
+            }
+          ]
         }
       ]
     }
@@ -2405,7 +3497,7 @@
     {
       "take": "live_1_boombap",
       "start_seconds": 4.8,
-      "hits": 5,
+      "hits": 6,
       "max_error_samples": 2.1432586105873952e-05
     },
     {
@@ -2483,19 +3575,19 @@
     {
       "take": "live_6_uptempo",
       "start_seconds": 0.0,
-      "hits": 16,
+      "hits": 14,
       "max_error_samples": 2.107979391041681e-05
     },
     {
       "take": "live_6_uptempo",
       "start_seconds": 4.8,
-      "hits": 16,
+      "hits": 13,
       "max_error_samples": 2.196175481472551e-05
     },
     {
       "take": "live_6_uptempo",
       "start_seconds": 9.6,
-      "hits": 5,
+      "hits": 4,
       "max_error_samples": 0.00016696263731574845
     }
   ],

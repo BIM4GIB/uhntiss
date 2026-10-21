@@ -112,20 +112,40 @@ struct Neighbours {
   }
 };
 } // namespace
-Drum classifyAttack(const Features &features) noexcept {
-  std::array<double, 4> votes{};
-  for (auto root : model::roots) {
-    const model::Node *node = &model::nodes[root];
-    while (node->feature >= 0) {
-      // sklearn's training/evaluation input is float32. Keep split semantics
-      // identical in the exported model, including values on a boundary.
-      const bool left = float(features[node->feature]) <= node->threshold;
-      node = &model::nodes[left ? node->left : node->right];
-    }
-    for (size_t d = 0; d < votes.size(); ++d)
-      votes[d] += model::leafVotes[node->left][d];
+template <class R, class N, class V>
+std::array<double, 4> vote(const Features &f, const R &roots, const N &nodes,
+                           const V &leaves) noexcept {
+  std::array<double, 4> result{};
+  for (auto root : roots) {
+    auto node = &nodes[root];
+    while (node->feature >= 0)
+      node = &nodes[float(f[node->feature]) <= node->threshold ? node->left
+                                                               : node->right];
+    for (int d = 0; d < 4; ++d)
+      result[d] += leaves[node->left][d];
   }
-  return Drum(std::max_element(votes.begin(), votes.end()) - votes.begin());
+  return result;
+}
+Drum classifyAttack(const Features &features, double sampleRate) noexcept {
+  // Rate-specific calibration uses the same descriptor and deadline. Exactly
+  // one primary forest runs; high-rate IIR descriptors differ slightly.
+  const auto first =
+      sampleRate > 48000.
+          ? vote(features, highrate::roots, highrate::nodes,
+                 highrate::leafVotes)
+          : vote(features, model::roots, model::nodes, model::leafVotes);
+  const int voice =
+      int(std::max_element(first.begin(), first.end()) - first.begin());
+  if (voice < 3)
+    return Drum(voice);
+  // Recover only rejected windows. Existing positive voice choices stand.
+  const auto second =
+      vote(features, recovery::roots, recovery::nodes, recovery::leafVotes);
+  const int next = int(std::max_element(second.begin(), second.begin() + 3) -
+                       second.begin());
+  if (second[3] > .3 || second[next] < .6)
+    return Drum::noise;
+  return Drum(next);
 }
 void Profile::add(Drum drum, const Features &features) noexcept {
   const auto d = int(drum);
@@ -147,7 +167,7 @@ Drum Profile::classify(const Detection &detection) const noexcept {
       n.add(detection.features, examples[d][i], d, d * 3 + i);
   return n.choose();
 }
-void Detector::prepare(double sr) noexcept {
+void AttackTracker::prepare(double sr) noexcept {
   sr = std::isfinite(sr) ? clamp(sr, 8000., 384000.) : 48000.;
   sr_ = sr;
   window_ = int(std::round(model::windowSeconds * sr));
@@ -162,7 +182,7 @@ void Detector::prepare(double sr) noexcept {
   slowCoeff_ = 1. - std::exp(-1. / (.045 * sr));
   reset();
 }
-void Detector::reset() noexcept {
+void AttackTracker::reset() noexcept {
   hp_ = dc_ = fast_ = slow_ = previous_ = total_ = peak_ = 0.;
   history_ = {};
   historySum_ = onsetPower_ = earlyPower_ = onsetDc_ = onsetPeak_ =
@@ -174,16 +194,18 @@ void Detector::reset() noexcept {
   released_ = true;
   started_ = false;
 }
-float Detector::attackVelocity() const noexcept {
+float AttackTracker::attackVelocity() const noexcept {
   return float(clamp(std::pow(peak_, .55), .08, 1.));
 }
-bool Detector::process(double x, double beat, double threshold,
-                       Detection &result, Policy policy) noexcept {
+bool AttackTracker::process(double x, double beat, double threshold,
+                            Detection &result, Policy policy) noexcept {
   const bool recoverRejected = policy != Policy::fixedVoice;
   started_ = false;
   if (!std::isfinite(x))
     x = 0.;
   threshold = std::isfinite(threshold) ? clamp(threshold, .002, .2) : .010;
+  if (policy == Policy::quiet)
+    threshold *= .3;
   dc_ += dcCoeff_ * (x - dc_);
   hp_ = x - dc_;
   for (size_t i = 0; i < bands_.size(); ++i)
@@ -246,29 +268,19 @@ bool Detector::process(double x, double beat, double threshold,
     crossings_ += (hp_ * previous_ < 0.);
     ++count_;
     if (!--collect_) {
-      Features features{};
-      for (size_t half = 0; half < 2; ++half) {
-        double mean = 0.;
-        const double samples = half ? window_ - window_ / 2 : window_ / 2;
-        for (size_t band = 0; band < 6; ++band) {
-          features[half * 6 + band] =
-              std::log(std::max(energy_[half][band] / samples, 1e-12));
-          mean += features[half * 6 + band] / 6.;
-        }
-        for (size_t band = 0; band < 6; ++band)
-          features[half * 6 + band] -= mean;
-      }
-      features[12] = double(crossings_) / count_ * sr_ / 48000. * 10.;
-      features[13] = std::sqrt(total_ / count_) / (peak_ + 1e-12) * 5.;
-      const double power = total_ / count_;
-      features[14] =
-          std::log((power + 1e-12) / (std::max(0., onsetPower_) + 1e-12));
-      features[15] =
-          std::log(((total_ - earlyPower_) / (window_ - window_ / 2) + 1e-12) /
-                   (earlyPower_ / (window_ / 2) + 1e-12));
-      features[16] = std::log(power + 1e-12);
-      result = {classifyAttack(features), attackVelocity(), onsetBeat_,
-                features};
+      const auto features = descriptor();
+      const bool quiet = policy == Policy::quiet;
+      auto drum = Drum::noise;
+      if (quiet) {
+        const auto votes = vote(features, recovery::roots, recovery::nodes,
+                                recovery::leafVotes);
+        const int voice = int(
+            std::max_element(votes.begin(), votes.begin() + 3) - votes.begin());
+        if (voice == 2 && votes[3] <= .4 && attackVelocity() <= .22f)
+          drum = Drum::hat;
+      } else
+        drum = classifyAttack(features, sr_);
+      result = {drum, attackVelocity(), onsetBeat_, features};
       if (recoverRejected &&
           (result.drum == Drum::noise || policy == Policy::candidates)) {
         refractory_ = 0;
@@ -283,6 +295,85 @@ bool Detector::process(double x, double beat, double threshold,
   historyCount_ = std::min(historyCount_ + 1, historySize_);
   previous_ = hp_;
   return detected;
+}
+Features AttackTracker::descriptor() const noexcept {
+  Features features{};
+  for (size_t half = 0; half < 2; ++half) {
+    double mean = 0.;
+    const double samples = half ? window_ - window_ / 2 : window_ / 2;
+    for (size_t band = 0; band < 6; ++band) {
+      features[half * 6 + band] =
+          std::log(std::max(energy_[half][band] / samples, 1e-12));
+      mean += features[half * 6 + band] / 6.;
+    }
+    for (size_t band = 0; band < 6; ++band)
+      features[half * 6 + band] -= mean;
+  }
+  features[12] = double(crossings_) / count_ * sr_ / 48000. * 10.;
+  features[13] = std::sqrt(total_ / count_) / (peak_ + 1e-12) * 5.;
+  const double power = total_ / count_;
+  features[14] =
+      std::log((power + 1e-12) / (std::max(0., onsetPower_) + 1e-12));
+  features[15] =
+      std::log(((total_ - earlyPower_) / (window_ - window_ / 2) + 1e-12) /
+               (earlyPower_ / (window_ / 2) + 1e-12));
+  features[16] = std::log(power + 1e-12);
+  return features;
+}
+void Detector::prepare(double sr) noexcept {
+  sr = std::isfinite(sr) ? clamp(sr, 8000., 384000.) : 48000.;
+  primary_.prepare(sr);
+  quiet_.prepare(sr);
+  refractory_ = int(.035 * sr);
+  window_ = int(std::round(model::windowSeconds * sr));
+  reset();
+}
+void Detector::reset() noexcept {
+  primary_.reset();
+  quiet_.reset();
+  sample_ = 0;
+  lastAccepted_ = -1000000;
+  previousPolicy_ = Policy::automatic;
+}
+bool Detector::process(double input, double beat, double threshold,
+                       Detection &result, Policy policy) noexcept {
+  if (policy != previousPolicy_) {
+    quiet_.reset();
+    previousPolicy_ = policy;
+    lastAccepted_ = -1000000;
+  }
+  ++sample_;
+  Detection primary{}, quiet{};
+  const bool ready = primary_.process(input, beat, threshold, primary, policy);
+  if (policy != Policy::automatic) {
+    if (ready)
+      result = primary;
+    return ready;
+  }
+  const bool quietReady =
+      quiet_.process(input, beat, threshold, quiet, Policy::quiet);
+  // Compare sample positions, never beat subdivisions. Both deadlines are
+  // exactly one window after their own onset; no extra waiting or snapping.
+  const bool available = sample_ - window_ + 1 - lastAccepted_ >= refractory_;
+  if (ready && primary.drum != Drum::noise && available) {
+    result = primary;
+    lastAccepted_ = sample_ - window_ + 1;
+    return true;
+  }
+  // An active primary attack wins. Breath/tails must pass both the quiet
+  // hat model and the raw-velocity cap before they can produce a trigger.
+  if (quietReady && quiet.drum != Drum::noise && !primary_.pending() &&
+      available) {
+    result = quiet;
+    lastAccepted_ = sample_ - window_ + 1;
+    return true;
+  }
+  if (ready) {
+    result = primary;
+    result.drum = Drum::noise;
+    return true;
+  }
+  return false;
 }
 void Kit::prepare(double sr) noexcept {
   sr_ = sr;
@@ -624,8 +715,8 @@ void Engine::process(double input, Clock clock, double &left,
   const bool complete = detector_.process(
       clamp(input * inputSmooth_, -4., 4.), clock.beat, settings_.threshold,
       detection,
-      settings_.voice < 0 && learning_ < 0 ? Detector::Policy::automatic
-                                           : Detector::Policy::fixedVoice);
+      settings_.voice < 0 && learning_ < 0 ? AttackTracker::Policy::automatic
+                                           : AttackTracker::Policy::fixedVoice);
   if (detector_.started()) {
     earlyDrum_ = learning_ >= 0 ? learning_
                                 : (settings_.voice >= 0 && settings_.voice <= 2

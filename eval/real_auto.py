@@ -1,18 +1,15 @@
 """Full-take Auto research and native regression. Never imported by the device.
 
 The acoustic audit is signal-assisted, not independent listening ground truth.
-Whole-take cross-validation measures transfer; the final model uses all eight
-personal recordings. Its full-corpus score is therefore a regression, not an
-unseen-performance accuracy claim. No reference timing reaches the runtime.
+The Pocket04 trainer in transfer_auto reserves a whole source. Seven mixed
+takes are training regressions; the reserved source measures transfer within
+this development collection. No reference timing reaches the runtime.
 """
 
 from __future__ import annotations
 import argparse
 import hashlib
 import json
-import subprocess
-import tempfile
-import shutil
 from pathlib import Path
 import numpy as np
 from eval.native_auto import ROOT, analyze, match, read
@@ -44,12 +41,14 @@ def label_candidates(candidates, events):
     return labels
 
 
-def corpus(binary):
+def corpus(binary, exclude=()):
     audit = load("pocket-real-takes.json")
     iso = load("pocket-isolated-attacks.json")
     rows = []
     sources = []
     for take in audit["takes"] + iso["takes"]:
+        if take.get("name") in exclude:
+            continue
         path = ROOT / take["source"]
         assert digest(path) == take["sha256"], f"Changed source: {path}"
         sources.append(dict(source=take["source"], sha256=take["sha256"]))
@@ -142,7 +141,7 @@ def corpus(binary):
     return rows, sources, iso
 
 
-def export(model, x):
+def export(model, x, namespace="model"):
     def vector(v):
         return "{" + ", ".join(format(float(a), ".17g") for a in v) + "}"
 
@@ -161,7 +160,9 @@ def export(model, x):
         def visit(i):
             if tree.children_left[i] < 0:
                 votes = tree.value[i][0]
-                key = tuple(votes / votes.sum() * weight)
+                key = tuple(
+                    votes / votes.sum() * weight * getattr(estimator, "vote_mask", 1.0)
+                )
                 if key not in leaf_ids:
                     leaf_ids[key] = len(leaves)
                     leaves.append(key)
@@ -196,7 +197,7 @@ def export(model, x):
         + str(roots).replace("[", "{").replace("]", "}")
         + ";\n}\n"
     )
-    return text
+    return text.replace("namespace pocket::model", f"namespace pocket::{namespace}")
 
 
 def score(rows, take):
@@ -234,35 +235,6 @@ def summarize(scores):
         wrong=sum(len(s["wrong"]) for s in scores),
         extra=sum(len(s["extra"]) for s in scores),
     )
-
-
-def native_fold(estimator, x, take):
-    # Replay the held-out take through its own native model, including onset
-    # recovery decisions. Do not borrow detections from the all-data model.
-    with tempfile.TemporaryDirectory() as tmp:
-        root = Path(tmp)
-        include = root / "pocket"
-        include.mkdir()
-        shutil.copyfile(MODEL / "include/pocket/engine.hpp", include / "engine.hpp")
-        (include / "attack_model.hpp").write_text(export(estimator, x))
-        executable = root / "analyze"
-        subprocess.run(
-            [
-                "c++",
-                "-std=c++17",
-                "-O2",
-                "-I",
-                str(root),
-                str(MODEL / "src/engine.cpp"),
-                str(MODEL / "tools/analyze.cpp"),
-                "-o",
-                str(executable),
-            ],
-            check=True,
-            capture_output=True,
-        )
-        audio, sr = read(ROOT / take["source"])
-        return score(analyze(executable, audio, sr), take)
 
 
 ENSEMBLE = [
@@ -303,58 +275,6 @@ def predict_model(model, x):
     return votes.argmax(1)
 
 
-def train(binary, cache=None):
-    import sklearn
-
-    rows, sources, iso = corpus(binary)
-    if cache:
-        cache.write_text(json.dumps(rows))
-    x = np.array([r["features"] for r in rows])
-    y = np.array([r["label"] for r in rows])
-    takes = np.array([r["take"] for r in rows])
-    cv = []
-    audit = load("pocket-real-takes.json")
-    for take in audit["takes"]:
-        training = takes != take["name"]
-        estimator = fit_model(x[training], y[training], takes[training])
-        cv.append(native_fold(estimator, x[training], take))
-    estimator = fit_model(x, y, takes)
-    header = export(estimator, x)
-    (MODEL / "include/pocket/attack_model.hpp").write_text(header)
-    info = dict(
-        compiled_model_sha256=hashlib.sha256(header.encode()).hexdigest(),
-        audit_sha256=digest(DATA / "pocket-real-takes.json"),
-        isolated_audit_sha256=digest(DATA / "pocket-isolated-attacks.json"),
-        feature_version=2,
-        features=17,
-        window_ms=10,
-        history_ms=30,
-        envelope_highpass_hz=70,
-        feature_highpass_hz=25,
-        classifier="ExtraTreesClassifier",
-        export="Exact shared leaves/subtrees, double thresholds and probabilities; no quantization",
-        sklearn_version=sklearn.__version__,
-        parameters=PARAMETERS,
-        ensemble=ENSEMBLE,
-        context_seed=93021,
-        context_scenes=8,
-        gain_augmentation=GAINS,
-        training_rows=len(rows),
-        training=sources,
-        heldout_attacks=iso["heldout_attacks"],
-        exclusions="Every fourth isolated primary attack and all candidates within 200ms excluded at every gain. Whole-take CV excludes all gains of the evaluated take; deployment trains on all eight personal takes. Constructed test grooves excluded.",
-        reference=audit["method"],
-        development_cross_validation=dict(summary=summarize(cv), takes=cv),
-    )
-    (MODEL / "auto-model.json").write_text(json.dumps(info, indent=2) + "\n")
-    # C++ parity is checked against this exact training run after rebuilding.
-    if cache:
-        cache.with_suffix(".predictions.json").write_text(
-            json.dumps(predict_model(estimator, x).tolist())
-        )
-    print(json.dumps(info["development_cross_validation"], indent=2))
-
-
 def report(binary):
     audit = load("pocket-real-takes.json")
     baseline = load("pocket02-real-predictions.json")
@@ -368,7 +288,7 @@ def report(binary):
     return dict(
         reference=audit["method"],
         tolerance_ms=25,
-        scope="Full untrimmed personal recordings used for deployment training. Regression, not unseen-performance accuracy.",
+        scope="Full untrimmed recordings: seven training sources and the reserved uptempo source. Development regression, not untouched-test accuracy.",
         before=dict(commit=baseline["commit"], summary=summarize(before), takes=before),
         after=dict(summary=summarize(after), takes=after),
     )
@@ -382,6 +302,8 @@ def main():
     p.add_argument("--cache", type=Path)
     a = p.parse_args()
     if a.command == "train":
+        from eval.transfer_auto import train
+
         train(a.binary.resolve(), a.cache)
     else:
         result = json.dumps(report(a.binary.resolve()), indent=2) + "\n"

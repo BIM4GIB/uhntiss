@@ -70,7 +70,8 @@ struct Detection {
 };
 // The factory model contains causal attack descriptors, never audio or a
 // rhythm grid. A decision cannot move, invent or quantize an onset.
-Drum classifyAttack(const Features &features) noexcept;
+Drum classifyAttack(const Features &features,
+                    double sampleRate = 48000.) noexcept;
 struct Profile {
   std::array<std::array<Features, 3>, 3> examples{};
   std::array<int, 3> count{};
@@ -80,11 +81,13 @@ struct Profile {
     return count[0] >= 3 && count[1] >= 3 && count[2] >= 3;
   }
 };
-class Detector {
+// One causal 10 ms attack window with fixed storage. Auto uses a second
+// tracker only to recover low-level hats; forced voices and Teach use one.
+class AttackTracker {
 public:
   // candidates is an offline research policy: collect a model-independent
   // superset of attacks. The Engine only uses automatic or fixedVoice.
-  enum class Policy { automatic, fixedVoice, candidates };
+  enum class Policy { automatic, fixedVoice, candidates, quiet };
   void prepare(double sampleRate) noexcept;
   bool process(double input, double beat, double threshold, Detection &event,
                Policy policy = Policy::automatic) noexcept;
@@ -96,6 +99,7 @@ public:
   void reset() noexcept;
 
 private:
+  Features descriptor() const noexcept;
   double sr_ = 48000., hp_ = 0., dc_ = 0.;
   double fast_ = 0., slow_ = 0., previous_ = 0., onsetBeat_ = 0.;
   double total_ = 0., peak_ = 0.;
@@ -111,6 +115,26 @@ private:
   int collect_ = 0, window_ = 480, refractory_ = 0, count_ = 0, crossings_ = 0,
       quiet_ = 0, releaseSamples_ = 0;
   bool released_ = true, started_ = false;
+};
+class Detector {
+public:
+  using Policy = AttackTracker::Policy;
+  void prepare(double sr) noexcept;
+  bool process(double input, double beat, double threshold, Detection &event,
+               Policy policy = Policy::automatic) noexcept;
+  bool started() const noexcept { return primary_.started(); }
+  float attackVelocity() const noexcept { return primary_.attackVelocity(); }
+  bool pending() const noexcept { return primary_.pending(); }
+  double pendingBeat() const noexcept { return primary_.pendingBeat(); }
+  double level() const noexcept { return primary_.level(); }
+  void reset() noexcept;
+
+private:
+  // Both trackers see raw input. The quiet path never applies audio gain.
+  AttackTracker primary_{}, quiet_{};
+  std::int64_t sample_ = 0, lastAccepted_ = -1000000;
+  int refractory_ = 1680, window_ = 480;
+  Policy previousPolicy_ = Policy::automatic;
 };
 class Kit {
 public:

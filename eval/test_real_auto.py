@@ -16,12 +16,13 @@ def check(build):
     binary = build / "pocket_analyze"
     audit = load("pocket-real-takes.json")
     result = report(binary)
-    assert result["after"]["summary"] == dict(
-        reference_hits=271, correct=271, missed=0, wrong=0, extra=0
-    ), "full original takes regressed; inspect every unmatched or wrong attack"
+    baseline = load("pocket04-deployment-baseline.json")
+    assert result["after"]["summary"] == baseline["original_summary"], (
+        "original full-take output changed"
+    )
     cases = []
     for sr in (44100, 48000, 96000):
-        for gain in (0.5, 1.0, 2.0):
+        for gain in (0.25, 0.5, 1.0, 2.0):
             scores = []
             for take in audit["takes"]:
                 y, source_sr = read(ROOT / take["source"])
@@ -33,6 +34,18 @@ def check(build):
                 scores.append(score(rows, take))
             cases.append(
                 dict(sample_rate=sr, gain=gain, summary=summarize(scores), takes=scores)
+            )
+    for before, after in zip(baseline["cases"], cases):
+        assert (before["sample_rate"], before["gain"]) == (
+            after["sample_rate"],
+            after["gain"],
+        )
+        assert after["summary"]["correct"] >= before["summary"]["correct"], (
+            "whole-take correct voices regressed"
+        )
+        for metric in ("missed", "wrong", "extra"):
+            assert after["summary"][metric] <= before["summary"][metric], (
+                f"whole-take {metric} regressed"
             )
     # Exercise late portions of the full takes with their preceding audio
     # intact. Comparing only the first two bars would miss most of the playing.

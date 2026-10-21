@@ -1,1 +1,46 @@
-{"audio_seconds":14.4,"processing_seconds":0.19773,"p99_block_ms":0.049333,"max_block_ms":3.03725,"block_budget_ms":1.45125,"accepted_live_hits":45}
+{
+  "sample_rate": 48000,
+  "cases": [
+    {
+      "source": "mimic/live_3_snareheavy.mimic.wav",
+      "gain": 1,
+      "audio_seconds": 14.4,
+      "processing_seconds": 0.233826,
+      "p99_block_ms": 0.062542,
+      "max_block_ms": 3.07912,
+      "block_budget_ms": 1.33333,
+      "accepted_live_hits": 45
+    },
+    {
+      "source": "mimic/live_3_snareheavy.mimic.wav",
+      "gain": 0.25,
+      "audio_seconds": 14.4,
+      "processing_seconds": 0.220243,
+      "p99_block_ms": 0.05625,
+      "max_block_ms": 0.328917,
+      "block_budget_ms": 1.33333,
+      "accepted_live_hits": 45
+    },
+    {
+      "source": "mimic/live_6_uptempo.mimic.wav",
+      "gain": 1,
+      "audio_seconds": 14.4,
+      "processing_seconds": 0.221272,
+      "p99_block_ms": 0.058958,
+      "max_block_ms": 0.412042,
+      "block_budget_ms": 1.33333,
+      "accepted_live_hits": 31
+    },
+    {
+      "source": "mimic/live_6_uptempo.mimic.wav",
+      "gain": 0.25,
+      "audio_seconds": 14.4,
+      "processing_seconds": 0.221075,
+      "p99_block_ms": 0.05475,
+      "max_block_ms": 0.477416,
+      "block_budget_ms": 1.33333,
+      "accepted_live_hits": 31
+    }
+  ],
+  "scope": "Desktop observation with 512-event loop. Not a hard real-time guarantee or hardware round-trip measurement."
+}

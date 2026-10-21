@@ -1,0 +1,2059 @@
+{
+  "scope": "Whole-source held-out development replay; not an untouched or unseen-performer benchmark.",
+  "sample_rate": 48000,
+  "audit_sha256": "130bd7f50c4f72549b6324adc22f7d135fdd5eb7ba8577b19d2c7b3ce335f1cf",
+  "engine_sha256": "2a7c3e270089fc24fdaea3b69b01c1bd4067996309c219786a6f10133287b31d",
+  "summaries": [
+    {
+      "gain": 1.0,
+      "reference_hits": 271,
+      "correct": 243,
+      "missed": 12,
+      "wrong": 16,
+      "extra": 14
+    },
+    {
+      "gain": 0.5,
+      "reference_hits": 271,
+      "correct": 228,
+      "missed": 26,
+      "wrong": 17,
+      "extra": 17
+    },
+    {
+      "gain": 0.25,
+      "reference_hits": 271,
+      "correct": 220,
+      "missed": 39,
+      "wrong": 12,
+      "extra": 16
+    }
+  ],
+  "folds": [
+    {
+      "test_take": "bb100",
+      "test_source": "mimic/bb100.mimic.wav",
+      "test_sha256": "1d6c2f38c06b77f000233f7a8486570e81f5fcd7b1c92385f752ef1135aa5bd6",
+      "training_groups": [
+        "bb84",
+        "isolated",
+        "isolated_context",
+        "live_1_boombap",
+        "live_2_fourfloor",
+        "live_3_snareheavy",
+        "live_4_kicksnare",
+        "live_5_sparse",
+        "live_6_uptempo"
+      ],
+      "training_sources": [
+        {
+          "source": "mimic/bb84.mimic.wav",
+          "sha256": "2aff08c01c151c47e2a963808baea64ed105d054b3b6a61a292f9aa568d7c98d"
+        },
+        {
+          "source": "mimic/live_1_boombap.mimic.wav",
+          "sha256": "171166eeb01de10631881262022cf7fe02aa673eac1db0d97cf880718b770bd0"
+        },
+        {
+          "source": "mimic/live_2_fourfloor.mimic.wav",
+          "sha256": "37aa735d9c81a8bcd40a29091272b68fe881c447dcf503a588c3c170c0e623b1"
+        },
+        {
+          "source": "mimic/live_3_snareheavy.mimic.wav",
+          "sha256": "844422f8923951e5df6c3852496118883c35fdb92846f0a24b258d111d87da4b"
+        },
+        {
+          "source": "mimic/live_4_kicksnare.mimic.wav",
+          "sha256": "e26533d28c29cc52354bd9edb218809842d0a1b4eae9e04daeb6e092c3b529eb"
+        },
+        {
+          "source": "mimic/live_5_sparse.mimic.wav",
+          "sha256": "4935720eb687962da86e3c3b7778e649ce9346f80a7bfc0b6f9c244867502abc"
+        },
+        {
+          "source": "mimic/live_6_uptempo.mimic.wav",
+          "sha256": "3b1720e13241b20ec70216ed60ea101d90467e36fe927c2d7c3f7cadd182d60f"
+        },
+        {
+          "source": "calibration/hat_closed.wav",
+          "sha256": "963dccce31b5a7bc387e0d5c414007d0ba82f01822277ad6d3dc8c5c595cd1c2"
+        },
+        {
+          "source": "calibration/hat_open.wav",
+          "sha256": "6dbac74d6e61c9e277a7ec09e7243bedda1dc1c24c15c4ed5ee35926265ed926"
+        },
+        {
+          "source": "calibration/kick.wav",
+          "sha256": "60be61611d62897a1c0ec63387ae5feaab0d7cf210190ff436cd7320db899e05"
+        },
+        {
+          "source": "calibration/snare.wav",
+          "sha256": "9f1988dc116a9bb3389639d1457916f10939fdcddea343819eb43ae6562f0cc9"
+        }
+      ],
+      "training_rows": 4941,
+      "native_model_sha256": "2d0795894e7acb16fb85c94966fa226df75da8efe96e6614dc6e1fdf0d145085",
+      "parity_rows": 18906,
+      "highrate_parity_rows": 18906,
+      "causality": "pass",
+      "cases": [
+        {
+          "gain": 1.0,
+          "score": {
+            "take": "bb100",
+            "reference_hits": 31,
+            "detected": 32,
+            "correct": 26,
+            "wrong": [
+              {
+                "time": 11.74341667,
+                "expected": 1,
+                "actual": 2
+              },
+              {
+                "time": 5.450583333,
+                "expected": 2,
+                "actual": 1
+              },
+              {
+                "time": 3.982333333,
+                "expected": 0,
+                "actual": 1
+              }
+            ],
+            "missed": [
+              {
+                "time": 6.93224,
+                "drum": 1
+              },
+              {
+                "time": 9.32481,
+                "drum": 1
+              }
+            ],
+            "extra": [
+              {
+                "time": 5.380375,
+                "drum": 2
+              },
+              {
+                "time": 8.634979167,
+                "drum": 2
+              },
+              {
+                "time": 11.0726875,
+                "drum": 2
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 5,
+              "max_error_samples": 1.6128005597693118e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 16,
+              "max_error_samples": 1.6127984281411045e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 11,
+              "max_error_samples": 0.00016012799619602447
+            }
+          ]
+        },
+        {
+          "gain": 0.5,
+          "score": {
+            "take": "bb100",
+            "reference_hits": 31,
+            "detected": 30,
+            "correct": 24,
+            "wrong": [
+              {
+                "time": 3.98375,
+                "expected": 0,
+                "actual": 1
+              }
+            ],
+            "missed": [
+              {
+                "time": 3.38032,
+                "drum": 1
+              },
+              {
+                "time": 6.93224,
+                "drum": 1
+              },
+              {
+                "time": 8.11256,
+                "drum": 1
+              },
+              {
+                "time": 9.32481,
+                "drum": 1
+              },
+              {
+                "time": 10.53605,
+                "drum": 1
+              },
+              {
+                "time": 11.74331,
+                "drum": 1
+              }
+            ],
+            "extra": [
+              {
+                "time": 5.382770833,
+                "drum": 2
+              },
+              {
+                "time": 8.635020833,
+                "drum": 2
+              },
+              {
+                "time": 9.821291667,
+                "drum": 1
+              },
+              {
+                "time": 11.03704167,
+                "drum": 2
+              },
+              {
+                "time": 12.2125,
+                "drum": 2
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 4,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 15,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 11,
+              "max_error_samples": 0.00016012808146115276
+            }
+          ]
+        },
+        {
+          "gain": 0.25,
+          "score": {
+            "take": "bb100",
+            "reference_hits": 31,
+            "detected": 25,
+            "correct": 23,
+            "wrong": [],
+            "missed": [
+              {
+                "time": 3.38032,
+                "drum": 1
+              },
+              {
+                "time": 4.53968,
+                "drum": 1
+              },
+              {
+                "time": 5.74195,
+                "drum": 1
+              },
+              {
+                "time": 6.93224,
+                "drum": 1
+              },
+              {
+                "time": 8.11256,
+                "drum": 1
+              },
+              {
+                "time": 9.32481,
+                "drum": 1
+              },
+              {
+                "time": 10.53605,
+                "drum": 1
+              },
+              {
+                "time": 11.74331,
+                "drum": 1
+              }
+            ],
+            "extra": [
+              {
+                "time": 4.116833333,
+                "drum": 2
+              },
+              {
+                "time": 5.38525,
+                "drum": 2
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 4,
+              "max_error_samples": 1.6128005597693118e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 13,
+              "max_error_samples": 1.6128069546539336e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 8,
+              "max_error_samples": 0.00016012799619602447
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "test_take": "bb84",
+      "test_source": "mimic/bb84.mimic.wav",
+      "test_sha256": "2aff08c01c151c47e2a963808baea64ed105d054b3b6a61a292f9aa568d7c98d",
+      "training_groups": [
+        "bb100",
+        "isolated",
+        "isolated_context",
+        "live_1_boombap",
+        "live_2_fourfloor",
+        "live_3_snareheavy",
+        "live_4_kicksnare",
+        "live_5_sparse",
+        "live_6_uptempo"
+      ],
+      "training_sources": [
+        {
+          "source": "mimic/bb100.mimic.wav",
+          "sha256": "1d6c2f38c06b77f000233f7a8486570e81f5fcd7b1c92385f752ef1135aa5bd6"
+        },
+        {
+          "source": "mimic/live_1_boombap.mimic.wav",
+          "sha256": "171166eeb01de10631881262022cf7fe02aa673eac1db0d97cf880718b770bd0"
+        },
+        {
+          "source": "mimic/live_2_fourfloor.mimic.wav",
+          "sha256": "37aa735d9c81a8bcd40a29091272b68fe881c447dcf503a588c3c170c0e623b1"
+        },
+        {
+          "source": "mimic/live_3_snareheavy.mimic.wav",
+          "sha256": "844422f8923951e5df6c3852496118883c35fdb92846f0a24b258d111d87da4b"
+        },
+        {
+          "source": "mimic/live_4_kicksnare.mimic.wav",
+          "sha256": "e26533d28c29cc52354bd9edb218809842d0a1b4eae9e04daeb6e092c3b529eb"
+        },
+        {
+          "source": "mimic/live_5_sparse.mimic.wav",
+          "sha256": "4935720eb687962da86e3c3b7778e649ce9346f80a7bfc0b6f9c244867502abc"
+        },
+        {
+          "source": "mimic/live_6_uptempo.mimic.wav",
+          "sha256": "3b1720e13241b20ec70216ed60ea101d90467e36fe927c2d7c3f7cadd182d60f"
+        },
+        {
+          "source": "calibration/hat_closed.wav",
+          "sha256": "963dccce31b5a7bc387e0d5c414007d0ba82f01822277ad6d3dc8c5c595cd1c2"
+        },
+        {
+          "source": "calibration/hat_open.wav",
+          "sha256": "6dbac74d6e61c9e277a7ec09e7243bedda1dc1c24c15c4ed5ee35926265ed926"
+        },
+        {
+          "source": "calibration/kick.wav",
+          "sha256": "60be61611d62897a1c0ec63387ae5feaab0d7cf210190ff436cd7320db899e05"
+        },
+        {
+          "source": "calibration/snare.wav",
+          "sha256": "9f1988dc116a9bb3389639d1457916f10939fdcddea343819eb43ae6562f0cc9"
+        }
+      ],
+      "training_rows": 4948,
+      "native_model_sha256": "dc28d41086897ba5b1956ade7573f26b609ecd44229d5479d1f05db2ee30a2f1",
+      "parity_rows": 18825,
+      "highrate_parity_rows": 18825,
+      "causality": "pass",
+      "cases": [
+        {
+          "gain": 1.0,
+          "score": {
+            "take": "bb84",
+            "reference_hits": 31,
+            "detected": 34,
+            "correct": 28,
+            "wrong": [
+              {
+                "time": 9.624270833,
+                "expected": 1,
+                "actual": 2
+              },
+              {
+                "time": 9.281145833,
+                "expected": 2,
+                "actual": 1
+              },
+              {
+                "time": 12.43285417,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [],
+            "extra": [
+              {
+                "time": 10.8895,
+                "drum": 2
+              },
+              {
+                "time": 10.993375,
+                "drum": 1
+              },
+              {
+                "time": 12.99816667,
+                "drum": 2
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 3,
+              "max_error_samples": 1.6127984281411045e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 13,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 17,
+              "max_error_samples": 0.00016012799619602447
+            },
+            {
+              "start_seconds": 14.399999999999999,
+              "hits": 1,
+              "max_error_samples": 0.00016001280300770304
+            }
+          ]
+        },
+        {
+          "gain": 0.5,
+          "score": {
+            "take": "bb84",
+            "reference_hits": 31,
+            "detected": 32,
+            "correct": 28,
+            "wrong": [
+              {
+                "time": 9.281208333,
+                "expected": 2,
+                "actual": 1
+              },
+              {
+                "time": 9.633354167,
+                "expected": 1,
+                "actual": 2
+              },
+              {
+                "time": 12.43697917,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [],
+            "extra": [
+              {
+                "time": 10.99389583,
+                "drum": 1
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 3,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 13,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 15,
+              "max_error_samples": 0.00016012808146115276
+            },
+            {
+              "start_seconds": 14.399999999999999,
+              "hits": 1,
+              "max_error_samples": 0.00016001271774257475
+            }
+          ]
+        },
+        {
+          "gain": 0.25,
+          "score": {
+            "take": "bb84",
+            "reference_hits": 31,
+            "detected": 29,
+            "correct": 25,
+            "wrong": [
+              {
+                "time": 9.281291667,
+                "expected": 2,
+                "actual": 1
+              },
+              {
+                "time": 11.7564375,
+                "expected": 0,
+                "actual": 1
+              },
+              {
+                "time": 9.637625,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [
+              {
+                "time": 10.67274,
+                "drum": 2
+              },
+              {
+                "time": 12.42676,
+                "drum": 1
+              },
+              {
+                "time": 13.2419,
+                "drum": 0
+              }
+            ],
+            "extra": [
+              {
+                "time": 10.69791667,
+                "drum": 2
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 3,
+              "max_error_samples": 1.593600984506338e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 13,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 12,
+              "max_error_samples": 0.00016012799619602447
+            },
+            {
+              "start_seconds": 14.399999999999999,
+              "hits": 1,
+              "max_error_samples": 9.634959496906959e-09
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "test_take": "live_1_boombap",
+      "test_source": "mimic/live_1_boombap.mimic.wav",
+      "test_sha256": "171166eeb01de10631881262022cf7fe02aa673eac1db0d97cf880718b770bd0",
+      "training_groups": [
+        "bb100",
+        "bb84",
+        "isolated",
+        "isolated_context",
+        "live_2_fourfloor",
+        "live_3_snareheavy",
+        "live_4_kicksnare",
+        "live_5_sparse",
+        "live_6_uptempo"
+      ],
+      "training_sources": [
+        {
+          "source": "mimic/bb100.mimic.wav",
+          "sha256": "1d6c2f38c06b77f000233f7a8486570e81f5fcd7b1c92385f752ef1135aa5bd6"
+        },
+        {
+          "source": "mimic/bb84.mimic.wav",
+          "sha256": "2aff08c01c151c47e2a963808baea64ed105d054b3b6a61a292f9aa568d7c98d"
+        },
+        {
+          "source": "mimic/live_2_fourfloor.mimic.wav",
+          "sha256": "37aa735d9c81a8bcd40a29091272b68fe881c447dcf503a588c3c170c0e623b1"
+        },
+        {
+          "source": "mimic/live_3_snareheavy.mimic.wav",
+          "sha256": "844422f8923951e5df6c3852496118883c35fdb92846f0a24b258d111d87da4b"
+        },
+        {
+          "source": "mimic/live_4_kicksnare.mimic.wav",
+          "sha256": "e26533d28c29cc52354bd9edb218809842d0a1b4eae9e04daeb6e092c3b529eb"
+        },
+        {
+          "source": "mimic/live_5_sparse.mimic.wav",
+          "sha256": "4935720eb687962da86e3c3b7778e649ce9346f80a7bfc0b6f9c244867502abc"
+        },
+        {
+          "source": "mimic/live_6_uptempo.mimic.wav",
+          "sha256": "3b1720e13241b20ec70216ed60ea101d90467e36fe927c2d7c3f7cadd182d60f"
+        },
+        {
+          "source": "calibration/hat_closed.wav",
+          "sha256": "963dccce31b5a7bc387e0d5c414007d0ba82f01822277ad6d3dc8c5c595cd1c2"
+        },
+        {
+          "source": "calibration/hat_open.wav",
+          "sha256": "6dbac74d6e61c9e277a7ec09e7243bedda1dc1c24c15c4ed5ee35926265ed926"
+        },
+        {
+          "source": "calibration/kick.wav",
+          "sha256": "60be61611d62897a1c0ec63387ae5feaab0d7cf210190ff436cd7320db899e05"
+        },
+        {
+          "source": "calibration/snare.wav",
+          "sha256": "9f1988dc116a9bb3389639d1457916f10939fdcddea343819eb43ae6562f0cc9"
+        }
+      ],
+      "training_rows": 5002,
+      "native_model_sha256": "5eccd640261ecff736aee5e391d35035e1fa739cf418774c16f671e4afddd925",
+      "parity_rows": 19079,
+      "highrate_parity_rows": 19079,
+      "causality": "pass",
+      "cases": [
+        {
+          "gain": 1.0,
+          "score": {
+            "take": "live_1_boombap",
+            "reference_hits": 21,
+            "detected": 22,
+            "correct": 16,
+            "wrong": [
+              {
+                "time": 4.644,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 3.4620625,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 1.3418125,
+                "expected": 2,
+                "actual": 1
+              }
+            ],
+            "missed": [
+              {
+                "time": 2.549,
+                "drum": 2
+              },
+              {
+                "time": 6.234,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 2.404229167,
+                "drum": 1
+              },
+              {
+                "time": 2.581125,
+                "drum": 2
+              },
+              {
+                "time": 5.8788125,
+                "drum": 1
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 17,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 5,
+              "max_error_samples": 1.612802691397519e-05
+            }
+          ]
+        },
+        {
+          "gain": 0.5,
+          "score": {
+            "take": "live_1_boombap",
+            "reference_hits": 21,
+            "detected": 19,
+            "correct": 10,
+            "wrong": [
+              {
+                "time": 4.644145833,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 3.462375,
+                "expected": 1,
+                "actual": 0
+              }
+            ],
+            "missed": [
+              {
+                "time": 0.149,
+                "drum": 2
+              },
+              {
+                "time": 1.342,
+                "drum": 2
+              },
+              {
+                "time": 1.97,
+                "drum": 2
+              },
+              {
+                "time": 2.549,
+                "drum": 2
+              },
+              {
+                "time": 3.77,
+                "drum": 2
+              },
+              {
+                "time": 4.349,
+                "drum": 2
+              },
+              {
+                "time": 4.931,
+                "drum": 2
+              },
+              {
+                "time": 5.518,
+                "drum": 2
+              },
+              {
+                "time": 6.234,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 0.17575,
+                "drum": 2
+              },
+              {
+                "time": 1.376875,
+                "drum": 2
+              },
+              {
+                "time": 1.996645833,
+                "drum": 2
+              },
+              {
+                "time": 2.6225,
+                "drum": 2
+              },
+              {
+                "time": 3.826020833,
+                "drum": 2
+              },
+              {
+                "time": 4.396125,
+                "drum": 2
+              },
+              {
+                "time": 5.878958333,
+                "drum": 1
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 16,
+              "max_error_samples": 1.612799493955208e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 3,
+              "max_error_samples": 1.603197574695514e-05
+            }
+          ]
+        },
+        {
+          "gain": 0.25,
+          "score": {
+            "take": "live_1_boombap",
+            "reference_hits": 21,
+            "detected": 14,
+            "correct": 11,
+            "wrong": [],
+            "missed": [
+              {
+                "time": 0.753,
+                "drum": 2
+              },
+              {
+                "time": 1.342,
+                "drum": 2
+              },
+              {
+                "time": 1.677,
+                "drum": 0
+              },
+              {
+                "time": 1.97,
+                "drum": 2
+              },
+              {
+                "time": 2.549,
+                "drum": 2
+              },
+              {
+                "time": 3.146,
+                "drum": 2
+              },
+              {
+                "time": 3.77,
+                "drum": 2
+              },
+              {
+                "time": 4.931,
+                "drum": 2
+              },
+              {
+                "time": 5.838,
+                "drum": 1
+              },
+              {
+                "time": 6.234,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 0.2295,
+                "drum": 2
+              },
+              {
+                "time": 2.581979167,
+                "drum": 2
+              },
+              {
+                "time": 4.965041667,
+                "drum": 2
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 11,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 3,
+              "max_error_samples": 1.612802691397519e-05
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "test_take": "live_2_fourfloor",
+      "test_source": "mimic/live_2_fourfloor.mimic.wav",
+      "test_sha256": "37aa735d9c81a8bcd40a29091272b68fe881c447dcf503a588c3c170c0e623b1",
+      "training_groups": [
+        "bb100",
+        "bb84",
+        "isolated",
+        "isolated_context",
+        "live_1_boombap",
+        "live_3_snareheavy",
+        "live_4_kicksnare",
+        "live_5_sparse",
+        "live_6_uptempo"
+      ],
+      "training_sources": [
+        {
+          "source": "mimic/bb100.mimic.wav",
+          "sha256": "1d6c2f38c06b77f000233f7a8486570e81f5fcd7b1c92385f752ef1135aa5bd6"
+        },
+        {
+          "source": "mimic/bb84.mimic.wav",
+          "sha256": "2aff08c01c151c47e2a963808baea64ed105d054b3b6a61a292f9aa568d7c98d"
+        },
+        {
+          "source": "mimic/live_1_boombap.mimic.wav",
+          "sha256": "171166eeb01de10631881262022cf7fe02aa673eac1db0d97cf880718b770bd0"
+        },
+        {
+          "source": "mimic/live_3_snareheavy.mimic.wav",
+          "sha256": "844422f8923951e5df6c3852496118883c35fdb92846f0a24b258d111d87da4b"
+        },
+        {
+          "source": "mimic/live_4_kicksnare.mimic.wav",
+          "sha256": "e26533d28c29cc52354bd9edb218809842d0a1b4eae9e04daeb6e092c3b529eb"
+        },
+        {
+          "source": "mimic/live_5_sparse.mimic.wav",
+          "sha256": "4935720eb687962da86e3c3b7778e649ce9346f80a7bfc0b6f9c244867502abc"
+        },
+        {
+          "source": "mimic/live_6_uptempo.mimic.wav",
+          "sha256": "3b1720e13241b20ec70216ed60ea101d90467e36fe927c2d7c3f7cadd182d60f"
+        },
+        {
+          "source": "calibration/hat_closed.wav",
+          "sha256": "963dccce31b5a7bc387e0d5c414007d0ba82f01822277ad6d3dc8c5c595cd1c2"
+        },
+        {
+          "source": "calibration/hat_open.wav",
+          "sha256": "6dbac74d6e61c9e277a7ec09e7243bedda1dc1c24c15c4ed5ee35926265ed926"
+        },
+        {
+          "source": "calibration/kick.wav",
+          "sha256": "60be61611d62897a1c0ec63387ae5feaab0d7cf210190ff436cd7320db899e05"
+        },
+        {
+          "source": "calibration/snare.wav",
+          "sha256": "9f1988dc116a9bb3389639d1457916f10939fdcddea343819eb43ae6562f0cc9"
+        }
+      ],
+      "training_rows": 4964,
+      "native_model_sha256": "0576f68772150fcd71d95c2446967149b8059b34b4b08c119862c89f64161004",
+      "parity_rows": 19013,
+      "highrate_parity_rows": 19013,
+      "causality": "pass",
+      "cases": [
+        {
+          "gain": 1.0,
+          "score": {
+            "take": "live_2_fourfloor",
+            "reference_hits": 29,
+            "detected": 29,
+            "correct": 26,
+            "wrong": [
+              {
+                "time": 0.067,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 0.667,
+                "expected": 1,
+                "actual": 0
+              }
+            ],
+            "missed": [
+              {
+                "time": 8.029,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 8.064604167,
+                "drum": 2
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 15,
+              "max_error_samples": 1.6128005597693118e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 14,
+              "max_error_samples": 1.6128069546539336e-05
+            }
+          ]
+        },
+        {
+          "gain": 0.5,
+          "score": {
+            "take": "live_2_fourfloor",
+            "reference_hits": 29,
+            "detected": 29,
+            "correct": 26,
+            "wrong": [],
+            "missed": [
+              {
+                "time": 6.323,
+                "drum": 2
+              },
+              {
+                "time": 7.477,
+                "drum": 2
+              },
+              {
+                "time": 8.029,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 6.353416667,
+                "drum": 2
+              },
+              {
+                "time": 7.504041667,
+                "drum": 2
+              },
+              {
+                "time": 8.062229167,
+                "drum": 2
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 15,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 14,
+              "max_error_samples": 1.612802691397519e-05
+            }
+          ]
+        },
+        {
+          "gain": 0.25,
+          "score": {
+            "take": "live_2_fourfloor",
+            "reference_hits": 29,
+            "detected": 29,
+            "correct": 25,
+            "wrong": [],
+            "missed": [
+              {
+                "time": 6.323,
+                "drum": 2
+              },
+              {
+                "time": 7.477,
+                "drum": 2
+              },
+              {
+                "time": 8.029,
+                "drum": 2
+              },
+              {
+                "time": 8.632,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 6.357333333,
+                "drum": 2
+              },
+              {
+                "time": 7.514083333,
+                "drum": 2
+              },
+              {
+                "time": 8.0723125,
+                "drum": 2
+              },
+              {
+                "time": 8.670708333,
+                "drum": 2
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 15,
+              "max_error_samples": 1.6128005597693118e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 14,
+              "max_error_samples": 1.6127984281411045e-05
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "test_take": "live_3_snareheavy",
+      "test_source": "mimic/live_3_snareheavy.mimic.wav",
+      "test_sha256": "844422f8923951e5df6c3852496118883c35fdb92846f0a24b258d111d87da4b",
+      "training_groups": [
+        "bb100",
+        "bb84",
+        "isolated",
+        "isolated_context",
+        "live_1_boombap",
+        "live_2_fourfloor",
+        "live_4_kicksnare",
+        "live_5_sparse",
+        "live_6_uptempo"
+      ],
+      "training_sources": [
+        {
+          "source": "mimic/bb100.mimic.wav",
+          "sha256": "1d6c2f38c06b77f000233f7a8486570e81f5fcd7b1c92385f752ef1135aa5bd6"
+        },
+        {
+          "source": "mimic/bb84.mimic.wav",
+          "sha256": "2aff08c01c151c47e2a963808baea64ed105d054b3b6a61a292f9aa568d7c98d"
+        },
+        {
+          "source": "mimic/live_1_boombap.mimic.wav",
+          "sha256": "171166eeb01de10631881262022cf7fe02aa673eac1db0d97cf880718b770bd0"
+        },
+        {
+          "source": "mimic/live_2_fourfloor.mimic.wav",
+          "sha256": "37aa735d9c81a8bcd40a29091272b68fe881c447dcf503a588c3c170c0e623b1"
+        },
+        {
+          "source": "mimic/live_4_kicksnare.mimic.wav",
+          "sha256": "e26533d28c29cc52354bd9edb218809842d0a1b4eae9e04daeb6e092c3b529eb"
+        },
+        {
+          "source": "mimic/live_5_sparse.mimic.wav",
+          "sha256": "4935720eb687962da86e3c3b7778e649ce9346f80a7bfc0b6f9c244867502abc"
+        },
+        {
+          "source": "mimic/live_6_uptempo.mimic.wav",
+          "sha256": "3b1720e13241b20ec70216ed60ea101d90467e36fe927c2d7c3f7cadd182d60f"
+        },
+        {
+          "source": "calibration/hat_closed.wav",
+          "sha256": "963dccce31b5a7bc387e0d5c414007d0ba82f01822277ad6d3dc8c5c595cd1c2"
+        },
+        {
+          "source": "calibration/hat_open.wav",
+          "sha256": "6dbac74d6e61c9e277a7ec09e7243bedda1dc1c24c15c4ed5ee35926265ed926"
+        },
+        {
+          "source": "calibration/kick.wav",
+          "sha256": "60be61611d62897a1c0ec63387ae5feaab0d7cf210190ff436cd7320db899e05"
+        },
+        {
+          "source": "calibration/snare.wav",
+          "sha256": "9f1988dc116a9bb3389639d1457916f10939fdcddea343819eb43ae6562f0cc9"
+        }
+      ],
+      "training_rows": 4843,
+      "native_model_sha256": "64d76a1dfdb9fc615d5c8d1eee570ac5d903db7a22eef728620fbb4d5e4d2f59",
+      "parity_rows": 18552,
+      "highrate_parity_rows": 18552,
+      "causality": "pass",
+      "cases": [
+        {
+          "gain": 1.0,
+          "score": {
+            "take": "live_3_snareheavy",
+            "reference_hits": 45,
+            "detected": 46,
+            "correct": 43,
+            "wrong": [
+              {
+                "time": 10.10535417,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 1.218354167,
+                "expected": 1,
+                "actual": 0
+              }
+            ],
+            "missed": [],
+            "extra": [
+              {
+                "time": 0.05529166667,
+                "drum": 1
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 15,
+              "max_error_samples": 1.612799493955208e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 16,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 15,
+              "max_error_samples": 0.00016012808146115276
+            }
+          ]
+        },
+        {
+          "gain": 0.5,
+          "score": {
+            "take": "live_3_snareheavy",
+            "reference_hits": 45,
+            "detected": 45,
+            "correct": 41,
+            "wrong": [
+              {
+                "time": 11.06402083,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 2.443104167,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 9.806270833,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 1.2185625,
+                "expected": 1,
+                "actual": 0
+              }
+            ],
+            "missed": [],
+            "extra": []
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 14,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 16,
+              "max_error_samples": 1.6127984281411045e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 15,
+              "max_error_samples": 0.00016012799619602447
+            }
+          ]
+        },
+        {
+          "gain": 0.25,
+          "score": {
+            "take": "live_3_snareheavy",
+            "reference_hits": 45,
+            "detected": 45,
+            "correct": 40,
+            "wrong": [
+              {
+                "time": 2.4431875,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 11.065125,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 9.806416667,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 5.1965,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 1.2186875,
+                "expected": 1,
+                "actual": 0
+              }
+            ],
+            "missed": [],
+            "extra": []
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 14,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 16,
+              "max_error_samples": 1.6128069546539336e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 15,
+              "max_error_samples": 0.00016012799619602447
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "test_take": "live_4_kicksnare",
+      "test_source": "mimic/live_4_kicksnare.mimic.wav",
+      "test_sha256": "e26533d28c29cc52354bd9edb218809842d0a1b4eae9e04daeb6e092c3b529eb",
+      "training_groups": [
+        "bb100",
+        "bb84",
+        "isolated",
+        "isolated_context",
+        "live_1_boombap",
+        "live_2_fourfloor",
+        "live_3_snareheavy",
+        "live_5_sparse",
+        "live_6_uptempo"
+      ],
+      "training_sources": [
+        {
+          "source": "mimic/bb100.mimic.wav",
+          "sha256": "1d6c2f38c06b77f000233f7a8486570e81f5fcd7b1c92385f752ef1135aa5bd6"
+        },
+        {
+          "source": "mimic/bb84.mimic.wav",
+          "sha256": "2aff08c01c151c47e2a963808baea64ed105d054b3b6a61a292f9aa568d7c98d"
+        },
+        {
+          "source": "mimic/live_1_boombap.mimic.wav",
+          "sha256": "171166eeb01de10631881262022cf7fe02aa673eac1db0d97cf880718b770bd0"
+        },
+        {
+          "source": "mimic/live_2_fourfloor.mimic.wav",
+          "sha256": "37aa735d9c81a8bcd40a29091272b68fe881c447dcf503a588c3c170c0e623b1"
+        },
+        {
+          "source": "mimic/live_3_snareheavy.mimic.wav",
+          "sha256": "844422f8923951e5df6c3852496118883c35fdb92846f0a24b258d111d87da4b"
+        },
+        {
+          "source": "mimic/live_5_sparse.mimic.wav",
+          "sha256": "4935720eb687962da86e3c3b7778e649ce9346f80a7bfc0b6f9c244867502abc"
+        },
+        {
+          "source": "mimic/live_6_uptempo.mimic.wav",
+          "sha256": "3b1720e13241b20ec70216ed60ea101d90467e36fe927c2d7c3f7cadd182d60f"
+        },
+        {
+          "source": "calibration/hat_closed.wav",
+          "sha256": "963dccce31b5a7bc387e0d5c414007d0ba82f01822277ad6d3dc8c5c595cd1c2"
+        },
+        {
+          "source": "calibration/hat_open.wav",
+          "sha256": "6dbac74d6e61c9e277a7ec09e7243bedda1dc1c24c15c4ed5ee35926265ed926"
+        },
+        {
+          "source": "calibration/kick.wav",
+          "sha256": "60be61611d62897a1c0ec63387ae5feaab0d7cf210190ff436cd7320db899e05"
+        },
+        {
+          "source": "calibration/snare.wav",
+          "sha256": "9f1988dc116a9bb3389639d1457916f10939fdcddea343819eb43ae6562f0cc9"
+        }
+      ],
+      "training_rows": 4917,
+      "native_model_sha256": "5d8c201ae3b56c90703423032455d7cc8bd84e6ab79bbcbfa2b16cd6dc71854b",
+      "parity_rows": 18841,
+      "highrate_parity_rows": 18841,
+      "causality": "pass",
+      "cases": [
+        {
+          "gain": 1.0,
+          "score": {
+            "take": "live_4_kicksnare",
+            "reference_hits": 33,
+            "detected": 34,
+            "correct": 32,
+            "wrong": [
+              {
+                "time": 5.081291667,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [],
+            "extra": [
+              {
+                "time": 0.273375,
+                "drum": 0
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 15,
+              "max_error_samples": 1.6128005597693118e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 14,
+              "max_error_samples": 1.6127984281411045e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 5,
+              "max_error_samples": 0.00016003198766156856
+            }
+          ]
+        },
+        {
+          "gain": 0.5,
+          "score": {
+            "take": "live_4_kicksnare",
+            "reference_hits": 33,
+            "detected": 33,
+            "correct": 32,
+            "wrong": [
+              {
+                "time": 5.081541667,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [],
+            "extra": []
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 14,
+              "max_error_samples": 1.6127984281411045e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 14,
+              "max_error_samples": 1.6128069546539336e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 5,
+              "max_error_samples": 0.00016012791093089618
+            }
+          ]
+        },
+        {
+          "gain": 0.25,
+          "score": {
+            "take": "live_4_kicksnare",
+            "reference_hits": 33,
+            "detected": 33,
+            "correct": 30,
+            "wrong": [
+              {
+                "time": 4.790520833,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 5.087833333,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [
+              {
+                "time": 10.5181,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 10.5750625,
+                "drum": 2
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 14,
+              "max_error_samples": 1.6128005597693118e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 14,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 5,
+              "max_error_samples": 0.00016003198766156856
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "test_take": "live_5_sparse",
+      "test_source": "mimic/live_5_sparse.mimic.wav",
+      "test_sha256": "4935720eb687962da86e3c3b7778e649ce9346f80a7bfc0b6f9c244867502abc",
+      "training_groups": [
+        "bb100",
+        "bb84",
+        "isolated",
+        "isolated_context",
+        "live_1_boombap",
+        "live_2_fourfloor",
+        "live_3_snareheavy",
+        "live_4_kicksnare",
+        "live_6_uptempo"
+      ],
+      "training_sources": [
+        {
+          "source": "mimic/bb100.mimic.wav",
+          "sha256": "1d6c2f38c06b77f000233f7a8486570e81f5fcd7b1c92385f752ef1135aa5bd6"
+        },
+        {
+          "source": "mimic/bb84.mimic.wav",
+          "sha256": "2aff08c01c151c47e2a963808baea64ed105d054b3b6a61a292f9aa568d7c98d"
+        },
+        {
+          "source": "mimic/live_1_boombap.mimic.wav",
+          "sha256": "171166eeb01de10631881262022cf7fe02aa673eac1db0d97cf880718b770bd0"
+        },
+        {
+          "source": "mimic/live_2_fourfloor.mimic.wav",
+          "sha256": "37aa735d9c81a8bcd40a29091272b68fe881c447dcf503a588c3c170c0e623b1"
+        },
+        {
+          "source": "mimic/live_3_snareheavy.mimic.wav",
+          "sha256": "844422f8923951e5df6c3852496118883c35fdb92846f0a24b258d111d87da4b"
+        },
+        {
+          "source": "mimic/live_4_kicksnare.mimic.wav",
+          "sha256": "e26533d28c29cc52354bd9edb218809842d0a1b4eae9e04daeb6e092c3b529eb"
+        },
+        {
+          "source": "mimic/live_6_uptempo.mimic.wav",
+          "sha256": "3b1720e13241b20ec70216ed60ea101d90467e36fe927c2d7c3f7cadd182d60f"
+        },
+        {
+          "source": "calibration/hat_closed.wav",
+          "sha256": "963dccce31b5a7bc387e0d5c414007d0ba82f01822277ad6d3dc8c5c595cd1c2"
+        },
+        {
+          "source": "calibration/hat_open.wav",
+          "sha256": "6dbac74d6e61c9e277a7ec09e7243bedda1dc1c24c15c4ed5ee35926265ed926"
+        },
+        {
+          "source": "calibration/kick.wav",
+          "sha256": "60be61611d62897a1c0ec63387ae5feaab0d7cf210190ff436cd7320db899e05"
+        },
+        {
+          "source": "calibration/snare.wav",
+          "sha256": "9f1988dc116a9bb3389639d1457916f10939fdcddea343819eb43ae6562f0cc9"
+        }
+      ],
+      "training_rows": 4853,
+      "native_model_sha256": "f3005372de26df14a4836d4b7dcde83d927b61d2bd25f31ed4f60440d0e04f6a",
+      "parity_rows": 18478,
+      "highrate_parity_rows": 18478,
+      "causality": "pass",
+      "cases": [
+        {
+          "gain": 1.0,
+          "score": {
+            "take": "live_5_sparse",
+            "reference_hits": 44,
+            "detected": 45,
+            "correct": 42,
+            "wrong": [
+              {
+                "time": 14.609875,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 7.908583333,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [],
+            "extra": [
+              {
+                "time": 8.587520833,
+                "drum": 2
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 7,
+              "max_error_samples": 1.6127984281411045e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 14,
+              "max_error_samples": 1.603197574695514e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 12,
+              "max_error_samples": 0.00016012799619602447
+            },
+            {
+              "start_seconds": 14.399999999999999,
+              "hits": 12,
+              "max_error_samples": 0.00016012808146115276
+            }
+          ]
+        },
+        {
+          "gain": 0.5,
+          "score": {
+            "take": "live_5_sparse",
+            "reference_hits": 44,
+            "detected": 44,
+            "correct": 39,
+            "wrong": [
+              {
+                "time": 14.61008333,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 5.183083333,
+                "expected": 1,
+                "actual": 0
+              },
+              {
+                "time": 7.9109375,
+                "expected": 1,
+                "actual": 2
+              },
+              {
+                "time": 7.767,
+                "expected": 1,
+                "actual": 2
+              },
+              {
+                "time": 5.391458333,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [],
+            "extra": []
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 7,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 13,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 12,
+              "max_error_samples": 0.00016012799619602447
+            },
+            {
+              "start_seconds": 14.399999999999999,
+              "hits": 12,
+              "max_error_samples": 0.00016012791093089618
+            }
+          ]
+        },
+        {
+          "gain": 0.25,
+          "score": {
+            "take": "live_5_sparse",
+            "reference_hits": 44,
+            "detected": 42,
+            "correct": 41,
+            "wrong": [
+              {
+                "time": 7.765291667,
+                "expected": 1,
+                "actual": 2
+              }
+            ],
+            "missed": [
+              {
+                "time": 7.908,
+                "drum": 1
+              },
+              {
+                "time": 11.715,
+                "drum": 0
+              }
+            ],
+            "extra": []
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 7,
+              "max_error_samples": 1.6127984281411045e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 12,
+              "max_error_samples": 1.603197574695514e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 11,
+              "max_error_samples": 0.00016012799619602447
+            },
+            {
+              "start_seconds": 14.399999999999999,
+              "hits": 12,
+              "max_error_samples": 0.00016003207292669686
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "test_take": "live_6_uptempo",
+      "test_source": "mimic/live_6_uptempo.mimic.wav",
+      "test_sha256": "3b1720e13241b20ec70216ed60ea101d90467e36fe927c2d7c3f7cadd182d60f",
+      "training_groups": [
+        "bb100",
+        "bb84",
+        "isolated",
+        "isolated_context",
+        "live_1_boombap",
+        "live_2_fourfloor",
+        "live_3_snareheavy",
+        "live_4_kicksnare",
+        "live_5_sparse"
+      ],
+      "training_sources": [
+        {
+          "source": "mimic/bb100.mimic.wav",
+          "sha256": "1d6c2f38c06b77f000233f7a8486570e81f5fcd7b1c92385f752ef1135aa5bd6"
+        },
+        {
+          "source": "mimic/bb84.mimic.wav",
+          "sha256": "2aff08c01c151c47e2a963808baea64ed105d054b3b6a61a292f9aa568d7c98d"
+        },
+        {
+          "source": "mimic/live_1_boombap.mimic.wav",
+          "sha256": "171166eeb01de10631881262022cf7fe02aa673eac1db0d97cf880718b770bd0"
+        },
+        {
+          "source": "mimic/live_2_fourfloor.mimic.wav",
+          "sha256": "37aa735d9c81a8bcd40a29091272b68fe881c447dcf503a588c3c170c0e623b1"
+        },
+        {
+          "source": "mimic/live_3_snareheavy.mimic.wav",
+          "sha256": "844422f8923951e5df6c3852496118883c35fdb92846f0a24b258d111d87da4b"
+        },
+        {
+          "source": "mimic/live_4_kicksnare.mimic.wav",
+          "sha256": "e26533d28c29cc52354bd9edb218809842d0a1b4eae9e04daeb6e092c3b529eb"
+        },
+        {
+          "source": "mimic/live_5_sparse.mimic.wav",
+          "sha256": "4935720eb687962da86e3c3b7778e649ce9346f80a7bfc0b6f9c244867502abc"
+        },
+        {
+          "source": "calibration/hat_closed.wav",
+          "sha256": "963dccce31b5a7bc387e0d5c414007d0ba82f01822277ad6d3dc8c5c595cd1c2"
+        },
+        {
+          "source": "calibration/hat_open.wav",
+          "sha256": "6dbac74d6e61c9e277a7ec09e7243bedda1dc1c24c15c4ed5ee35926265ed926"
+        },
+        {
+          "source": "calibration/kick.wav",
+          "sha256": "60be61611d62897a1c0ec63387ae5feaab0d7cf210190ff436cd7320db899e05"
+        },
+        {
+          "source": "calibration/snare.wav",
+          "sha256": "9f1988dc116a9bb3389639d1457916f10939fdcddea343819eb43ae6562f0cc9"
+        }
+      ],
+      "training_rows": 4906,
+      "native_model_sha256": "6a3397b336cfd2a941c0ce92819588fafec6b41414d1fffcfc0c8d403112b5b9",
+      "parity_rows": 18750,
+      "highrate_parity_rows": 18750,
+      "causality": "pass",
+      "cases": [
+        {
+          "gain": 1.0,
+          "score": {
+            "take": "live_6_uptempo",
+            "reference_hits": 37,
+            "detected": 31,
+            "correct": 30,
+            "wrong": [],
+            "missed": [
+              {
+                "time": 2.313,
+                "drum": 0
+              },
+              {
+                "time": 4.604,
+                "drum": 1
+              },
+              {
+                "time": 7.148,
+                "drum": 1
+              },
+              {
+                "time": 7.242,
+                "drum": 0
+              },
+              {
+                "time": 7.564,
+                "drum": 2
+              },
+              {
+                "time": 9.573,
+                "drum": 1
+              },
+              {
+                "time": 9.671,
+                "drum": 0
+              }
+            ],
+            "extra": [
+              {
+                "time": 7.5891875,
+                "drum": 2
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 14,
+              "max_error_samples": 1.6128005597693118e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 13,
+              "max_error_samples": 1.6032061012083432e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 4,
+              "max_error_samples": 0.00016000316804820613
+            }
+          ]
+        },
+        {
+          "gain": 0.5,
+          "score": {
+            "take": "live_6_uptempo",
+            "reference_hits": 37,
+            "detected": 30,
+            "correct": 28,
+            "wrong": [
+              {
+                "time": 4.4623125,
+                "expected": 1,
+                "actual": 0
+              }
+            ],
+            "missed": [
+              {
+                "time": 2.313,
+                "drum": 0
+              },
+              {
+                "time": 4.604,
+                "drum": 1
+              },
+              {
+                "time": 5.714,
+                "drum": 2
+              },
+              {
+                "time": 6.694,
+                "drum": 2
+              },
+              {
+                "time": 7.148,
+                "drum": 1
+              },
+              {
+                "time": 7.242,
+                "drum": 0
+              },
+              {
+                "time": 9.573,
+                "drum": 1
+              },
+              {
+                "time": 9.671,
+                "drum": 0
+              }
+            ],
+            "extra": [
+              {
+                "time": 5.7441875,
+                "drum": 2
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 14,
+              "max_error_samples": 1.6128005597693118e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 12,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 4,
+              "max_error_samples": 0.00016012799619602447
+            }
+          ]
+        },
+        {
+          "gain": 0.25,
+          "score": {
+            "take": "live_6_uptempo",
+            "reference_hits": 37,
+            "detected": 31,
+            "correct": 25,
+            "wrong": [
+              {
+                "time": 1.971854167,
+                "expected": 1,
+                "actual": 0
+              }
+            ],
+            "missed": [
+              {
+                "time": 2.313,
+                "drum": 0
+              },
+              {
+                "time": 4.604,
+                "drum": 1
+              },
+              {
+                "time": 5.714,
+                "drum": 2
+              },
+              {
+                "time": 6.694,
+                "drum": 2
+              },
+              {
+                "time": 7.148,
+                "drum": 1
+              },
+              {
+                "time": 7.242,
+                "drum": 0
+              },
+              {
+                "time": 7.564,
+                "drum": 2
+              },
+              {
+                "time": 9.098,
+                "drum": 2
+              },
+              {
+                "time": 9.573,
+                "drum": 1
+              },
+              {
+                "time": 9.671,
+                "drum": 0
+              },
+              {
+                "time": 10.676,
+                "drum": 2
+              }
+            ],
+            "extra": [
+              {
+                "time": 5.7475,
+                "drum": 2
+              },
+              {
+                "time": 6.726645833,
+                "drum": 2
+              },
+              {
+                "time": 7.589041667,
+                "drum": 2
+              },
+              {
+                "time": 9.12575,
+                "drum": 2
+              },
+              {
+                "time": 10.70491667,
+                "drum": 2
+              }
+            ]
+          },
+          "capture": [
+            {
+              "start_seconds": 0.0,
+              "hits": 14,
+              "max_error_samples": 1.6128005597693118e-05
+            },
+            {
+              "start_seconds": 4.8,
+              "hits": 13,
+              "max_error_samples": 1.612802691397519e-05
+            },
+            {
+              "start_seconds": 9.6,
+              "hits": 4,
+              "max_error_samples": 0.00016003198766156856
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "baseline_sha256": "caa4c41847662936ca4ea490a22400a81343893bf8f85e949ca27bce9ea602de",
+  "release_gate": "pass: no aggregate correct/missed/wrong/extra regression at any tested gain",
+  "deployment_model_matches_reserved_fold": true
+}
