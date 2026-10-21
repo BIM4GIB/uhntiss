@@ -1,12 +1,14 @@
-# UHNTISS Pocket · drums milestone 01
+# UHNTISS Pocket 02 · Auto drums
 
 A local voice-to-drum instrument and two-bar looper for Ableton Live. Native C++
 handles detection, synthesis, transport and recording. Max for Live supplies the
 host connection and controls. Python remains an offline research tool.
 
-**Performance alpha, not a stage-certified release.** Fixed-voice layering is the
-predictable path. Automatic kick/snare/hat recognition is experimental, even after
-teaching. This milestone does not claim professional performer endorsement.
+**Playable performance alpha.** Auto now uses a native, trained attack classifier
+and captures mixed kick/snare/hat performances without changing voices. The
+factory examples come from this repo’s isolated vocal recordings. Different
+voices, mic positions and snare articulations can still need a short soundcheck.
+This is not a claim of stage reliability or performer endorsement.
 
 ## Play
 
@@ -14,20 +16,21 @@ Requires macOS 11+, Ableton Live with Max for Live, and a mono mic input. The
 provided external is universal Apple Silicon/Intel. The portable core also builds
 on Linux; there is no Windows Max external in this release.
 
-1. Keep `UHNTISS Pocket.amxd`, `pocket-ui.js` and `uhntiss.pocket01~.mxo` together.
+1. Keep `UHNTISS Pocket.amxd`, `pocket-ui.js` and `uhntiss.pocket02~.mxo` together.
    Drag the `.amxd` onto an **audio track**. No API key, bridge, Python, Node server,
    network connection or downloaded kit is needed to play.
 2. Select your mono mic channel in Live; set the track's Monitor to **In**. The
    device produces drum sound; it does not pass the dry mic through. Use your
    normal low-latency interface setup and headphones while using an open mic.
-3. Start with **Input Voice → Kick**. Vocal attacks trigger the kick immediately.
+3. Leave **Input Voice → Auto**. Beatbox kick (`B`), snare (`PF`) and hat (`TS`)
+   in one performance; no mode switching between hits.
    Adjust Input and Gate until quiet room noise stops triggering and soft hits
    still register. Use the kick/snare/hat pads to test the kit without a mic.
 4. Run Live in **4/4**. Press **Record 2 Bars** before a downbeat. The display moves
    from armed to recording at the next bar; play for two bars. The new loop starts
    at the following seam. If armed with transport stopped, start Live and watch
    the armed/recording display for the actual capture boundary.
-5. Select **Overdub**, switch Input Voice to Snare or Hat, and record another pass.
+5. Select **Overdub** to add another mixed pass, still in Auto.
    Original hits keep their phase even if the pass starts on the other bar.
    **Replace** swaps in a new take. The old loop plays while you make either take.
 6. **Undo** cancels an armed/in-progress take, or restores the previous committed
@@ -55,16 +58,30 @@ changes the profile, not the loop undo history. All three voices must have three
 examples before the profile is used. The profile and loop are stored with the
 Live device/set via a `pattr` blob.
 
-This uses four causal features from the first 8 ms after detection. Some vocal
-kick/snare attacks are indistinguishable in that window. Teaching does not solve
-that fundamental limit. Use a fixed voice when the response needs to be certain.
-Open hats, simultaneous vocal sounds, continuous rolls and bleed suppression are
-outside this milestone. The onset detector has a 24 ms refractory period.
+Auto measures six log-energy bands in the early and late halves of a **10 ms**
+attack window, plus sample-rate-normalized zero crossings and crest shape. A
+bounded three-neighbour classifier compares these 14 features with 125 compiled
+examples. Gain variants of one source attack share one vote. No audio samples,
+model download, rhythm prediction, grid or Python process is used at runtime.
+
+The personal profile keeps all **nine examples**, rather than collapsing each
+voice into one average. It uses the same features and distance metric as the
+factory model. Save your Set after teaching. The v3 state decoder also accepts
+v2 loop blobs, but discards their incompatible four-feature voice profiles;
+re-teach those profiles. Replacing a device in Live does not itself transfer its
+old device state. Keep the old device/Set if you need its take.
+
+Onset release must last 4 ms, suppressing a second trigger from a transient’s
+small trough. After a genuine quiet gap the slow detector baseline recovers,
+so the previous loud hit does not mask a soft one. The minimum onset separation
+is **35 ms**. Open hats map to the closed-hat voice. Simultaneous overlapping
+vocal classes, continuous textures, speech rejection and speaker-bleed cancellation
+remain outside this version. Fixed voices remain available for deliberate layering.
 
 ## Timing and recovery contract
 
 - Fixed voices sound on the threshold-crossing sample. The same synth voice
-  refines its velocity during the next 8 ms without retriggering. Auto waits for
+  refines its velocity during the next 10 ms without retriggering. Auto waits for
   that analysis window before sounding. Loop playback uses the original onset
   timestamp and the refined velocity, not the later decision time.
 - Live's audio-rate `plugphasor~` provides phase. `plugsync~` PPQ anchors the beat
@@ -112,19 +129,36 @@ vendored or distributed. Release bundles are ad-hoc signed, not notarized.
 `build.mjs` also emits the inspectable `.maxpat`. The SDK CMake target can be enabled
 with `-DMAX_SDK_PATH=...` on macOS.
 
-For the independent native detector report (Python research environment only):
+For native Auto regression and research (Python is development-only):
 
 ```sh
-uv run python -m eval.native_pocket
+uv run python -m eval.test_native_auto
+uv run python -m eval.native_auto report
+uv run python -m eval.native_auto train  # regenerate the compiled feature table
 ```
 
-The existing Python transcription oracle is not evidence about this native
-classifier. The default native Auto report gives onset F1 about 0.33/0.47 and
-matched class accuracy 0.73/0.44 on the two existing fixtures. Those references are
-auto-labelled grid MIDI, not hand-labelled vocal onset truth, and are too small
-for a performance claim. They nevertheless make the recognition weakness clear.
-The next recognition milestone needs a diverse, hand-labelled, held-out corpus
-and performer audition of false triggers, missed ghost notes and latency.
+`auto-model.json` records the exact source hashes, reserved attack times and
+training settings. Every fourth primary isolated attack is reserved before
+augmentation; all examples within 200 ms of it are excluded from training. The
+factory model never trains on the mixed `mimic/` grooves. Model generation calls
+the actual C++ detector, avoiding a separate Python feature implementation.
+
+The regression constructs unsnapped 32-hit mixed grooves from those reserved
+recordings. All 32 voices and onsets pass at 44.1/48/96 kHz and 0.5×/1×/2× gain,
+with no extra triggers; capture retains the detected timestamps within one
+sample. Source attack association uses a 25 ms window: changes in gain can move
+threshold crossing (observed maximum 15.91 ms), so that result is **not** a claim
+of one-sample accuracy relative to a human-labelled physical mouth onset.
+Quiet-room noise, full audio-to-loop capture, dynamics and a 12 ms algorithmic
+monitoring bound are also checked. See `auto-regression.json` and `VALIDATION.md`.
+
+These are constructed performances from one recording collection. The separate
+whole-take report retains every result, including failures: several legacy
+fixed-grid labels drift or omit real attacks, and results on those takes remain
+mixed. It is not a clean, independently annotated accuracy benchmark. New
+performers, stage microphones, bleed and very fast flams still need audition and
+labelled recordings. The older offline Python oracle is not evidence about the
+native classifier.
 
 ## Architecture decision
 
@@ -156,3 +190,9 @@ clears again and restores the `pattr` blob, then writes its result to
 release: it generates test notes and changes its own loop. Stop transport after
 the test. This verifies the host adapter; it does not test mic recognition or
 physical footswitch hardware.
+
+The additional `qa/build-auto-smoke.mjs` harness feeds reserved real vocal audio
+through the new external inside Live, then checks voices, relative timing,
+Clear/Undo and v3 state restore. It needs `auto-input.wav` and
+`auto-expected.json` in the test build folder, and a 120 BPM host. Its source
+player, audio files and QA script are excluded from the playable release.

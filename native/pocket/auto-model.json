@@ -1,0 +1,106 @@
+{
+  "feature_version": 1,
+  "window_ms": 10,
+  "distance_weights": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    4,
+    4,
+    4,
+    4,
+    4,
+    4,
+    1,
+    1
+  ],
+  "gain_augmentation": [
+    0.5,
+    1.0,
+    2.0
+  ],
+  "prototypes": 125,
+  "training": [
+    {
+      "source": "calibration/hat_closed.wav",
+      "sha256": "963dccce31b5a7bc387e0d5c414007d0ba82f01822277ad6d3dc8c5c595cd1c2",
+      "primary_training_attacks": 12,
+      "heldout_attacks": 3
+    },
+    {
+      "source": "calibration/hat_open.wav",
+      "sha256": "6dbac74d6e61c9e277a7ec09e7243bedda1dc1c24c15c4ed5ee35926265ed926",
+      "primary_training_attacks": 6,
+      "heldout_attacks": 1
+    },
+    {
+      "source": "calibration/kick.wav",
+      "sha256": "60be61611d62897a1c0ec63387ae5feaab0d7cf210190ff436cd7320db899e05",
+      "primary_training_attacks": 13,
+      "heldout_attacks": 4
+    },
+    {
+      "source": "calibration/snare.wav",
+      "sha256": "9f1988dc116a9bb3389639d1457916f10939fdcddea343819eb43ae6562f0cc9",
+      "primary_training_attacks": 7,
+      "heldout_attacks": 2
+    }
+  ],
+  "heldout_attacks": [
+    {
+      "source": "calibration/hat_closed.wav",
+      "time": 1.933469388,
+      "drum": 2
+    },
+    {
+      "source": "calibration/hat_closed.wav",
+      "time": 3.920045351,
+      "drum": 2
+    },
+    {
+      "source": "calibration/hat_closed.wav",
+      "time": 5.891269841,
+      "drum": 2
+    },
+    {
+      "source": "calibration/hat_open.wav",
+      "time": 4.219251701,
+      "drum": 2
+    },
+    {
+      "source": "calibration/kick.wav",
+      "time": 1.587460317,
+      "drum": 0
+    },
+    {
+      "source": "calibration/kick.wav",
+      "time": 3.459931973,
+      "drum": 0
+    },
+    {
+      "source": "calibration/kick.wav",
+      "time": 5.298707483,
+      "drum": 0
+    },
+    {
+      "source": "calibration/kick.wav",
+      "time": 7.247709751,
+      "drum": 0
+    },
+    {
+      "source": "calibration/snare.wav",
+      "time": 1.836235828,
+      "drum": 1
+    },
+    {
+      "source": "calibration/snare.wav",
+      "time": 5.825102041,
+      "drum": 1
+    }
+  ],
+  "exclusions": "Every fourth primary attack per source is excluded before all gain augmentation. No mimic or fixture groove is used for training.",
+  "compiled_model_sha256": "ff13c2cc60663212f0ae6599fd91c40c589fdc8c6be36016e9d5e745c5947791"
+}

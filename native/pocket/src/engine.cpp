@@ -1,4 +1,5 @@
 #include "pocket/engine.hpp"
+#include "pocket/attack_model.hpp"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -66,48 +67,95 @@ bool Loop::append(Event e) noexcept {
   events[i] = e;
   return true;
 }
-void Profile::add(Drum drum, const std::array<double, 4> &features) noexcept {
+namespace {
+struct Neighbours {
+  std::array<double, 3> distance{1e30, 1e30, 1e30};
+  std::array<int, 3> drum{}, source{-1, -1, -1};
+  void add(const Features &a, const Features &b, int label,
+           int group) noexcept {
+    double d = 0.;
+    for (size_t j = 0; j < a.size(); ++j) {
+      const double delta = (a[j] - b[j]) / model::scale[j];
+      d += delta * delta;
+    }
+    for (size_t i = 0; i < distance.size(); ++i)
+      if (source[i] == group) {
+        if (d >= distance[i])
+          return;
+        for (size_t j = i; j + 1 < distance.size(); ++j) {
+          distance[j] = distance[j + 1];
+          drum[j] = drum[j + 1];
+          source[j] = source[j + 1];
+        }
+        distance.back() = 1e30;
+        source.back() = -1;
+        break;
+      }
+    for (size_t i = 0; i < distance.size(); ++i)
+      if (d < distance[i]) {
+        for (size_t k = distance.size() - 1; k > i; --k) {
+          distance[k] = distance[k - 1];
+          drum[k] = drum[k - 1];
+          source[k] = source[k - 1];
+        }
+        distance[i] = d;
+        drum[i] = label;
+        source[i] = group;
+        break;
+      }
+  }
+  Drum choose() const noexcept {
+    std::array<double, 3> votes{};
+    for (size_t i = 0; i < distance.size(); ++i)
+      votes[drum[i]] += 1. / (1. + distance[i]);
+    return Drum(std::max_element(votes.begin(), votes.end()) - votes.begin());
+  }
+};
+} // namespace
+Drum classifyAttack(const Features &features) noexcept {
+  Neighbours n;
+  for (const auto &e : model::examples)
+    n.add(features, e.features, e.drum, e.source);
+  return n.choose();
+}
+void Profile::add(Drum drum, const Features &features) noexcept {
   const auto d = int(drum);
   if (d < 0 || d > 2)
     return;
-  const int n = std::min(++count[d], 100);
-  count[d] = n;
-  for (size_t i = 0; i < 4; ++i)
-    mean[d][i] += (features[i] - mean[d][i]) / n;
+  for (double f : features)
+    if (!std::isfinite(f))
+      return;
+  const auto i = std::clamp(count[d], 0, 2);
+  examples[d][i] = features;
+  count[d] = std::min(i + 1, 3);
 }
 Drum Profile::classify(const Detection &detection) const noexcept {
   if (!ready())
     return detection.drum;
-  double closest = 1e9;
-  int best = 0;
-  for (int d = 0; d < 3; ++d) {
-    double distance = 0.;
-    for (size_t i = 0; i < 4; ++i) {
-      const double delta = detection.features[i] - mean[d][i];
-      distance += delta * delta;
-    }
-    if (distance < closest) {
-      closest = distance;
-      best = d;
-    }
-  }
-  return Drum(best);
+  Neighbours n;
+  for (int d = 0; d < 3; ++d)
+    for (int i = 0; i < 3; ++i)
+      n.add(detection.features, examples[d][i], d, d * 3 + i);
+  return n.choose();
 }
 void Detector::prepare(double sr) noexcept {
+  sr = std::isfinite(sr) ? clamp(sr, 8000., 384000.) : 48000.;
   sr_ = sr;
-  window_ = int(std::round(.008 * sr));
-  lowCoeff_ = coeff(420., sr);
-  midCoeff_ = coeff(3000., sr);
+  window_ = int(std::round(model::windowSeconds * sr));
+  const double edges[] = {150., 400., 1000., 2500., 6000.};
+  for (size_t i = 0; i < bands_.size(); ++i)
+    bandCoeffs_[i] = coeff(std::min(edges[i], sr * .45), sr);
   dcCoeff_ = coeff(25., sr);
-  attack_ = 1. - std::exp(-1. / (.0006 * sr));
-  release_ = 1. - std::exp(-1. / (.006 * sr));
+  attack_ = 1. - std::exp(-1. / (.0004 * sr));
+  release_ = 1. - std::exp(-1. / (.004 * sr));
   slowCoeff_ = 1. - std::exp(-1. / (.045 * sr));
   reset();
 }
 void Detector::reset() noexcept {
-  hp_ = dc_ = low_ = mid_ = fast_ = slow_ = previous_ = total_ = lowEnergy_ =
-      highEnergy_ = peak_ = 0.;
-  collect_ = refractory_ = count_ = crossings_ = 0;
+  hp_ = dc_ = fast_ = slow_ = previous_ = total_ = peak_ = 0.;
+  bands_ = {};
+  energy_ = {};
+  collect_ = refractory_ = count_ = crossings_ = quiet_ = releaseSamples_ = 0;
   released_ = true;
   started_ = false;
 }
@@ -117,50 +165,75 @@ float Detector::attackVelocity() const noexcept {
 bool Detector::process(double x, double beat, double threshold,
                        Detection &result) noexcept {
   started_ = false;
+  if (!std::isfinite(x))
+    x = 0.;
+  threshold = std::isfinite(threshold) ? clamp(threshold, .002, .2) : .010;
   dc_ += dcCoeff_ * (x - dc_);
   hp_ = x - dc_;
-  low_ += lowCoeff_ * (hp_ - low_);
-  mid_ += midCoeff_ * (hp_ - mid_);
+  for (size_t i = 0; i < bands_.size(); ++i)
+    bands_[i] += bandCoeffs_[i] * (hp_ - bands_[i]);
   const auto a = std::abs(hp_);
   fast_ += (a > fast_ ? attack_ : release_) * (a - fast_);
   slow_ += slowCoeff_ * (a - slow_);
+  // Once the input really falls below the gate, an earlier loud hit must
+  // not mask the next quiet attack through the slow envelope's long decay.
+  if (fast_ < threshold * .5) {
+    quiet_ = std::min(quiet_ + 1, int(.002 * sr_) + 1);
+    if (quiet_ > int(.002 * sr_))
+      slow_ = std::min(slow_, fast_);
+  } else
+    quiet_ = 0;
   if (refractory_ > 0)
     --refractory_;
-  if (fast_ < threshold * .5 || fast_ < slow_ * .8)
-    released_ = true;
+  if (fast_ < threshold * .5 || fast_ < slow_ * .65) {
+    releaseSamples_ = std::min(releaseSamples_ + 1, int(.004 * sr_) + 1);
+    if (releaseSamples_ > int(.004 * sr_))
+      released_ = true;
+  } else
+    releaseSamples_ = 0;
   if (!collect_ && !refractory_ && fast_ > threshold && fast_ > slow_ * 1.65 &&
       released_) {
     started_ = true;
     collect_ = window_;
     count_ = crossings_ = 0;
-    total_ = lowEnergy_ = highEnergy_ = peak_ = 0.;
+    energy_ = {};
+    total_ = peak_ = 0.;
     onsetBeat_ = beat;
     released_ = false;
-    refractory_ = int(.024 * sr_);
+    releaseSamples_ = 0;
+    refractory_ = int(.035 * sr_);
   }
   bool detected = false;
   if (collect_) {
+    auto &energies = energy_[count_ < window_ / 2 ? 0 : 1];
+    double previousBand = 0.;
+    for (size_t i = 0; i < bands_.size(); ++i) {
+      double band = bands_[i] - previousBand;
+      energies[i] += band * band;
+      previousBand = bands_[i];
+    }
+    energies[5] += (hp_ - previousBand) * (hp_ - previousBand);
     total_ += hp_ * hp_;
-    lowEnergy_ += low_ * low_;
-    highEnergy_ += (hp_ - mid_) * (hp_ - mid_);
     peak_ = std::max(peak_, a);
     crossings_ += (hp_ * previous_ < 0.);
     ++count_;
     if (!--collect_) {
-      const double lowRatio = lowEnergy_ / (total_ + 1e-15),
-                   highRatio = highEnergy_ / (total_ + 1e-15);
-      const double zcr = double(crossings_) / double(count_);
-      const Drum drum =
-          (lowRatio > .40 && zcr < .13)
-              ? Drum::kick
-              : ((highRatio > .48 && zcr > .24) ? Drum::hat : Drum::snare);
-      const float velocity = float(clamp(std::pow(peak_, .55), .08, 1.));
-      result = {drum,
-                velocity,
-                onsetBeat_,
-                {clamp(lowRatio, 0., 1.), clamp(highRatio, 0., 1.),
-                 clamp(zcr * 2., 0., 1.),
-                 std::sqrt(total_ / count_) / (peak_ + 1e-12)}};
+      Features features{};
+      for (size_t half = 0; half < 2; ++half) {
+        double mean = 0.;
+        const double samples = half ? window_ - window_ / 2 : window_ / 2;
+        for (size_t band = 0; band < 6; ++band) {
+          features[half * 6 + band] =
+              std::log(std::max(energy_[half][band] / samples, 1e-12));
+          mean += features[half * 6 + band] / 6.;
+        }
+        for (size_t band = 0; band < 6; ++band)
+          features[half * 6 + band] -= mean;
+      }
+      features[12] = double(crossings_) / count_ * sr_ / 48000. * 10.;
+      features[13] = std::sqrt(total_ / count_) / (peak_ + 1e-12) * 5.;
+      result = {classifyAttack(features), attackVelocity(), onsetBeat_,
+                features};
       detected = true;
     }
   }
@@ -292,7 +365,7 @@ void Engine::learn(int drum) noexcept {
   earlyVoice_ = 0;
   learning_ = drum;
   profile_.count[drum] = 0;
-  profile_.mean[drum] = {};
+  profile_.examples[drum] = {};
   ++revision_;
 }
 void Engine::arm() noexcept {

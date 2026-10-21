@@ -27,3 +27,11 @@ jobs:
 
       - name: Run the eval oracle (gated — fails below targets)
         run: uv run python -m eval.run_eval
+
+      - name: Build the native Auto test tools
+        run: |
+          cmake -S native/pocket -B native/pocket/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build native/pocket/build --parallel
+
+      - name: Verify causal Auto on reserved vocal attacks
+        run: uv run python -m eval.test_native_auto

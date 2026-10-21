@@ -24,7 +24,7 @@ function button(id,label,x,y,w,h,command,{toggle=false,on=label,initial=0,accent
 }
 box('display','jsui',{filename:'pocket-ui.js',jsarguments:[],numinlets:1,numoutlets:0,border:0,ignoreclick:1,background:1,presentation:1,presentation_rect:[0,0,980,169],patching_rect:[20,20,980,169]});
 obj('in','plugin~');obj('phase','plugphasor~');obj('sync','plugsync~');
-obj('engine','uhntiss.pocket01~',{varname:'pocket_engine'});obj('out','plugout~');
+obj('engine','uhntiss.pocket02~',{varname:'pocket_engine'});obj('out','plugout~');
 wire('in',0,'engine');wire('phase',0,'engine',1);wire('engine',0,'out');wire('engine',1,'out',1);wire('engine',2,'display');
 obj('hostbeat','prepend hostbeat');obj('running','prepend running');obj('meter','prepend meter');
 wire('sync',6,'hostbeat');wire('sync',0,'running');wire('sync',4,'meter');
@@ -40,7 +40,7 @@ for(const [i,name] of ['KICK','SNARE','HAT'].entries())button('pad'+i,name,16+i*
 box('voice','live.menu',{...param('voice','Input Voice',0,2,3,{parameter_enum:['Auto','Kick','Snare','Hat']}),items:['Auto','Kick','Snare','Hat'],presentation:1,presentation_rect:[828,10,87,21]});
 obj('voice-msg','prepend setting voice');wire('voice',0,'voice-msg');wire('voice-msg',0,'engine');
 for(const [i,name] of ['K','S','H'].entries())button('learn'+i,'TEACH '+name,665+i*101,144,93,18,'learn '+i);
-const knobs=[['input','Input',1,0.1,4],['threshold','Gate',.018,.002,.12],['tone','Tone',.5,0,1],['decay','Decay',.5,0,1],['drive','Heat',.25,0,1],['output','Level',.75,0,1]];
+const knobs=[['input','Input',1,0.1,4],['threshold','Gate',.010,.002,.12],['tone','Tone',.5,0,1],['decay','Decay',.5,0,1],['drive','Heat',.25,0,1],['output','Level',.75,0,1]];
 for(const [i,[id,name,value,min,max]] of knobs.entries()) {
  const p=param(id,name,value,0,max,{parameter_mmin:min,parameter_unitstyle:1});
  box(id,'live.dial',{...p,presentation:1,presentation_rect:[662+i*51,51,44,68],appearance:0,activefgdialcolor:[.71,.96,.36,1],activeneedlecolor:[.89,.94,.89,1],textcolor:[.67,.73,.68,1],annotation:id==='threshold'?'Raise the gate until room noise stops triggering hits.':name});
@@ -51,7 +51,7 @@ obj('load','live.thisdevice');obj('init','t b b b b b b b b b b');wire('load',0,
 ['voice','mode','monitor','playback',...knobs.map(k=>k[0])].forEach((id,i)=>{box('read-'+id,'message',{text:'outputvalue'});wire('init',i,'read-'+id);wire('read-'+id,0,id);});
 obj('banks','live.banks',{banks:{0:['record','undo','mode','clear','input','threshold','tone','output'],1:['pad0','pad1','pad2','voice','decay','drive','monitor','playback']}});
 boxes.push(boxes.shift()); // Max stores frontmost boxes first; the canvas belongs behind controls.
-const patch={patcher:{fileversion:1,appversion:{major:9,minor:1,revision:0,architecture:'x64',modernui:1},classnamespace:'box',rect:[100,100,1000,700],openinpresentation:1,default_fontsize:12,default_fontface:0,default_fontname:'Arial',bgcolor:[.055,.068,.062,1],devicewidth:980,boxes,lines,parameters,dependency_cache:[{name:'pocket-ui.js',type:'TEXT',implicit:1},{name:'uhntiss.pocket01~.mxo',type:'iLaX'}],autosave:0}};
+const patch={patcher:{fileversion:1,appversion:{major:9,minor:1,revision:0,architecture:'x64',modernui:1},classnamespace:'box',rect:[100,100,1000,700],openinpresentation:1,default_fontsize:12,default_fontface:0,default_fontname:'Arial',bgcolor:[.055,.068,.062,1],devicewidth:980,boxes,lines,parameters,dependency_cache:[{name:'pocket-ui.js',type:'TEXT',implicit:1},{name:'uhntiss.pocket02~.mxo',type:'iLaX'}],autosave:0}};
 const json=JSON.stringify(patch,null,2);
 fs.writeFileSync(path.join(out,'UHNTISS Pocket.maxpat'),json+'\n');
 const payload=Buffer.from(json+'\0');

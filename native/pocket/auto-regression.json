@@ -1,0 +1,78 @@
+{
+  "reference": "Constructed unsnapped grooves from reserved source attacks; all gain variants of those attacks excluded from training. Same recording session, not unseen performers. Source-onset association uses 25ms; captured timestamps independently checked within one sample.",
+  "cases": [
+    {
+      "sample_rate": 44100,
+      "gain": 0.5,
+      "hits": 32,
+      "correct_voices": 32,
+      "max_source_alignment_ms": 2.890023140589504,
+      "capture_error_samples_less_than": 1
+    },
+    {
+      "sample_rate": 44100,
+      "gain": 1.0,
+      "hits": 32,
+      "correct_voices": 32,
+      "max_source_alignment_ms": 6.654195297505633,
+      "capture_error_samples_less_than": 1
+    },
+    {
+      "sample_rate": 44100,
+      "gain": 2.0,
+      "hits": 32,
+      "correct_voices": 32,
+      "max_source_alignment_ms": 15.902494617234254,
+      "capture_error_samples_less_than": 1
+    },
+    {
+      "sample_rate": 48000,
+      "gain": 0.5,
+      "hits": 32,
+      "correct_voices": 32,
+      "max_source_alignment_ms": 2.879535140589695,
+      "capture_error_samples_less_than": 1
+    },
+    {
+      "sample_rate": 48000,
+      "gain": 1.0,
+      "hits": 32,
+      "correct_voices": 32,
+      "max_source_alignment_ms": 6.641298397505629,
+      "capture_error_samples_less_than": 1
+    },
+    {
+      "sample_rate": 48000,
+      "gain": 2.0,
+      "hits": 32,
+      "correct_voices": 32,
+      "max_source_alignment_ms": 15.879535417234191,
+      "capture_error_samples_less_than": 1
+    },
+    {
+      "sample_rate": 96000,
+      "gain": 0.5,
+      "hits": 32,
+      "correct_voices": 32,
+      "max_source_alignment_ms": 2.8899521405896245,
+      "capture_error_samples_less_than": 1
+    },
+    {
+      "sample_rate": 96000,
+      "gain": 1.0,
+      "hits": 32,
+      "correct_voices": 32,
+      "max_source_alignment_ms": 6.630882097506063,
+      "capture_error_samples_less_than": 1
+    },
+    {
+      "sample_rate": 96000,
+      "gain": 2.0,
+      "hits": 32,
+      "correct_voices": 32,
+      "max_source_alignment_ms": 15.88995241723401,
+      "capture_error_samples_less_than": 1
+    }
+  ],
+  "room_noise": "pass"
+}

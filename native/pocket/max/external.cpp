@@ -1,6 +1,7 @@
 #include "ext.h"
 #include "ext_obex.h"
 #include "pocket/engine.hpp"
+#include "pocket/state.hpp"
 #include "z_dsp.h"
 #include <algorithm>
 #include <atomic>
@@ -35,7 +36,7 @@ struct Data {
   Queue<Command, 128> commands;
   Queue<Snapshot, 4> snapshots;
   std::mutex producers; // Only message threads enter this mutex.
-  std::atomic<double> ppq{0.}, input{1.}, output{.75}, threshold{.018},
+  std::atomic<double> ppq{0.}, input{1.}, output{.75}, threshold{.010},
       tone{.5}, decay{.5}, drive{.25};
   std::atomic<int> voice{-1};
   std::atomic<bool> running{false}, fourFour{true}, monitor{true},
@@ -252,8 +253,9 @@ void tick(Object *x) {
   clock_delay(x->clock, 33.);
 }
 t_max_err getvalue(Object *x, long *argc, t_atom **argv) {
-  const auto &loop = x->data->saved;
-  const long required = 18 + long(loop.count) * 3;
+  StateValues values;
+  const long required =
+      long(encodeState(x->data->saved, x->data->savedProfile, values));
   if (!*argv || *argc < required) {
     if (*argv)
       sysmem_freeptr(*argv);
@@ -264,52 +266,23 @@ t_max_err getvalue(Object *x, long *argc, t_atom **argv) {
     return MAX_ERR_OUT_OF_MEM;
   }
   *argc = required;
-  atom_setlong(*argv, 2);
-  atom_setfloat(*argv + 1, loop.anchor);
-  atom_setlong(*argv + 2, long(loop.count));
-  for (size_t i = 0; i < loop.count; ++i) {
-    atom_setfloat(*argv + 3 + i * 3, loop.events[i].beat);
-    atom_setfloat(*argv + 4 + i * 3, loop.events[i].velocity);
-    atom_setlong(*argv + 5 + i * 3, int(loop.events[i].drum));
-  }
-  const long offset = 3 + long(loop.count) * 3;
-  for (int d = 0; d < 3; ++d) {
-    atom_setlong(*argv + offset + d * 5, x->data->savedProfile.count[d]);
-    for (int j = 0; j < 4; ++j)
-      atom_setfloat(*argv + offset + d * 5 + 1 + j,
-                    x->data->savedProfile.mean[d][j]);
-  }
+  for (long i = 0; i < required; ++i)
+    atom_setfloat(*argv + i, values[i]);
   return MAX_ERR_NONE;
 }
 t_max_err setvalue(Object *x, long argc, t_atom *argv) {
-  if (argc < 18 || atom_getlong(argv) != 2)
+  if (argc < 0 || argc > long(maxStateValues))
     return MAX_ERR_GENERIC;
-  const long n = atom_getlong(argv + 2);
-  if (n < 0 || n > long(maxEvents) || argc != 18 + n * 3)
-    return MAX_ERR_GENERIC;
+  StateValues values{};
+  for (long i = 0; i < argc; ++i) {
+    if (atom_gettype(argv + i) != A_LONG && atom_gettype(argv + i) != A_FLOAT)
+      return MAX_ERR_GENERIC;
+    values[i] = atom_getfloat(argv + i);
+  }
   Command c;
   c.action = Action::restore;
-  c.loop.anchor = atom_getfloat(argv + 1);
-  if (!std::isfinite(c.loop.anchor))
-    return MAX_ERR_GENERIC;
-  for (long i = 0; i < n; ++i)
-    if (!c.loop.append({atom_getfloat(argv + 3 + i * 3),
-                        float(atom_getfloat(argv + 4 + i * 3)),
-                        Drum(atom_getlong(argv + 5 + i * 3))}))
-      return MAX_ERR_GENERIC;
-  const long offset = 3 + n * 3;
-  for (int d = 0; d < 3; ++d) {
-    c.profile.count[d] = int(atom_getlong(argv + offset + d * 5));
-    if (c.profile.count[d] < 0 || c.profile.count[d] > 100)
-      return MAX_ERR_GENERIC;
-    for (int j = 0; j < 4; ++j) {
-      auto f = atom_getfloat(argv + offset + d * 5 + 1 + j);
-      if (!std::isfinite(f) || f < 0. || f > 1.)
-        return MAX_ERR_GENERIC;
-      c.profile.mean[d][j] = f;
-    }
-  }
-  if (!enqueue(x, c))
+  if (!decodeState(values.data(), size_t(argc), c.loop, c.profile) ||
+      !enqueue(x, c))
     return MAX_ERR_GENERIC;
   x->data->savedProfile = c.profile;
   x->data->saved = c.loop;
@@ -356,7 +329,7 @@ void *create(t_symbol *, long, t_atom *) {
 }
 } // namespace
 extern "C" C74_EXPORT void ext_main(void *) {
-  auto *c = class_new("uhntiss.pocket01~", (method)create, (method)destroy,
+  auto *c = class_new("uhntiss.pocket02~", (method)create, (method)destroy,
                       sizeof(Object), nullptr, A_GIMME, 0);
   class_addmethod(c, (method)dsp, "dsp64", A_CANT, 0);
   class_addmethod(c, (method)assist, "assist", A_CANT, 0);

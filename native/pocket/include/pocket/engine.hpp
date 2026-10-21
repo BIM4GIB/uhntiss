@@ -34,7 +34,7 @@ struct Loop {
 struct Settings {
   double inputGain = 1.;
   double outputGain = .75;
-  double threshold = .018;
+  double threshold = .010;
   double tone = .5;
   double decay = .5;
   double drive = .25;
@@ -61,16 +61,20 @@ private:
   double base_ = 0., previous_ = 0., host_ = 0.;
   bool valid_ = false, running_ = false, fourFour_ = true;
 };
+using Features = std::array<double, 14>;
 struct Detection {
   Drum drum;
   float velocity;
   double beat;
-  std::array<double, 4> features{};
+  Features features{};
 };
+// The factory model contains causal attack descriptors, never audio or a
+// rhythm grid. A decision cannot move, invent or quantize an onset.
+Drum classifyAttack(const Features &features) noexcept;
 struct Profile {
-  std::array<std::array<double, 4>, 3> mean{};
+  std::array<std::array<Features, 3>, 3> examples{};
   std::array<int, 3> count{};
-  void add(Drum drum, const std::array<double, 4> &features) noexcept;
+  void add(Drum drum, const Features &features) noexcept;
   Drum classify(const Detection &detection) const noexcept;
   bool ready() const noexcept {
     return count[0] >= 3 && count[1] >= 3 && count[2] >= 3;
@@ -89,12 +93,15 @@ public:
   void reset() noexcept;
 
 private:
-  double sr_ = 48000., hp_ = 0., dc_ = 0., low_ = 0., mid_ = 0.;
+  double sr_ = 48000., hp_ = 0., dc_ = 0.;
   double fast_ = 0., slow_ = 0., previous_ = 0., onsetBeat_ = 0.;
-  double total_ = 0., lowEnergy_ = 0., highEnergy_ = 0., peak_ = 0.;
-  double lowCoeff_ = 0., midCoeff_ = 0., dcCoeff_ = 0., attack_ = 0.,
+  double total_ = 0., peak_ = 0.;
+  std::array<double, 5> bands_{}, bandCoeffs_{};
+  std::array<std::array<double, 6>, 2> energy_{};
+  double dcCoeff_ = 0., attack_ = 0.,
          release_ = 0., slowCoeff_ = 0.;
-  int collect_ = 0, window_ = 384, refractory_ = 0, count_ = 0, crossings_ = 0;
+  int collect_ = 0, window_ = 480, refractory_ = 0, count_ = 0, crossings_ = 0,
+      quiet_ = 0, releaseSamples_ = 0;
   bool released_ = true, started_ = false;
 };
 class Kit {

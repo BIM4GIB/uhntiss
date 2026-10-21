@@ -22,7 +22,7 @@ function text(str,x,y,size,c,bold) {mgraphics.set_source_rgba(c);mgraphics.selec
 function line(x,y,x2,y2,c,width) {mgraphics.set_source_rgba(c);mgraphics.set_line_width(width||1);mgraphics.move_to(x,y);mgraphics.line_to(x2,y2);mgraphics.stroke();}
 function paint() {
     rect(0,0,980,169,[.055,.068,.062,1]);
-    text("UHNTISS",16,27,23,ink,true);text("POCKET / 01",141,26,10,green,true);
+    text("UHNTISS",16,27,23,ink,true);text("POCKET / 02",141,26,10,green,true);
     text("INPUT VOICE",740,24,9,muted,false);text("LOCAL",924,24,10,green,true);
     line(16,38,964,38,[.17,.21,.18,1],1);
     var labels=["READY TO PLAY","ARMED / NEXT BAR","CAPTURING YOUR POCKET","LOOP LOCKED","NO HITS / LOOP KEPT","TAKE FULL / LOOP KEPT","USE 4/4 FOR THIS DEVICE","TAKE CANCELLED / TRANSPORT MOVED"];
@@ -45,7 +45,7 @@ function paint() {
     text("2 BARS / 4:4",310,140,9,ink,true);text("NO QUANTIZE",428,140,9,muted,false);
     text(undos?"UNDO "+undos+" DEEP":"FIRST TAKE IS YOURS",536,140,9,muted,false);
     var help=state===1?"Start on the next downbeat. Record again cancels.":state===2?"Keep playing. The next cycle is yours.":"Mic or mapped pads. Your timing. Your accents.";
-    if(!calibrated && state===0)help="Auto: teach 3 hits each. Or select a fixed voice.";
+    if(!calibrated && state===0)help="Auto: B / PF / TS. Teach to tune your voice.";
     if(learning>=0)help="Make "+remaining+" isolated "+["B","PF","TS"][learning]+" sounds. Leave a short gap.";
     text(help,310,157,10,muted,false);
     text("INPUT",665,137,8,muted,true);
