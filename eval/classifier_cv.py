@@ -12,12 +12,13 @@ Run: ``uv run python -m eval.classifier_cv``
 from __future__ import annotations
 
 from eval.featurelab import cross_val, labeled_onsets
-from mouthflow.devices.drum.features import drum_features
+from mouthflow.devices.drum.features import DEFAULT_FEATURE_SET, FEATURE_SETS
 
 
 def main() -> int:
     rows = labeled_onsets()
-    cross_val(drum_features, "production (drum_features)", rows)
+    _, fn = FEATURE_SETS[DEFAULT_FEATURE_SET]
+    cross_val(fn, f"production ({DEFAULT_FEATURE_SET})", rows)
     return 0
 
 
