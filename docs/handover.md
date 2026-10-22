@@ -1,11 +1,50 @@
 # Mouthflow — session handover
 
-Last updated: 2026-10-22 (state as of the last commit, PR #18, 2026-07-04).
+Last updated: 2026-10-22 (branch `feat/avp-cross-performer`, on top of PR #18).
 Read this first when picking up work.
 (Architecture overview for newcomers: [`ARCHITECTURE.md`](ARCHITECTURE.md);
 honest gap list: [`KNOWN-LIMITATIONS.md`](KNOWN-LIMITATIONS.md); audit findings
 + the forward plan: [`roadmap.md`](roadmap.md); voice-dataset design:
 [`corpus.md`](corpus.md).)
+
+**2026-10-22 — cross-performer drums (`feat/avp-cross-performer`).** The
+drum classifier finally has numbers from more than one voice, and it changed
+because of them. Know about:
+
+- **AVP dataset in the lab.** `eval/avp.py` loads the Amateur Vocal
+  Percussion dataset (25 amateurs on a MacBook mic, 4,314 hand-annotated
+  hits, CC BY 4.0; gitignored under `datasets/avp/`, fetch instructions in
+  the module). `eval/avp_eval.py` reproduces the three protocols of the
+  MIT-licensed reference project (beatboxing-to-midi) plus 25-way
+  leave-one-performer-out and full-enrollment calibration, over every
+  featurizer × classifier. BLAS threads are capped inside it — four uncapped
+  runs in parallel produced nothing in 71 minutes.
+- **Production classifier changed** (`devices/drum/features.py`,
+  `classify.py`): feature set `all123` (= the old `drum10` + 13 MFCC
+  mean/std/delta + a level-invariant 3-slice log-mel shape) selected by the
+  model file's `feature_set` key (legacy files default to `drum10`). Three
+  tiers: per-user k-NN `drum_model.json` → AVP-trained MLP
+  `drum_global.json` (new; what a fresh install gets) → heuristic. Your model
+  was retrained on `all123`: held-out 0.734 → 0.736, LOO 0.808 → 0.800
+  (noise at 260 hits); drum oracle 0.98 class acc, all gates green, 151 tests.
+  Extraction is 3.3 ms/onset.
+- **The numbers** (annotated onsets; reference project in brackets): unseen
+  voices 77.4 [60.3], improvisations 79.6 [71.9], calibrated 5/class 80.0
+  [74.5], full enrollment 83.4, leave-one-performer-out 68.0. The heuristic
+  fallback scored 41.7 on other voices (kick 0.9 %). Snare is the hard class
+  everywhere (40–60 %). Per-performer feature normalisation adds ~1 pt to
+  the global model (not shipped: needs running per-user stats); the
+  roadmap's embedding+prototype recipe lost to plain k-NN; a per-take
+  loudness column was neutral. Detected-onset protocol tracks these within
+  2 pts (onset recall 96.2 %).
+- **Next: user calibration = enrollment.** AVP says ~30 hits per class gets
+  83 % vs 80 % at 5 per class, so the enrollment take is four one-class
+  clips (kick / snare / closed hat / open hat, ~12 s each) — one class per
+  clip cannot be swapped (today's 48k take swapped two sections). Build
+  `mouthflow enroll`: record or ingest the four clips, label by clip,
+  `train_classifier` → per-user model, show the held-out number. Then the
+  same flow for other people's voices is the first real test of the global
+  fallback → enrollment path.
 
 **2026-07-03/04 — PRs #13–#18: bass fixed on real takes, then a dataset
 pipeline so the next fixes are measured, not guessed.** Verified 2026-10-22:
@@ -335,7 +374,8 @@ cat datasets/manifest.jsonl                                  # per-row scores, r
 |---|---|
 | `mouthflow/signal.py` | shared DSP (onset/tempo/features/quantise/write_midi, `grid_fit`/`grid_phase` trust helpers) |
 | `mouthflow/devices/base.py`, `registry.py` | DeviceSpec + registry |
-| `mouthflow/devices/drum/` | drum transcriber + k-NN classifier + `drum_model.json` |
+| `mouthflow/devices/drum/` | drum transcriber + 3-tier classifier (`features.py` feature sets, `classify.py`), `drum_model.json` (per-user) + `drum_global.json` (AVP MLP) |
+| `eval/avp.py`, `eval/avp_eval.py`, `eval/train_global.py` | AVP loader, cross-performer eval matrix, global-model trainer |
 | `mouthflow/devices/pitched.py` | bass + lead transcriber (pyin) |
 | `mouthflow/devices/{bass,lead}/` | device specs + prompts |
 | `mouthflow/devices/drone/` | drone transcriber + contour + device + prompt |

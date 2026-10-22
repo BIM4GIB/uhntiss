@@ -28,79 +28,35 @@ Run: ``uv run python -m eval.avp_eval [--onsets gt|detected] [--feats ...] [--cl
 from __future__ import annotations
 
 import argparse
+import os
 import time
 from collections import Counter
 from pathlib import Path
+
+# Cap BLAS threads BEFORE numpy loads: the models here are tiny matrices, and a
+# default 16-thread pool spends its time spinning, not multiplying. Measured on
+# this Mac: 4 uncapped runs in parallel produced no result in 71 min; capped
+# at 3 threads a full MLP fit takes 0.8 s. Respect an explicit user setting.
+for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "VECLIB_MAXIMUM_THREADS", "MKL_NUM_THREADS"):
+    os.environ.setdefault(_v, "4")
 
 import numpy as np
 
 from eval import avp
 from eval.featurelab import baseline, bands_only, rich
 from mouthflow import signal
-from mouthflow.devices.drum.features import drum_features
+from mouthflow.devices.drum.features import drum_features, drum_features_v2, logmel3, mfcc_stats
+
+
+def drum_plus_logmel(audio, sr, t):
+    return [*drum_features(audio, sr, t), *logmel3(audio, sr, t)]
 
 CACHE = avp.REPO / "datasets" / "avp" / "cache"
 CLASSES = list(avp.CLASSES)
 K = 5
 
 
-# --- candidate featurizers (new; the winner gets promoted into devices/drum) ----
-
-def _window(audio, sr, t, dur):
-    s = int(t * sr)
-    fr = audio[s : min(s + int(dur * sr), len(audio))]
-    if len(fr) < int(dur * sr):
-        fr = np.pad(fr, (0, int(dur * sr) - len(fr)))
-    return fr.astype(np.float32)
-
-
-def mfcc_stats(audio, sr, t):
-    """13 MFCCs: mean + std over 0-150 ms, plus the mean delta — 39 dims."""
-    import librosa
-
-    fr = _window(audio, sr, t, 0.150)
-    m = librosa.feature.mfcc(y=fr, sr=sr, n_mfcc=13, n_fft=1024, hop_length=256)
-    d = librosa.feature.delta(m, width=3) if m.shape[1] >= 3 else np.zeros_like(m)
-    return [*m.mean(1), *m.std(1), *d.mean(1)]
-
-
-def logmel3(audio, sr, t, n_mels: int = 24):
-    """Level-invariant log-mel shape at three moments of the hit + decay slopes.
-
-    attack 0-30 ms, body 30-90 ms, tail 90-200 ms: each slice is a log-mel
-    spectrum normalised by its own total energy (so mic gain cancels), plus the
-    log-energy drop attack->body and body->tail (how the hit decays). 74 dims.
-    """
-    import librosa
-
-    fr = _window(audio, sr, t, 0.200)
-    S = librosa.feature.melspectrogram(
-        y=fr, sr=sr, n_fft=1024, hop_length=128, n_mels=n_mels, fmin=60, fmax=sr / 2, power=2.0
-    )
-    hop_s = 128 / sr
-    edges = [0.0, 0.030, 0.090, 0.200]
-    feats: list[float] = []
-    energies: list[float] = []
-    for a, b in zip(edges, edges[1:]):
-        fa, fb = int(a / hop_s), max(int(a / hop_s) + 1, int(b / hop_s))
-        sl = S[:, fa:fb].mean(axis=1) + 1e-10
-        tot = float(sl.sum())
-        feats.extend(np.log(sl / tot).tolist())
-        energies.append(np.log(tot))
-    feats.append(energies[1] - energies[0])
-    feats.append(energies[2] - energies[1])
-    return feats
-
-
-def drum_plus_logmel(audio, sr, t):
-    """Production 10 + logmel3 — does the shape feature add to contrast?"""
-    return [*drum_features(audio, sr, t), *logmel3(audio, sr, t)]
-
-
-def all123(audio, sr, t):
-    """Production 10 + MFCC stats 39 + logmel 74 — everything the lab has."""
-    return [*drum_features(audio, sr, t), *mfcc_stats(audio, sr, t), *logmel3(audio, sr, t)]
-
+# --- featurizers: the production sets live in devices/drum/features ---------------
 
 FEATURIZERS = {
     "baseline5": baseline,
@@ -110,7 +66,7 @@ FEATURIZERS = {
     "mfcc39": mfcc_stats,
     "logmel74": logmel3,
     "drum10+logmel74": drum_plus_logmel,
-    "all123": all123,
+    "all123": drum_features_v2,
 }
 
 
