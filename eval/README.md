@@ -15,6 +15,7 @@ below before it lands.
 | [`classifier_cv.py`](classifier_cv.py) | Drum classifier generalisation on THIS performer: leave-one-out + held-out-take CV + confusion matrix over the production feature set (`all123`) | `uv run python -m eval.classifier_cv` |
 | [`avp_eval.py`](avp_eval.py) | **Cross-performer** drum classifier numbers on the AVP dataset (25 amateurs, MacBook mic, 4314 annotated hits): unseen voices, leave-one-performer-out, improvisations, and per-user calibration (5/class and full enrollment), over every featurizer × classifier; reproduces the MIT reference project's protocols for comparison. Needs `datasets/avp/` (see [`avp.py`](avp.py)) | `uv run python -m eval.avp_eval [--onsets detected] [--speaker-norm] [--embed-knn]` |
 | [`avp_pocket.py`](avp_pocket.py) | The **native Pocket** classifier on AVP: onset recall, extra triggers, factory forests on other voices, Teach as shipped vs medoid vs a 30-example profile, and the Python `all123` k-NN on the *same* detected onsets. Needs the built tool (`mouthflow/pocket.py`). Contract: [`docs/pocket-integration.md`](../docs/pocket-integration.md) | `uv run python -m eval.avp_pocket [--sr 48000]` |
+| [`avp_window.py`](avp_window.py) | **Window study** for Pocket: the same enrollment protocol on Pocket's detected onsets with one causal feature family over 10/20/40/80/200 ms windows and 3-slice layouts, plus Teach-sized (3/voice) rows. Answers "feature vector or window?" — see [`docs/pocket-integration.md`](../docs/pocket-integration.md) | `uv run python -m eval.avp_window` |
 | [`train_global.py`](train_global.py) | Trains the cross-performer MLP fallback and writes [`mouthflow/drum_global.json`](../mouthflow/drum_global.json) (used when no per-user model exists) | `uv run python -m eval.train_global` |
 | [`onset_sanity.py`](onset_sanity.py) | Onset *detector* in isolation — raw (un-quantised) onsets vs. mimic reference grids, so tempo/phase errors don't fold into the score | `uv run python -m eval.onset_sanity` |
 | [`note_eval.py`](note_eval.py) | Pitched voices (bass/lead): note P/R/F1 + octave-error rate vs. `mimic/<name>.notegrid.json`; ships a synthetic sine self-test | `uv run python -m eval.note_eval` |
@@ -52,6 +53,9 @@ or a single honest headline number:
   voices (hat 91, kick 9, snare 15), Teach 71.7 %, 30-example profile 72.5 %,
   `all123` k-NN on the same onsets 81.1 %. Any change to Pocket's features,
   metric or Teach must rerun this and paste the table into the PR.
+- `avp_window` — same onsets, causal windows: 10 ms caps at ~73–74 %
+  whatever the features; 3 causal slices to 80 ms reach 80.3 % (Teach-sized
+  76.4 vs Pocket 17's 67.5). The 10 ms window is the ceiling, not the metric.
 - `onset_sanity` — the detector gate, tempo-independent. Use when changing
   onset detection.
 - `note_eval` — *intended* as the pitched gate, but see below.

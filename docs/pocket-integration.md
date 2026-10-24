@@ -78,6 +78,46 @@ same detections. The next cross-team decision is therefore about the
 **feature vector** (can a 10 ms causal window carry more of what `all123`
 carries?), not the profile size.
 
+## Window study: the ceiling is the 10 ms window, not the metric (`eval/avp_window.py`, 2026-10-24)
+
+Same 3,996 Pocket-detected onsets, same enrollment protocol (that
+performer's repetition hits → k-NN → their improvisation), one feature
+family (level-normalised log-mel + MFCC + zcr + centroid + 30 ms
+pre-context ratio) over **causal** windows starting at the detection:
+
+| features | window | acc (k · s · h) |
+|---|---|---|
+| Pocket's own 17, through the same k-NN | 10 ms (+30 ms context) | 72.1 (78 · 54 · 79) |
+| richer family | 10 ms | 73.6 (75 · 56 · 86) |
+| richer family | 20 ms | 75.4 |
+| richer family | 40 ms | 77.7 |
+| richer family | 80 ms | 79.6 (87 · 56 · 90) |
+| richer family, one 200 ms window | 200 ms | 74.2 (the attack gets diluted) |
+| **3 causal slices 0–10 / 10–40 / 40–80 ms** | **80 ms** | **80.3 (84 · 63 · 90)** |
+| 3 slices 0–10 / 10–40 / 40–120 ms | 120 ms | 81.2 (84 · 67 · 89) |
+| `all123` (mouthflow, non-causal design) | ≤200 ms | 81.1 (85 · 65 · 89) |
+
+Teach-sized (3 examples per voice, 3-NN, z-scored): Pocket 17 → 67.5,
+richer 10 ms → 69.0, **3 slices to 80 ms → 76.4** (k 85 · s 80 · h 64).
+(Pocket's native scale-normalised metric does better than z-scoring from
+nine examples — 71.7 in `avp_pocket` — so treat the Teach-sized rows as a
+ranking, not absolute; the gap is +7–9 either way.)
+
+**Reading.** Replacing the metric changes nothing (72.1 vs 72.5). Richer
+features inside 10 ms buy 1.5 points. Every doubling of the causal window
+buys ~2 points, and a 3-slice attack/body/tail layout at 80 ms recovers
+snare (54 → 63) and reaches the non-causal `all123` number. The 10 ms
+decision is the ceiling.
+
+**Recommendation to Pocket (Codex's call):** keep the 10 ms decision for
+what the performer *hears* (provisional voice, as now), and re-decide at
+80 ms with the 3-slice causal vector for what the *loop stores* — a
+delayed decision for the commit path, in the lineage of Stowell's
+"delayed decision-making in real-time beatbox classification". The audible
+hit stays at 10 ms; the recorded loop gets +8 points across performers.
+If a re-label must also correct the sounding voice, that is a voice-steal/
+crossfade question on the synth side, not a classifier one.
+
 ## How a change travels
 
 - Pocket changes features/metric/state → bump `feature_version` in
