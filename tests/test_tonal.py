@@ -18,8 +18,11 @@ def _isolate_dataset_dirs(tmp_path, monkeypatch):
 
 
 def test_root_midi_lands_in_voice_register():
-    assert tonal._root_midi("bass", "E") == 28   # E1
-    assert 28 <= tonal._root_midi("bass", "Bb") <= 40
+    # bass references sit where a voice can hum them (E2..D#3, 82-156 Hz); the
+    # pipeline's octave snap moves the line into the bass register afterwards
+    assert tonal._root_midi("bass", "E") == 40   # E2
+    assert tonal._root_midi("bass", "A") == 45   # A2 = 110 Hz, what the first rows were actually hummed at
+    assert 40 <= tonal._root_midi("bass", "Bb") <= 52
     assert 55 <= tonal._root_midi("lead", "C") <= 67
     assert 48 <= tonal._root_midi("drone", "F#") <= 60
 
@@ -78,3 +81,13 @@ def test_live_plan_chunking_fits_default_scenes():
     for rows in PLANS.values():
         chunks = [rows[i:i + _SLOTS_PER_TRACK] for i in range(0, len(rows), _SLOTS_PER_TRACK)]
         assert all(len(c) <= 8 for c in chunks)
+
+
+def test_pitch_class_metrics_forgive_the_performers_octave():
+    from eval.note_eval import match_stats
+
+    ref = [(0.0, 33), (1.0, 40), (2.0, 33)]
+    pred = [(0.0, 45), (1.0, 40), (2.0, 45)]  # A1 refs hummed at A2
+    st = match_stats(pred, ref, 0.0)
+    assert st["tp"] == 1 and st["octave_err"] == 2
+    assert st["f1"] < 0.4 and st["f1_pc"] == 1.0

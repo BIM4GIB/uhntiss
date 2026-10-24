@@ -14,6 +14,34 @@ in-flight work; on 2026-10-22 a catch-up reported "last work = PR #18" while
 PR #19 (Pocket 05, the native rebuild, 10 commits, CI green) sat open as a
 draft.
 
+**2026-10-24 (late) — bass dataset: the harness was measuring the
+performer's octave, not the tracker (`feat/bass-dataset-register`).**
+Diagnosed the two existing rows spectrally before recording more:
+
+- **b02** (key A, 120): every A1 (55 Hz) reference was hummed at A2 — no
+  55 Hz energy exists in the take; the pipeline transcribed what was sung.
+  Exact-octave F1 0.55 → pitch-class F1 **0.91**, recall 1.0. One real
+  tracker error (a pyin sub-octave at 7.2 s).
+- **b01** (key F, 90): the 44 Hz references were hummed between F1/F2/C3;
+  the remaining failure is **over-segmentation of sustained hums** (19 notes
+  for 10, fragments on scoops and level dips): pitch-class F1 0.62, P 0.47.
+  This is the transcriber problem the new rows must test.
+- **Fix:** bass references now generate in the hum register
+  (`_ROOT_OCTAVE_BASE["bass"]` 28 → 40, roots E2–D#3; lead/drone unchanged);
+  `note_eval` reports `f1_pc`/`recall_pc` (octave-agnostic) next to the
+  exact numbers; the ingest gate uses pitch-class recall. b01/b02 stay in
+  the manifest at the old register (calibrate rows). 171 tests.
+- **SwiftF0 probe (2 takes, not a decision):** `uv run --with swift-f0`,
+  `SwiftF0().detect(y, 16000)`. Agrees with the spectra where pyin didn't
+  (b01's F2 notes, b02's 7.2 s error) and runs in 0.03 s/take vs ~1 s. The
+  A/B stays gated on the 8 eval rows. Not a dependency yet.
+- **Recording next:** open a NEW Live set (the one open now is Codex's
+  calibration project — don't `data_setup` into it), drop MouthflowBass,
+  `data_setup` → "MF Ref starter_bass" tracks (18 remaining rows, new
+  register), per row: play the ref clip, record audio next to it, select
+  the take, `data_ingest`. Rows b03–b12 calibrate, be1–be8 eval (recorded
+  last, never tuned against).
+
 **2026-10-24 — Pocket wired to enrollment + AVP (`feat/pocket-avp-enroll`,
 PR into `feat/native-pocket-drums`).** Contract doc:
 [`pocket-integration.md`](pocket-integration.md). `mouthflow/pocket.py`
