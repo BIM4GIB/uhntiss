@@ -29,14 +29,19 @@ machinery, not evidence.
 | What | Have | Spec target |
 | --- | --- | --- |
 | Tracked drum fixture trios (wav+mid+json) | 2 (`tests/fixtures/clips/01_boombap_mimic`, `02_bb100`) | N=20 ([`docs/spec.md`](spec.md) §Eval harness) |
-| Drum classifier accuracy | LOO CV ≈ 0.81, held-out-take mean ≈ 0.73 ([`eval/classifier_cv.py`](../eval/classifier_cv.py)) on one user's small dataset | — |
+| Drum classifier accuracy (this performer) | LOO CV ≈ 0.80, held-out-take mean ≈ 0.74 ([`eval/classifier_cv.py`](../eval/classifier_cv.py)) on 260 labelled hits | — |
+| Drum classifier accuracy (other performers) | AVP, 25 amateurs ([`eval/avp_eval.py`](../eval/avp_eval.py)): global MLP 68 % leave-one-performer-out; per-user k-NN after enrollment 83 % on their improvisations | — |
 | Pitched note eval | synthetic self-test only (clean sines, bass F1 1.0) ([`eval/note_eval.py`](../eval/note_eval.py)) | real hummed takes |
 
 No `mimic/*.notegrid.json` reference grids exist yet, so the pitched voices (bass,
 lead, drone) have **zero** accuracy numbers on real audio. The per-user k-NN timbre
 classifier (`mouthflow/drum_model.json`, 10 features, heuristic fallback) will not
-transfer to other voices/mics without recalibration. All quality numbers should be
-read as "one performer, one laptop mic".
+transfer to other voices/mics without recalibration. Since 2026-10-22 the drum
+classifier also has a cross-performer number (AVP, above); everything else
+should still be read as "one performer, one laptop mic". The AVP numbers say
+the hard class is snare (40–60 % across performers for every model tried) and
+that enrollment on the performer's own hits is worth +13 points over the best
+global model — the per-user calibration flow is the product, not a nicety.
 
 ## 3. Drone automation is runtime-unverified
 

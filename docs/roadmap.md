@@ -231,7 +231,14 @@ ships a user-feelable improvement.
    suggestion ("hum a bassline in F minor"), fuzzy fallback instead of
    `available[0]`. Filter kit-discovery pollution via the existing
    `instrument_filter` hook (KNOWN-LIMITATIONS #5).
-10. **Neural ears, behind existing seams, measured before default**:
+10. **Neural ears, behind existing seams, measured before default** —
+    *drum half measured 2026-10-22 on AVP (`eval/avp_eval.py`): the
+    `all123` feature set + per-user k-NN is now production (83 % after
+    enrollment, +8 over `drum10`), an AVP-trained MLP replaces the heuristic
+    as the no-enrollment fallback (68 % vs 42 % on other voices), and the
+    embedding+prototype recipe below was tried and lost to plain feature-
+    space k-NN (81.4 vs 83.8) at this model size — not pursued. Pitch half
+    (SwiftF0) still pending the bass notegrids.*
     `PitchTracker` strategy seam — **SwiftF0** (MIT, ONNX, ~40× CPU-realtime,
     +12 pts over CREPE at 10 dB SNR = laptop-mic conditions) as the pyin
     replacement candidate; embedding + per-user prototype enrollment drum
