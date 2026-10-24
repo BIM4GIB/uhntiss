@@ -13,7 +13,7 @@ using namespace pocket;
 namespace {
 static_assert(std::atomic<double>::is_always_lock_free,
               "Audio controls require lock-free double atomics");
-enum class Action { record, undo, clear, tap, restore, learn };
+enum class Action { record, undo, clear, tap, restore, learn, profile };
 struct Command {
   Action action{};
   int drum = 0;
@@ -170,6 +170,9 @@ void perform(Object *x, t_object *, double **ins, long, double **outs, long,
     case Action::learn:
       d.engine.learn(c.drum);
       break;
+    case Action::profile:
+      d.engine.setProfile(c.profile);
+      break;
     }
   }
   const bool run = d.running.load(std::memory_order_relaxed),
@@ -251,6 +254,35 @@ void tick(Object *x) {
   x->data->request.store(true, std::memory_order_relaxed);
   qelem_set(x->qelem);
   clock_delay(x->clock, 33.);
+}
+// `profile <156 numbers>`: install a Teach profile built offline (the v4
+// profile block, see decodeProfile). Replaces the voice examples only; the
+// loop is untouched. Persists with the Set through the pattr state like a
+// taught profile does.
+void profile(Object *x, t_symbol *, long argc, t_atom *argv) {
+  if (argc != long(profileValues)) {
+    object_error((t_object *)x, "profile: expected %ld values, got %ld",
+                 long(profileValues), argc);
+    return;
+  }
+  std::array<double, profileValues> values{};
+  for (long i = 0; i < argc; ++i) {
+    if (atom_gettype(argv + i) != A_LONG && atom_gettype(argv + i) != A_FLOAT) {
+      object_error((t_object *)x, "profile: value %ld is not a number", i);
+      return;
+    }
+    values[i] = atom_getfloat(argv + i);
+  }
+  Command c;
+  c.action = Action::profile;
+  if (!decodeProfile(values.data(), values.size(), c.profile)) {
+    object_error((t_object *)x,
+                 "profile: rejected (needs 3 finite examples per voice)");
+    return;
+  }
+  if (!enqueue(x, c))
+    return;
+  x->data->savedProfile = c.profile;
 }
 t_max_err getvalue(Object *x, long *argc, t_atom **argv) {
   StateValues values;
@@ -337,6 +369,7 @@ extern "C" C74_EXPORT void ext_main(void *) {
   class_addmethod(c, (method)undo, "undo", 0);
   class_addmethod(c, (method)clear, "clear", 0);
   class_addmethod(c, (method)learn, "learn", A_LONG, 0);
+  class_addmethod(c, (method)profile, "profile", A_GIMME, 0);
   class_addmethod(c, (method)tap, "tap", A_LONG, A_DEFFLOAT, 0);
   class_addmethod(c, (method)hostbeat, "hostbeat", A_FLOAT, 0);
   class_addmethod(c, (method)running, "running", A_LONG, 0);

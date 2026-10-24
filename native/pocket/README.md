@@ -93,6 +93,17 @@ between accepted hits is **35 ms**. Rejected precursors can re-arm sooner on a f
 vocal classes, continuous textures, speech rejection and speaker-bleed cancellation
 remain outside this version. Fixed voices remain available for deliberate layering.
 
+### Loading a profile built offline
+
+**PROFILE** (top row) loads a Teach profile that was built outside the device:
+`uv run mouthflow enroll export-pocket` records one clip per voice, runs this
+engine's own detector over them and keeps the three most representative hits
+per voice (see `docs/pocket-integration.md`). The external accepts the same
+payload as a `profile <156 values>` message — the v4 profile block, validated
+by `decodeProfile` — and persists it with the Set like a taught profile. On
+AVP (25 other performers) a 3-example profile scores ~72 % against the
+factory forests' ~48 %; the profile size is not the limiting factor there.
+
 ## Timing and recovery contract
 
 - Fixed voices sound on the threshold-crossing sample. The same synth voice

@@ -97,6 +97,32 @@ int main() {
           "fractional drum id rejected");
     Loop quiet;
     quiet.append({.12, .02f, Drum::hat});
+    {
+      // profile-only payload (offline Teach): the v4 profile block alone
+      Profile taught;
+      for (int d = 0; d < 3; ++d)
+        for (int i = 0; i < 3; ++i) {
+          Features f{};
+          for (size_t j = 0; j < f.size(); ++j)
+            f[j] = .1 * double(d + 1) + .01 * double(i) + .001 * double(j);
+          taught.add(Drum(d), f);
+        }
+      StateValues full{};
+      const auto fullSize = encodeState({}, taught, full);
+      check(fullSize == 3 + profileValues, "empty loop + profile is 3 + profileValues");
+      Profile got;
+      check(decodeProfile(full.data() + 3, profileValues, got) &&
+                got.ready() && got.examples == taught.examples,
+            "decodeProfile installs all nine examples");
+      check(!decodeProfile(full.data() + 3, profileValues - 1, got),
+            "decodeProfile rejects a short payload");
+      std::array<double, profileValues> bad{};
+      for (size_t i = 0; i < profileValues; ++i)
+        bad[i] = full[3 + i];
+      bad[5] = NAN;
+      check(!decodeProfile(bad.data(), bad.size(), got),
+            "decodeProfile rejects a non-finite feature");
+    }
     const auto quietSize = encodeState(quiet, {}, values);
     check(decodeState(values.data(), quietSize, after, restored) &&
               after.events[0].velocity == .02f,

@@ -333,3 +333,54 @@ def reset() -> None:
     except FileNotFoundError:
         pass
     drum_classify._MODEL = drum_classify._UNSET
+
+
+CLASSES_BY_DRUM = {0: "kick", 1: "snare", 2: "hat"}
+
+
+def export_pocket(binary: Path | str | None = None, sr: int = 48000, gate: float = 0.010) -> dict:
+    """Turn the enrolled clips into a Pocket Teach profile (3 medoids per voice).
+
+    Pocket (the native realtime device) is the other device line; its
+    profile holds exactly three 17-feature examples per voice. Instead of
+    the three hits you happened to play at the mic, this runs Pocket's own
+    detector over every enrolled clip (resampled to the Set's rate, default
+    48 kHz) and keeps the three most representative hits per voice. Open-hat
+    clips count as hats — Pocket maps open to closed.
+    """
+    import librosa
+
+    from mouthflow import pocket
+
+    bin_path = pocket.find_binary(binary)
+    scale = pocket.model_scale()
+    m = _load_manifest()
+    by_drum: dict[int, list[np.ndarray]] = {0: [], 1: [], 2: []}
+    detected: dict[str, int] = {}
+    used_clips: list[dict] = []
+    for e in m["clips"]:
+        path = Path(e.get("path", ""))
+        cls = e.get("class")
+        if not path.exists() or cls not in CLASSES:
+            continue
+        drum = {"kick": 0, "snare": 1, "hat": 2, "hat_open": 2}[cls]
+        y = _load_audio(path)
+        if sr != SR:
+            y = librosa.resample(y, orig_sr=SR, target_sr=sr).astype(np.float32)
+        rows = pocket.accepted(pocket.analyze(bin_path, y, sr, gate))
+        detected[cls] = detected.get(cls, 0) + len(rows)
+        by_drum[drum].extend(rows[:, 4:])
+        used_clips.append({"class": cls, "path": str(path), "pocket_hits": int(len(rows))})
+    examples = pocket.pick_examples({d: np.array(v) for d, v in by_drum.items()}, scale)
+    doc = pocket.write_profile(
+        examples,
+        {
+            "sample_rate": sr,
+            "gate": gate,
+            "pick": "medoid",
+            "source": {"kind": "mouthflow-enroll", "clips": used_clips, "detected": detected,
+                       "exported_at": datetime.now().isoformat(timespec="seconds")},
+        },
+    )
+    return {"written": doc["written"], "detected": detected,
+            "hits_per_drum": {CLASSES_BY_DRUM[d]: int(len(v)) for d, v in by_drum.items()}}

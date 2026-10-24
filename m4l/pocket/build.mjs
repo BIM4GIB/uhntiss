@@ -40,6 +40,11 @@ for(const [i,name] of ['KICK','SNARE','HAT'].entries())button('pad'+i,name,16+i*
 box('voice','live.menu',{...param('voice','Input Voice',0,2,3,{parameter_enum:['Auto','Kick','Snare','Hat']}),items:['Auto','Kick','Snare','Hat'],presentation:1,presentation_rect:[828,10,87,21]});
 obj('voice-msg','prepend setting voice');wire('voice',0,'voice-msg');wire('voice-msg',0,'engine');
 for(const [i,name] of ['K','S','H'].entries())button('learn'+i,'TEACH '+name,665+i*101,144,93,18,'learn '+i);
+// PROFILE: load a Teach profile built offline from one-class enrollment clips
+// (`mouthflow enroll export-pocket` writes uhntiss_pocket_profile.json on Max's
+// search path). js reads the file; the engine gets `profile <156 values>`.
+box('loadprofile','live.text',{...param('loadprofile','Load profile',0,2,1,{parameter_enum:['Off','On'],parameter_invisible:4,parameter_surface:1}),mode:0,text:'PROFILE',texton:'PROFILE',fontname:'Arial',fontsize:10,rounded:5,presentation:1,presentation_rect:[665,10,70,21],activebgcolor:[.14,.18,.15,1],activebgoncolor:[.71,.96,.36,1],activetextcolor:[.85,.90,.85,1],activetextoncolor:[.05,.07,.05,1],annotation:'Load the Teach profile exported by mouthflow enroll export-pocket'});
+obj('profile-js','js pocket-profile.js');wire('loadprofile',0,'profile-js');wire('profile-js',0,'engine');
 const knobs=[['input','Input',1,0.1,4],['threshold','Gate',.010,.002,.12],['tone','Tone',.5,0,1],['decay','Decay',.5,0,1],['drive','Heat',.25,0,1],['output','Level',.75,0,1]];
 for(const [i,[id,name,value,min,max]] of knobs.entries()) {
  const p=param(id,name,value,0,max,{parameter_mmin:min,parameter_unitstyle:1});
@@ -51,11 +56,12 @@ obj('load','live.thisdevice');obj('init','t b b b b b b b b b b');wire('load',0,
 ['voice','mode','monitor','playback',...knobs.map(k=>k[0])].forEach((id,i)=>{box('read-'+id,'message',{text:'outputvalue'});wire('init',i,'read-'+id);wire('read-'+id,0,id);});
 obj('banks','live.banks',{banks:{0:['record','undo','mode','clear','input','threshold','tone','output'],1:['pad0','pad1','pad2','voice','decay','drive','monitor','playback']}});
 boxes.push(boxes.shift()); // Max stores frontmost boxes first; the canvas belongs behind controls.
-const patch={patcher:{fileversion:1,appversion:{major:9,minor:1,revision:0,architecture:'x64',modernui:1},classnamespace:'box',rect:[100,100,1000,700],openinpresentation:1,default_fontsize:12,default_fontface:0,default_fontname:'Arial',bgcolor:[.055,.068,.062,1],devicewidth:980,boxes,lines,parameters,dependency_cache:[{name:'pocket-ui.js',type:'TEXT',implicit:1},{name:'uhntiss.pocket05~.mxo',type:'iLaX'}],autosave:0}};
+const patch={patcher:{fileversion:1,appversion:{major:9,minor:1,revision:0,architecture:'x64',modernui:1},classnamespace:'box',rect:[100,100,1000,700],openinpresentation:1,default_fontsize:12,default_fontface:0,default_fontname:'Arial',bgcolor:[.055,.068,.062,1],devicewidth:980,boxes,lines,parameters,dependency_cache:[{name:'pocket-ui.js',type:'TEXT',implicit:1},{name:'pocket-profile.js',type:'TEXT',implicit:1},{name:'uhntiss.pocket05~.mxo',type:'iLaX'}],autosave:0}};
 const json=JSON.stringify(patch,null,2);
 fs.writeFileSync(path.join(out,'UHNTISS Pocket.maxpat'),json+'\n');
 const payload=Buffer.from(json+'\0');
 const header=Buffer.alloc(32);header.write('ampf',0);header.writeUInt32LE(4,4);header.write('aaaa',8);header.write('meta',12);header.writeUInt32LE(4,16);header.writeUInt32LE(1,20);header.write('ptch',24);header.writeUInt32LE(payload.length,28);
 fs.writeFileSync(path.join(out,'UHNTISS Pocket.amxd'),Buffer.concat([header,payload]));
 fs.copyFileSync(path.join(here,'pocket-ui.js'),path.join(out,'pocket-ui.js'));
+fs.copyFileSync(path.join(here,'pocket-profile.js'),path.join(out,'pocket-profile.js'));
 console.log('Device generated: '+out);
