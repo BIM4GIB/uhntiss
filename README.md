@@ -74,3 +74,11 @@ flow. Quality methodology and current numbers: [`eval/README.md`](eval/README.md
 ## License
 
 MIT. See [`LICENSE`](LICENSE) and [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+## Data attribution
+
+The shipped cross-performer drum model (`mouthflow/drum_global.json`) is
+trained on the Amateur Vocal Percussion (AVP) dataset — Delgado, McDonald,
+Xu, Saitis, Sandler, *A New Dataset for Amateur Vocal Percussion Analysis*
+(AM'19), https://zenodo.org/records/3250230, CC BY 4.0. The dataset itself is
+not redistributed here; `eval/avp.py` explains how to fetch it.

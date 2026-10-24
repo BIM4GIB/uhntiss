@@ -73,4 +73,21 @@ inline bool decodeState(const double *values, size_t count, Loop &loop,
   profile = voice;
   return true;
 }
+// A profile-only payload: the v4 profile block alone (count + 3 x 17 features
+// per voice, profileValues doubles). Lets a host deliver a Teach profile
+// built offline (e.g. from one-class enrollment clips) without touching the
+// loop. Same validation as decodeState's current branch.
+inline bool decodeProfile(const double *values, size_t count,
+                          Profile &profile) noexcept {
+  if (!values || count != profileValues)
+    return false;
+  StateValues scratch{};
+  scratch[0] = 4.;
+  scratch[1] = 0.;
+  scratch[2] = 0.;
+  for (size_t i = 0; i < profileValues; ++i)
+    scratch[3 + i] = values[i];
+  Loop loop;
+  return decodeState(scratch.data(), 3 + profileValues, loop, profile);
+}
 } // namespace pocket

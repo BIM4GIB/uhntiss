@@ -12,10 +12,13 @@ below before it lands.
 | Script | What it measures | Run |
 |---|---|---|
 | [`run_eval.py`](run_eval.py) | End-to-end drum pipeline on the fixture corpus: onset F1 (50 ms tol), class accuracy, tempo ±3 BPM, vs. hand-placed `.mid` ground truth | `uv run python -m eval.run_eval` |
-| [`classifier_cv.py`](classifier_cv.py) | Drum classifier generalisation: leave-one-out + held-out-take CV + confusion matrix over the production 10-feature set | `uv run python -m eval.classifier_cv` |
+| [`classifier_cv.py`](classifier_cv.py) | Drum classifier generalisation on THIS performer: leave-one-out + held-out-take CV + confusion matrix over the production feature set (`all123`) | `uv run python -m eval.classifier_cv` |
+| [`avp_eval.py`](avp_eval.py) | **Cross-performer** drum classifier numbers on the AVP dataset (25 amateurs, MacBook mic, 4314 annotated hits): unseen voices, leave-one-performer-out, improvisations, and per-user calibration (5/class and full enrollment), over every featurizer × classifier; reproduces the MIT reference project's protocols for comparison. Needs `datasets/avp/` (see [`avp.py`](avp.py)) | `uv run python -m eval.avp_eval [--onsets detected] [--speaker-norm] [--embed-knn]` |
+| [`avp_pocket.py`](avp_pocket.py) | The **native Pocket** classifier on AVP: onset recall, extra triggers, factory forests on other voices, Teach as shipped vs medoid vs a 30-example profile, and the Python `all123` k-NN on the *same* detected onsets. Needs the built tool (`mouthflow/pocket.py`). Contract: [`docs/pocket-integration.md`](../docs/pocket-integration.md) | `uv run python -m eval.avp_pocket [--sr 48000]` |
+| [`train_global.py`](train_global.py) | Trains the cross-performer MLP fallback and writes [`mouthflow/drum_global.json`](../mouthflow/drum_global.json) (used when no per-user model exists) | `uv run python -m eval.train_global` |
 | [`onset_sanity.py`](onset_sanity.py) | Onset *detector* in isolation — raw (un-quantised) onsets vs. mimic reference grids, so tempo/phase errors don't fold into the score | `uv run python -m eval.onset_sanity` |
 | [`note_eval.py`](note_eval.py) | Pitched voices (bass/lead): note P/R/F1 + octave-error rate vs. `mimic/<name>.notegrid.json`; ships a synthetic sine self-test | `uv run python -m eval.note_eval` |
-| [`train_classifier.py`](train_classifier.py) | Trains the per-user k-NN drum model and writes [`mouthflow/drum_model.json`](../mouthflow/drum_model.json); prints the CV report first | `uv run python -m eval.train_classifier` |
+| [`train_classifier.py`](train_classifier.py) | Trains the *packaged* per-user k-NN drum model (this dev performer's calibration one-shots + mimic takes) and writes [`mouthflow/drum_model.json`](../mouthflow/drum_model.json); prints the CV report first. End users enroll with `mouthflow enroll` instead, which writes `~/.mouthflow/drum_model.json` (takes precedence) | `uv run python -m eval.train_classifier` |
 | [`featurelab.py`](featurelab.py) | Feature-experiment harness: bake candidate featurizers off against the baseline on the honest held-out-take metric | `uv run python -m eval.featurelab` |
 | [`timing_probe.py`](timing_probe.py) | Per-clip quantiser diagnosis: detected tempo + confidence, snap vs. raw decision, per-hit movement, swing estimate | `uv run python -m eval.timing_probe clip.wav [--tempo N]` |
 | [`baseline_ableton.py`](baseline_ableton.py) | Manages the manual A/B baseline: which clips have a paired `.baseline.mid` from Ableton's Convert Drums, checklist for the rest | `uv run python -m eval.baseline_ableton` |
@@ -35,8 +38,20 @@ or a single honest headline number:
   `--report-only` disables). Also reports swing-preservation error and
   velocity rank-correlation (n/a until labelled takes with real dynamics
   exist), and prints a train-contamination warning on the default corpus.
-- `classifier_cv` — the classifier gate. Held-out-take CV is the honest
-  number; LOO flatters slightly.
+- `classifier_cv` — the per-user classifier gate. Held-out-take CV is the
+  honest number; LOO flatters slightly.
+- `avp_eval` — the cross-performer classifier gate (2026-10-22). Headline
+  numbers on annotated onsets, `all123` features: leave-one-performer-out
+  68.0 % (global MLP), improvisations 79.6 % (k-NN), calibrated with 5 hits
+  per class 80.0 %, full enrollment (~30/class) 83.4 %. The MIT reference
+  project reports 60.3 / 71.9 / 74.5 on its three protocols. Snare is the
+  hard class for every model (cross-performer 40–60 %). Any change to
+  `devices/drum/features.py` or the classifier tiers must not regress these.
+- `avp_pocket` — the same dataset through the native Pocket engine
+  (2026-10-24, 44.1 k): onset recall 92.6 %, factory forests 47.7 % on other
+  voices (hat 91, kick 9, snare 15), Teach 71.7 %, 30-example profile 72.5 %,
+  `all123` k-NN on the same onsets 81.1 %. Any change to Pocket's features,
+  metric or Teach must rerun this and paste the table into the PR.
 - `onset_sanity` — the detector gate, tempo-independent. Use when changing
   onset detection.
 - `note_eval` — *intended* as the pitched gate, but see below.
