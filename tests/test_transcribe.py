@@ -212,6 +212,7 @@ def _sparse_pattern(bpm: float, bars: int = 8, jitter_ms: float = 8.0, seed: int
 @pytest.mark.parametrize("bpm", [120, 150, 160])
 def test_sparse_takes_do_not_halve_tempo(tmp_path, monkeypatch, bpm):
     monkeypatch.setattr(drum_classify, "_MODEL", None)
+    monkeypatch.setattr(drum_classify, "_GLOBAL", None)
     wav = tmp_path / "sparse.wav"
     sf.write(wav, _sparse_pattern(bpm), SR, subtype="PCM_16")
     assert transcribe_drums(wav).tempo_bpm == pytest.approx(bpm, abs=3.0)
@@ -223,6 +224,7 @@ def test_bar_align_translates_instead_of_shearing(tmp_path, monkeypatch):
     from mouthflow.devices.drum.transcriber import DrumTranscriber
 
     monkeypatch.setattr(drum_classify, "_MODEL", None)
+    monkeypatch.setattr(drum_classify, "_GLOBAL", None)
     bpm = 100.0
     lead_in = 0.03  # performer starts 30 ms after t=0
     y = np.concatenate([np.zeros(int(lead_in * SR), dtype=np.float32), _drum_pattern(bpm)])
@@ -291,6 +293,7 @@ def test_detect_tempo_no_octave_error(tmp_path, monkeypatch, bpm):
     # octave and refine to within the +-3 BPM eval tolerance. 8 ms of human
     # jitter makes the octave decidable from grid evidence (see _drum_pattern).
     monkeypatch.setattr(drum_classify, "_MODEL", None)
+    monkeypatch.setattr(drum_classify, "_GLOBAL", None)
     y = _drum_pattern(bpm, jitter_ms=8.0)
     onsets = _detect_onsets(y, SR)
     coarse, conf = _detect_tempo(y, SR, onsets)
@@ -304,6 +307,7 @@ def test_detect_tempo_no_octave_error(tmp_path, monkeypatch, bpm):
 
 def test_explicit_tempo_overrides_detection(tmp_path, monkeypatch):
     monkeypatch.setattr(drum_classify, "_MODEL", None)
+    monkeypatch.setattr(drum_classify, "_GLOBAL", None)
     # Explicit tempo is honored verbatim, regardless of the audio's real tempo.
     y = _drum_pattern(100)
     wav = tmp_path / "pattern.wav"
@@ -316,6 +320,7 @@ def test_transcribe_drums_end_to_end(tmp_path, monkeypatch):
     # beatbox, so synthetic tones aren't guaranteed to classify "correctly".
     # _classify reads _MODEL from its own module at call time, so patch there.
     monkeypatch.setattr(drum_classify, "_MODEL", None)
+    monkeypatch.setattr(drum_classify, "_GLOBAL", None)
     # 2s of a steady 4-on-the-floor kick at 120 BPM, beat every 500 ms.
     y = _place([(t, _kick_sample()) for t in (0.0, 0.5, 1.0, 1.5)], total_s=2.0)
     wav = tmp_path / "kick.wav"

@@ -1,9 +1,112 @@
 # Mouthflow — session handover
 
-Last updated: 2026-07-03. Read this first when picking up work.
+Last updated: 2026-10-22 (branch `feat/avp-cross-performer`, on top of PR #18).
+Read this first when picking up work.
 (Architecture overview for newcomers: [`ARCHITECTURE.md`](ARCHITECTURE.md);
 honest gap list: [`KNOWN-LIMITATIONS.md`](KNOWN-LIMITATIONS.md); audit findings
-+ the forward plan: [`roadmap.md`](roadmap.md).)
++ the forward plan: [`roadmap.md`](roadmap.md); voice-dataset design:
+[`corpus.md`](corpus.md).)
+
+**2026-10-22 — cross-performer drums (`feat/avp-cross-performer`).** The
+drum classifier finally has numbers from more than one voice, and it changed
+because of them. Know about:
+
+- **AVP dataset in the lab.** `eval/avp.py` loads the Amateur Vocal
+  Percussion dataset (25 amateurs on a MacBook mic, 4,314 hand-annotated
+  hits, CC BY 4.0; gitignored under `datasets/avp/`, fetch instructions in
+  the module). `eval/avp_eval.py` reproduces the three protocols of the
+  MIT-licensed reference project (beatboxing-to-midi) plus 25-way
+  leave-one-performer-out and full-enrollment calibration, over every
+  featurizer × classifier. BLAS threads are capped inside it — four uncapped
+  runs in parallel produced nothing in 71 minutes.
+- **Production classifier changed** (`devices/drum/features.py`,
+  `classify.py`): feature set `all123` (= the old `drum10` + 13 MFCC
+  mean/std/delta + a level-invariant 3-slice log-mel shape) selected by the
+  model file's `feature_set` key (legacy files default to `drum10`). Three
+  tiers: per-user k-NN `drum_model.json` → AVP-trained MLP
+  `drum_global.json` (new; what a fresh install gets) → heuristic. Your model
+  was retrained on `all123`: held-out 0.734 → 0.736, LOO 0.808 → 0.800
+  (noise at 260 hits); drum oracle 0.98 class acc, all gates green, 151 tests.
+  Extraction is 3.3 ms/onset.
+- **The numbers** (annotated onsets; reference project in brackets): unseen
+  voices 77.4 [60.3], improvisations 79.6 [71.9], calibrated 5/class 80.0
+  [74.5], full enrollment 83.4, leave-one-performer-out 68.0. The heuristic
+  fallback scored 41.7 on other voices (kick 0.9 %). Snare is the hard class
+  everywhere (40–60 %). Per-performer feature normalisation adds ~1 pt to
+  the global model (not shipped: needs running per-user stats); the
+  roadmap's embedding+prototype recipe lost to plain k-NN; a per-take
+  loudness column was neutral. Detected-onset protocol tracks these within
+  2 pts (onset recall 96.2 %).
+- **Next: user calibration = enrollment.** AVP says ~30 hits per class gets
+  83 % vs 80 % at 5 per class, so the enrollment take is four one-class
+  clips (kick / snare / closed hat / open hat, ~12 s each) — one class per
+  clip cannot be swapped (today's 48k take swapped two sections). Build
+  `mouthflow enroll`: record or ingest the four clips, label by clip,
+  `train_classifier` → per-user model, show the held-out number. Then the
+  same flow for other people's voices is the first real test of the global
+  fallback → enrollment path.
+
+**2026-07-03/04 — PRs #13–#18: bass fixed on real takes, then a dataset
+pipeline so the next fixes are measured, not guessed.** Verified 2026-10-22:
+136 tests pass, eval gates green (onset F1 0.87 / class acc 0.95 / tempo 2/2
+/ timing MAE 38 ms), installed panels identical to the repo at stamp
+`5c2c663`. Know about:
+
+- **Planner strict tool use (#13).** The first real `claude-sonnet-5` call
+  returned the `clips` tool argument as a *stringified* JSON object and the
+  take died in pydantic after the LLM call. `emit_plan` is now `strict: true`
+  (wire schema post-processed: `additionalProperties: false`, value
+  constraints stripped — `_LLMPlan` still enforces them) plus a
+  belt-and-braces un-stringify of JSON-in-JSON tool fields. Also:
+  `tests/conftest.py` isolates `~/.mouthflow` (kit cache + take vault) from
+  every test — a CLI test had been writing fake `Kit 0..9` URIs into the real
+  kit cache.
+- **Bass on real vaulted takes (#14, #15).** Diagnosed by replaying
+  `~/.mouthflow/takes/` (the vault paying off; `transcribe-clip` now
+  bookkeeps to `last_take.json` too). The clip played adjacent-semitone
+  *clusters* — pitch-wobble fragments quantising into one grid slot, plus
+  velocity-20 first notes and a forced snap onto a project grid the hum never
+  sat on. Fixes, all in `devices/pitched.py` / `refine.py` / `signal.py`:
+  `_enforce_monophony` for `MONOPHONIC` clips (same-slot notes collapse to
+  the most confident, overlaps clamp legato); `fit_to_bars auto` tolerates
+  0.10 bar of boundary overshoot (4.05 bars → 4 bars, not 8 with 4 silent);
+  **pitched grid trust** — note starts snap only when `signal.grid_fit ≤
+  0.20`, and then onto the performer-phase grid, otherwise performed timing
+  stays raw; velocity floors (pitched anchors 60/90/115, hard floor 40 —
+  quiet hummed notes are weak phonation, not ghost intent); bass
+  `min_note_s` 0.08 → 0.05 and re-articulation splitting on a 23 ms RMS so
+  staccato 8ths survive. The 11:27 take went 17 smeared notes → 25 clean
+  monophonic notes, min velocity 52. **Conclusion: pyin is now the
+  bottleneck** (octave errors), which is what the dataset is for.
+- **Version-stamped devices (#15).** Every panel title and glue ready-line
+  carries the build SHA (`MOUTHFLOW · BASS · 5c2c663`, `*` if dirty) so "am I
+  running latest?" is answerable inside Live. `generate.py --install`
+  **removes superseded files** (bare `Mouthflow.amxd` + `mouthflow.js` →
+  `MouthflowDrums.amxd`, which got the voice-neutral controls in #14).
+- **Voice dataset harness (#16, #17, #18).** Ground truth from *the
+  performer's own voice*, no manual annotation: every row is a reference
+  riff the performer imitates, so the reference grid **is** the label.
+  `mimic/tonal.py` (`gen`/`rec`/`score`; bass riffs `roots`/`pump8`/`funk`,
+  lead `steps`/`arp`/`held`, drone `hold`/`chord` — each stresses one failure
+  mode), `mimic/session.py` (guided resumable runner; plans `starter_bass`
+  20 = 12 calibrate / 8 eval, `starter_lead` 10, `starter_drone` 5; eval
+  rows use unseen keys/tempos and are recorded last, never tuned against),
+  and `mimic/live_ingest.py` (**Live-native flow**: `setup` drops the riffs
+  into the open set as MIDI clips on `MF Ref <plan>` tracks, you record
+  audio takes next to them, `ingest` fetches the *selected* take clip via
+  the bridge, rebuilds the grid at the current project tempo, scores, gates
+  and ingests). The pitched panels have a **DATASET column**
+  (`next / ingest / keep / skip / setup`; the headphone-playrec `record`
+  path remains reachable through the glue). Accepted rows land in
+  `datasets/<voice>/` + `manifest.jsonl` (gitignored — voice stays local).
+  **Progress: `starter_bass` 2/20** (b01, b02: both `roots`, F1 0.55 each,
+  b02 with 4 octave errors out of 10 notes). Both came through the
+  playrec session flow at sha `8e78451` (panel or terminal — not logged); the Live-native `setup`/`ingest`
+  round-trip is offline-tested only (not yet run in a real set).
+- **Gate to the next quality work:** when `starter_bass` reaches 20/20,
+  calibrate bass thresholds to this voice on the calibrate rows and run the
+  pyin-vs-SwiftF0 A/B on the eval split *with a number*. Then roadmap item 8
+  (installer + retake-in-place) and planner enrichment (item 9).
 
 **2026-07-03 (later) — the "feel batch" (`feat/next-honest-feel-speed`) landed
 the roadmap's NEXT items 5–7.** Know about:
@@ -154,13 +257,15 @@ the router classify by ear). Default is `drums`.
    degrades to a held note/chord (`apply_plan` logs "automation skipped").
    Remote Script edits need a **full Live restart** (Control-Surface toggle
    reuses the cached module).
-3. **Pitched eval + tonal mimic (foundation built; needs recorded data).**
-   `eval/note_eval.py` scores a take against a reference melody grid
-   (`mimic/<name>.notegrid.json`) — note P/R/F1 + octave-error, with onset
-   alignment; synthetic self-test passes (bass F1 1.0). Still TODO: place
-   hum-along reference melody clips in Live (like the drum references) so the
-   user can record bass/lead takes, then tune octave-continuity / segmentation
-   on real voice (deliberately NOT guessed in code — unsafe without real data).
+3. **Pitched eval + tonal dataset — HARNESS DONE (PRs #16–#18), DATA
+   PENDING.** `eval/note_eval.py` scores a take against a reference grid
+   (note P/R/F1 + octave-error, onset-aligned, wrong-pitch matches count
+   against precision, source-dependent `offset_range`). The reference clips
+   now live in Live (`mimic/live_ingest.py setup`) or play over headphones
+   (`mimic/session.py`). What's missing is **the performer at the mic**:
+   `starter_bass` is 2/20, lead and drone 0. No bass/lead threshold tuning
+   or pyin replacement until the eval split exists — anything else is
+   fitting noise.
 4. **Drums onset/tempo** — PR #6's octave-correct tempo + phase-aware
    quantization is **merged and integrated into the drum device**
    (`devices/drum/tempo.py`, `devices/drum/transcriber.py`); confidence-gated
@@ -175,9 +280,17 @@ uv run mouthflow record --device bass --duration 8     # mic → Live (Ableton +
 uv run mouthflow record-stream --device bass            # open-ended take; 'stop' on stdin ends it
 uv run mouthflow transcribe-clip --device bass          # selected Live clip → Live (needs bridge fork)
 uv run mouthflow dry-run clip.wav --device drone --json # pipeline only, prints Plan
+uv run mouthflow retry-last                 # replay the last vaulted take (~/.mouthflow/takes/)
 uv run python -m eval.run_eval              # drum oracle — gated, exits non-zero on regression
-uv run pytest -q                            # full suite — must all pass
-python m4l/generate.py --install            # regenerate panels + sync into User Library/Devices
+uv run pytest -q                            # full suite — must all pass (136)
+python m4l/generate.py --install            # regenerate stamped panels + sync, removes superseded files
+
+# voice dataset (see docs/corpus.md)
+uv run python -m mimic.session --list                       # plans + progress
+uv run python -m mimic.session run --plan starter_bass --output <headphones idx>   # guided playrec session
+uv run python -m mimic.live_ingest setup  --plan starter_bass   # reference MIDI clips into the open set
+uv run python -m mimic.live_ingest ingest --plan starter_bass   # score + ingest the SELECTED take clip
+cat datasets/manifest.jsonl                                  # per-row scores, role, pipeline sha
 ```
 
 ## The drum classifier / mimic harness (unchanged, now under devices/drum)
@@ -191,18 +304,25 @@ python m4l/generate.py --install            # regenerate panels + sync into User
   training, still the regression oracle for the drum path.
 
 ## In-Ableton UI (Max for Live)
-- `m4l/Mouthflow.amxd` (drums panel) + generated `Mouthflow{Bass,Lead,Drone}.amxd`.
-  Each panel loads a per-voice glue copy (`mouthflow_<voice>.js`) with the
-  voice **baked into the JS default** (not loadbang — that races Node-for-Max
-  startup). The glue subprocess-spawns `uv run mouthflow …`, so Python changes
-  reach the device with **no regen**.
-- `m4l/generate.py` **injects the in-device controls** into the pitched
-  panels: Transcribe Clip, record_start/record_stop (open-ended takes via
-  `record-stream`), and bars / correct (default ON) / key / scale fields.
+- `m4l/Mouthflow.amxd` is the bare **template**; the shipped devices are the
+  generated `Mouthflow{Drums,Bass,Lead,Drone}.amxd`. Each panel loads a
+  per-voice glue copy (`mouthflow_<voice>.js`) with the voice **baked into
+  the JS default** (not loadbang — that races Node-for-Max startup). The glue
+  subprocess-spawns `uv run mouthflow …`, so Python changes reach the device
+  with **no regen**.
+- `m4l/generate.py` **injects the in-device controls**: all panels get
+  Transcribe Clip, record_start/record_stop (open-ended takes via
+  `record-stream`) and the input level meter; pitched panels add bars /
+  correct (default ON) / key / scale fields and the **DATASET column**
+  (`data_next`, `data_ingest`, `data_keep`, `data_skip`, `data_setup`, each
+  panel with its own plan baked in). Panel titles + the glue ready-line carry
+  the **build stamp** (`git rev-parse --short HEAD`, `*` when dirty) — check
+  it against `git log` before debugging a "wrong" result.
   `--install` syncs panels + glue + `package.json` into
-  `~/Music/Ableton/User Library/Devices` (with `.bak` backups) — required,
-  because Live loads from there and `node.script` resolves the glue **next to
-  the .amxd**.
+  `~/Music/Ableton/User Library/Devices` (with `.bak` backups) and **removes
+  superseded files** (`Mouthflow.amxd`, `mouthflow.js`) — required, because
+  Live loads from there and `node.script` resolves the glue **next to the
+  .amxd**. Always version-stamp + install after a panel or glue change.
 - **Layout gotcha (verified on-screen):** Live's device strip is fixed-height
   (~196 px) and silently clips anything below — new controls must go in a
   **column to the right**, never stacked underneath. A fresh browser drag loads
@@ -213,12 +333,16 @@ python m4l/generate.py --install            # regenerate panels + sync into User
 |---|---|---|---|
 | drum transcribe (classify/tempo/quantize) | ✅ (regression oracle) | ✅ many sessions | most mature voice |
 | bass transcribe + refine (correct/bar-fit) | ✅ | ✅ real takes (2026-06/07) | confidence-gating validated on a real take |
+| bass monophony + grid trust + velocity floors (#14/#15) | ✅ | ✅ replayed vaulted takes | 17 smeared → 25 clean notes; octave errors remain (pyin) |
+| planner strict tool use on `claude-sonnet-5` (#13) | ✅ (mocked) | ✅ live dry-run end-to-end | plan 3.6 s on a real call |
+| tonal dataset: playrec session flow (#16/#17) | ✅ self-test F1 1.0 | ✅ 2 bass rows ingested | starter_bass 2/20 |
+| tonal dataset: Live-native `setup`/`ingest` (#18) | ✅ (plan chunking, row notes) | ❌ not yet run in a real set | needs bridge `get_selected_clip` |
 | lead transcribe | ✅ synthetic only | ⚠️ not yet on real voice | config clone of bass |
 | drone held note/chord | ✅ | ⚠️ lightly | — |
 | drone loudness→macro automation | client+serialization only | ❌ runtime-unverified | needs `set_clip_envelope` LOM check |
 | `transcribe-clip` (bridge fork) | client tested | ✅ round-trip verified | needs the fork spliced |
 | `record-stream` start/stop | ✅ (mocked stream) | ⚠️ via device buttons, lightly | — |
-| M4L panels (bass/lead/drone) | container+JS validated | ✅ render + controls verified on-screen | drums panel long-proven |
+| M4L panels (drums/bass/lead/drone, stamped) | container+JS validated | ✅ render + controls verified on-screen | DATASET buttons: whether the 2 rows came via panel or terminal isn't logged |
 | `--device auto` router | heuristic unit-tested | ❌ no labelled routing set | can misroute hummed chords |
 
 ## Known limits / gotchas
@@ -233,24 +357,37 @@ python m4l/generate.py --install            # regenerate panels + sync into User
 
 ## Workflow conventions
 - Branch off `main` → PR → **squash-merge**. End commit messages with
-  `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
-- Every change keeps `uv run pytest` and `uv run python -m eval.run_eval` green
-  (the eval is gated and CI-enforced; its class-acc number is a train-set upper
-  bound — the honest held-out figure is `classifier_cv`'s ≈0.73).
+  `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
+- Every change keeps `uv run pytest` (136) and `uv run python -m eval.run_eval`
+  green (the eval is gated and CI-enforced; its class-acc number is a train-set
+  upper bound — the honest held-out figure is `classifier_cv`'s ≈0.73).
+- Panel or glue change → `python m4l/generate.py --install` → commit the
+  stamped `.amxd`/`.js` in a follow-up `chore(m4l): panels stamped + installed`.
+- Debug a "the clip sounds wrong" complaint by replaying the vaulted take
+  (`mouthflow retry-last`, or `dry-run ~/.mouthflow/takes/<ts>.wav --json`),
+  never by guessing from the description.
+- Dataset rows tagged `eval` are **never** tuned against; changes to
+  pitched thresholds must not regress `datasets/manifest.jsonl` eval scores.
 
 ## Key files
 | path | what |
 |---|---|
-| `mouthflow/signal.py` | shared DSP (onset/tempo/features/quantise/write_midi) |
+| `mouthflow/signal.py` | shared DSP (onset/tempo/features/quantise/write_midi, `grid_fit`/`grid_phase` trust helpers) |
 | `mouthflow/devices/base.py`, `registry.py` | DeviceSpec + registry |
-| `mouthflow/devices/drum/` | drum transcriber + k-NN classifier + `drum_model.json` |
+| `mouthflow/devices/drum/` | drum transcriber + 3-tier classifier (`features.py` feature sets, `classify.py`), `drum_model.json` (per-user) + `drum_global.json` (AVP MLP) |
+| `eval/avp.py`, `eval/avp_eval.py`, `eval/train_global.py` | AVP loader, cross-performer eval matrix, global-model trainer |
 | `mouthflow/devices/pitched.py` | bass + lead transcriber (pyin) |
 | `mouthflow/devices/{bass,lead}/` | device specs + prompts |
 | `mouthflow/devices/drone/` | drone transcriber + contour + device + prompt |
 | `mouthflow/refine.py` | pitched post-processing: note correction (confidence-gated scale snap) + fit-to-bars/loop |
 | `mouthflow/classify.py` | intent router (`--device auto`) |
-| `mouthflow/plan.py` | Claude planner (per-device prompt + summary) |
+| `mouthflow/plan.py` | Claude planner (per-device prompt + summary; strict `emit_plan` tool on `claude-sonnet-5`) |
 | `mouthflow/execute.py` | ableton-mcp socket client, `list_instruments`, `set_clip_envelope` |
 | `bridge/` | forked Remote Script command source + install docs (drone automation) |
-| `m4l/` | Max for Live panels + `generate.py` + glue |
+| `m4l/` | Max for Live panels + `generate.py` (stamping, install, supersede) + glue |
+| `mimic/tonal.py`, `session.py`, `live_ingest.py` | voice dataset harness: riff gen/score/ingest, guided plans, Live-native setup/ingest |
+| `mimic/take.py` | drum mimic harness (label sanity gate) |
+| `datasets/` (gitignored) + `datasets/manifest.jsonl` | recorded voice rows with role + scores + pipeline sha |
+| `tests/conftest.py` | isolates `~/.mouthflow` (kit cache, take vault) from all tests |
+| `docs/corpus.md` | dataset design: roles, starter plans, growth loop |
 | `docs/spec.md` | original v0 spec (drums-era; architecture has since generalized) |

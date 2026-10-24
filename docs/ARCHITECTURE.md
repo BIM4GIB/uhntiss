@@ -50,7 +50,7 @@ The fields that matter:
 
 | Voice | Transcriber | Notes |
 |---|---|---|
-| drums | [`devices/drum/`](../mouthflow/devices/drum/) | Beatbox -> GM drums. Per-user k-NN timbre classifier over the 10-feature vector in [`features.py`](../mouthflow/devices/drum/features.py) (model in `drum_model.json`, heuristic fallback when absent). Octave-correct tempo + phase-aware, confidence-gated quantisation in [`tempo.py`](../mouthflow/devices/drum/tempo.py) |
+| drums | [`devices/drum/`](../mouthflow/devices/drum/) | Beatbox -> GM drums. Three-tier timbre classifier over the `all123` feature set in [`features.py`](../mouthflow/devices/drum/features.py): per-user k-NN (`drum_model.json`) → cross-performer MLP trained on AVP (`drum_global.json`) → heuristic. Octave-correct tempo + phase-aware, confidence-gated quantisation in [`tempo.py`](../mouthflow/devices/drum/tempo.py) |
 | bass | [`devices/pitched.py`](../mouthflow/devices/pitched.py) | `librosa.pyin` -> continuous f0 -> segmentation with hysteresis (`min_stable_s=0.08` — a pitch change must hold before it starts a new note, so vibrato/glides don't shatter one note) -> octave-snap to E1–E3 |
 | lead | same `PitchedTranscriber` | Bass and lead differ **only** by a `VoiceConfig` row (range, target octave G3–C6, finer grid) — no algorithm fork |
 | drone | [`devices/drone/`](../mouthflow/devices/drone/) | Stable pitch regions -> one held note, or a hummed sequence -> a ringing chord; loudness contour -> an `AutomationEnvelope` ([`contour.py`](../mouthflow/devices/drone/contour.py)) |
@@ -156,7 +156,7 @@ reviewed, never exercised at runtime.
 
 | Voice | Transcribe | Plan | Execute | Automation |
 |---|---|---|---|---|
-| drums | **live** — most mature; regression oracle (`eval/run_eval.py`), honest classifier number: LOO ≈ 0.81, held-out-take mean ≈ 0.73 (`eval/classifier_cv.py`) | live | live | n/a |
+| drums | **live** — most mature; regression oracle (`eval/run_eval.py`), honest classifier numbers: this performer LOO ≈ 0.80 / held-out ≈ 0.74 (`eval/classifier_cv.py`); 25 other performers 68 % global / 83 % enrolled (`eval/avp_eval.py`) | live | live | n/a |
 | bass | **live** — verified on real hummed takes in Live | live | live | n/a |
 | lead | **offline** — shares the bass code path, tests pass, but untested on a real sung take | offline | offline (same path as bass) | n/a |
 | drone | **offline** — held note/chord works in tests; synthetic only | offline | offline | **unverified** — needs the bridge fork; `set_clip_envelope` never run in Live |
