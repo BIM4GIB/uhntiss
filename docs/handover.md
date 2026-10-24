@@ -1,6 +1,6 @@
 # Mouthflow — session handover
 
-Last updated: 2026-10-24 (branch `feat/enroll`, on top of PR #20; PR #19 Pocket is open alongside).
+Last updated: 2026-10-24 (branch `feat/pocket-avp-enroll` = PR #19 + main + `feat/enroll` + the Pocket wiring).
 Read this first when picking up work.
 (Architecture overview for newcomers: [`ARCHITECTURE.md`](ARCHITECTURE.md);
 honest gap list: [`KNOWN-LIMITATIONS.md`](KNOWN-LIMITATIONS.md); audit findings
@@ -13,6 +13,20 @@ PR's description before summarising state. Merged history + main cannot see
 in-flight work; on 2026-10-22 a catch-up reported "last work = PR #18" while
 PR #19 (Pocket 05, the native rebuild, 10 commits, CI green) sat open as a
 draft.
+
+**2026-10-24 — Pocket wired to enrollment + AVP (`feat/pocket-avp-enroll`,
+PR into `feat/native-pocket-drums`).** Contract doc:
+[`pocket-integration.md`](pocket-integration.md). `mouthflow/pocket.py`
+replicates Pocket's Teach metric; `mouthflow enroll export-pocket` turns the
+enrolled clips into a 3-medoid-per-voice profile file; the external gained a
+`profile <156>` message (`decodeProfile` in `state.hpp`, +4 native checks,
+compiles universal with the SDK) and the device a **PROFILE** button
+(`pocket-profile.js`, not yet clicked in Live). `eval/avp_pocket.py` numbers
+(25 performers): onset recall 92.6 %; factory forests **47.7 %** on other
+voices (nearly everything → hat); Teach 71.7 %; 30-example profile 72.5 %;
+`all123` k-NN on the same onsets **81.1 %**. The gap is the feature
+vector/metric, not profile size — that's the cross-team question for Codex.
+Built device bundle for a first click: `m4l/pocket/build/` (gitignored).
 
 **2026-10-21 — UHNTISS Pocket 05 (PR #19, DRAFT, open, by Codex): the native
 realtime rebuild.** The set on this Mac runs it. Lives in
