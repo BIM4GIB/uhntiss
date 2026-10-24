@@ -92,6 +92,13 @@ def match_stats(pred: list[tuple[float, int]], ref: list[tuple[float, int]], off
     prec = tp / len(pred) if pred else 0.0
     rec = tp / len(ref) if ref else 0.0
     f1 = 2 * prec * rec / (prec + rec) if (prec + rec) else 0.0
+    # Pitch-class view: octave errors count as hits. For hummed references this
+    # is the "did it hear the note" number; the exact-octave f1 above also
+    # charges the performer's register choice (and the bass octave snap).
+    tp_pc = tp + octave
+    prec_pc = tp_pc / len(pred) if pred else 0.0
+    rec_pc = tp_pc / len(ref) if ref else 0.0
+    f1_pc = 2 * prec_pc * rec_pc / (prec_pc + rec_pc) if (prec_pc + rec_pc) else 0.0
     return {
         "notes_ref": len(ref),
         "notes_pred": len(pred),
@@ -103,6 +110,9 @@ def match_stats(pred: list[tuple[float, int]], ref: list[tuple[float, int]], off
         "precision": round(prec, 3),
         "recall": round(rec, 3),
         "f1": round(f1, 3),
+        "precision_pc": round(prec_pc, 3),
+        "recall_pc": round(rec_pc, 3),
+        "f1_pc": round(f1_pc, 3),
         "offset": round(offset, 3),
     }
 

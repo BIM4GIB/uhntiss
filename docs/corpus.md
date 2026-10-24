@@ -91,6 +91,15 @@ Every row is tagged with a **role**:
 | `starter_drone` | 5 | 5 cal | held-pitch/chord sanity |
 | drums (`take.py`) | 20 (presets x 85/100/120/140 + freestyle) | 12 train / 8 eval | replaces the train-contaminated fixture corpus; honest CI class-acc |
 
+**Register (changed 2026-10-24):** bass references are generated in the
+*hum* register, roots E2–D#3 (`_ROOT_OCTAVE_BASE["bass"] = 40`), not the
+bass register. The first two rows (b01/b02, base E1) showed every A1 (55 Hz)
+reference hummed at A2 and F1 (44 Hz) references wandering between octaves,
+so their "octave errors" were the performer's, not the tracker's. Scoring
+now reports `f1_pc` (pitch class, octave-agnostic — the "did it hear the
+note" number) next to the exact-octave `f1`, and the ingest gate uses
+pitch-class recall. b01/b02 stay in the manifest at the old register.
+
 Bass archetypes: `roots` (sustained pitch/octave stability), `pump8`
 (same-pitch staccato 8ths — re-articulation + velocity), `funk` (syncopation,
 rests, octave jump). Lead: `steps`, `arp`, `held`. Genre coverage enters

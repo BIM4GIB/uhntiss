@@ -77,7 +77,13 @@ RIFFS = {"bass": BASS_RIFFS, "lead": LEAD_RIFFS, "drone": DRONE_RIFFS}
 # Root register per voice (key letter -> MIDI in the voice's natural octave).
 _KEY_PC = {"C": 0, "C#": 1, "Db": 1, "D": 2, "D#": 3, "Eb": 3, "E": 4, "F": 5,
            "F#": 6, "Gb": 6, "G": 7, "G#": 8, "Ab": 8, "A": 9, "A#": 10, "Bb": 10, "B": 11}
-_ROOT_OCTAVE_BASE = {"bass": 28, "lead": 55, "drone": 48}  # E1 / G3 / C3 neighborhoods
+# The reference must sit where a voice can HUM it, not where the bass will
+# play it — the pipeline's octave snap moves the hummed line into the bass
+# register afterwards. Measured 2026-10-24 on the first two rows (base E1):
+# every A1 (55 Hz) reference was hummed at A2, and F1 (44 Hz) references
+# wandered between F1/F2, so "octave errors" were the performer's register,
+# not the tracker's. E2..D#3 (82-156 Hz) is where those takes actually sat.
+_ROOT_OCTAVE_BASE = {"bass": 40, "lead": 55, "drone": 48}  # E2 / G3 / C3 neighborhoods
 
 
 def _root_midi(voice: str, key: str) -> int:
@@ -233,11 +239,14 @@ def score(
     )
     n_ref = stats["notes_ref"]
     matched = stats["tp"] + stats["octave_err"] + stats["wrong_pitch"]
+    # Gate on PITCH CLASS: a performer who hums the riff an octave away from
+    # the reference still gave us a usable take; the register is reported
+    # separately (octave_err / f1 vs f1_pc).
     print(f"{name}: matched {matched}/{n_ref}  P {stats['precision']:.2f} "
-          f"R {stats['recall']:.2f} F1 {stats['f1']:.2f}  octave_err {stats['octave_err']}  "
+          f"R {stats['recall']:.2f} F1 {stats['f1']:.2f}  pitch-class F1 {stats['f1_pc']:.2f}  octave_err {stats['octave_err']}  "
           f"offset {stats['offset']*1000:.0f}ms")
 
-    ok = n_ref > 0 and matched / n_ref >= _MIN_MATCH_FRACTION and stats["recall"] >= _MIN_RECALL
+    ok = n_ref > 0 and matched / n_ref >= _MIN_MATCH_FRACTION and stats["recall_pc"] >= _MIN_RECALL
     if not ok and not force:
         print("  ** take doesn't track the reference well enough to be data "
               "(lost the riff, or bad alignment) — retake, or --force to keep")
