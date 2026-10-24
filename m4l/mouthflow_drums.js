@@ -35,6 +35,11 @@
  *   data_record            mic playrec fallback (headphones; no Live clips)
  *   data_keep              accept the last take even though the gate said retry
  *   data_skip              skip the plan's current take
+ *   enroll_kick / enroll_snare / enroll_hat / enroll_open
+ *                          enroll the SELECTED audio clip as that drum class
+ *                          (one class per clip; ~12 s / ~30 hits each)
+ *   enroll_train           build the per-user drum model from the enrolled clips
+ *   enroll_status          what's enrolled so far
  *   record_start           begin an open-ended mic recording
  *   record_stop            finish recording -> transcribe + apply
  *   record <0|1>           toggle form of record_start/record_stop
@@ -317,13 +322,18 @@ function recordStop() {
 // clip. The mic playrec flow (mimic/session.py) remains available for
 // data_record. All progress lines land in the status comment.
 function runTool(moduleArgs) {
+  runCmd(["run", "python", "-m"].concat(moduleArgs));
+}
+
+// Spawn any `uv <args>` in the repo and stream every output line to the
+// status comment (no plan parsing — for tools, not takes).
+function runCmd(args) {
   if (child || inFlight) {
     status("busy — cancel or finish the current run first");
     return;
   }
   inFlight = true;
   Max.outlet("busy", 1);
-  const args = ["run", "python", "-m"].concat(moduleArgs);
   const env = Object.assign({}, process.env);
   let proc;
   try {
@@ -360,6 +370,14 @@ function runSession(cmd) {
 
 function runLiveData(cmd) {
   runTool(["mimic.live_ingest", cmd, "--plan", state.plan]);
+}
+
+// Enrollment: the selected Live clip becomes one drum class (the clip is the
+// label), then `enroll train` writes ~/.mouthflow/drum_model.json, which the
+// drums classifier prefers over the packaged model.
+function enrollClip(cls) {
+  status(`enrolling selected clip as ${cls}…`);
+  runCmd(["run", "mouthflow", "enroll", "clip", cls]);
 }
 
 function listInputs() {
@@ -455,6 +473,13 @@ Max.addHandler("data_next", () => runSession("next"));
 Max.addHandler("data_record", () => runSession("record"));  // mic playrec fallback
 Max.addHandler("data_keep", () => runSession("keep"));
 Max.addHandler("data_skip", () => runSession("skip"));
+// per-user drum enrollment (drums panel ENROLL column)
+Max.addHandler("enroll_kick", () => enrollClip("kick"));
+Max.addHandler("enroll_snare", () => enrollClip("snare"));
+Max.addHandler("enroll_hat", () => enrollClip("hat"));
+Max.addHandler("enroll_open", () => enrollClip("hat_open"));
+Max.addHandler("enroll_train", () => runCmd(["run", "mouthflow", "enroll", "train"]));
+Max.addHandler("enroll_status", () => runCmd(["run", "mouthflow", "enroll", "status"]));
 // start/stop recording (performer-controlled length)
 Max.addHandler("record_start", recordStart);
 Max.addHandler("record_stop", recordStop);
@@ -474,4 +499,4 @@ Max.addHandler("cancel", () => {
   }
 });
 
-status("mouthflow drums ready · 5c2c663");
+status("mouthflow drums ready · 48a03a6");

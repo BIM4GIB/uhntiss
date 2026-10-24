@@ -158,9 +158,10 @@ def _inject_controls(maxpat: dict, pitched: bool = True) -> None:
     avoid colliding with the template (max id 153).
 
     ``pitched=False`` (the drums panel) keeps the voice-neutral controls —
-    Transcribe Clip, record start/stop, the level meter — and skips the
+    Transcribe Clip, record start/stop, the level meter — skips the
     note-correction / bar-fit fields, which only the pitched refine stage
-    reads.
+    reads, and adds the ENROLL column (per-user drum model from one-class
+    clips) in place of the pitched panels' DATASET column.
     """
     boxes = maxpat["patcher"]["boxes"]
     lines = maxpat["patcher"].setdefault("lines", [])
@@ -258,6 +259,20 @@ def _inject_controls(maxpat: dict, pitched: bool = True) -> None:
         msg("obj-264", "data_skip", [820, 530, 90, 20], [616, 64, 66, 22])
         msg("obj-265", "data_setup", [920, 500, 100, 20], [546, 92, 76, 22])
         for b in ("obj-260", "obj-261", "obj-263", "obj-264", "obj-265"):
+            wire(b, _NODE_INLET)
+    else:
+        # ENROLL column (drums; third column, x>=546): record ONE class per
+        # audio clip in Live (~12 s / ~30 hits), select it, press its class —
+        # the clip is the label. Then train writes ~/.mouthflow/drum_model.json
+        # (the classifier's top tier). Open hat is optional.
+        comment("obj-272", "enroll (selected clip)", [720, 480, 150, 18], [546, 20, 150, 14])
+        msg("obj-270", "enroll_kick", [720, 500, 90, 20], [546, 36, 66, 22])
+        msg("obj-271", "enroll_snare", [820, 500, 100, 20], [616, 36, 76, 22])
+        msg("obj-273", "enroll_hat", [720, 530, 90, 20], [546, 64, 66, 22])
+        msg("obj-274", "enroll_open", [820, 530, 100, 20], [616, 64, 76, 22])
+        msg("obj-275", "enroll_train", [720, 560, 100, 20], [546, 92, 66, 22])
+        msg("obj-276", "enroll_status", [820, 560, 100, 20], [616, 92, 76, 22])
+        for b in ("obj-270", "obj-271", "obj-273", "obj-274", "obj-275", "obj-276"):
             wire(b, _NODE_INLET)
 
     boxes.extend(add_b)

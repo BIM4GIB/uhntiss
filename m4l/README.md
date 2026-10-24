@@ -138,7 +138,8 @@ The prebuilt panel wires Generate / duration / count-in / hint / **kit dropdown
 `list_inputs` · `input_index <i>` · `input <i>` · `file <path>` ·
 `transcribe_clip` · `generate` · `bars <auto|off|1|2|4|8|16>` · `correct <0|1>` ·
 `key <C|F#|…>` · `scale <major|minor|…>` · `record_start` · `record_stop` ·
-`record <0|1>` · `cancel`
+`record <0|1>` · `cancel` · `enroll_kick` · `enroll_snare` · `enroll_hat` ·
+`enroll_open` · `enroll_train` · `enroll_status`
 
 ## Outlet reference (script → patch)
 `status <text>` · `level <dBFS>` (live input meter while record-streaming;
@@ -150,9 +151,31 @@ the pitched panels show it in a number box next to the record buttons) ·
 ## The drums panel
 
 `MouthflowDrums.amxd` is the full-featured drums device (Transcribe Clip,
-record start/stop, input level meter). The original `Mouthflow.amxd` is the
-bare June template, kept installed for compatibility with existing sets —
-new sets should use MouthflowDrums.
+record start/stop, input level meter, and the ENROLL column). The original
+`Mouthflow.amxd` is the bare June template; `generate.py --install` removes
+it — new sets use MouthflowDrums.
+
+### ENROLL — teach it your sounds (2026-10-24)
+
+The drums classifier's best tier is a k-NN over **your own** hits
+(`~/.mouthflow/drum_model.json`); on the AVP cross-performer dataset that is
++13 points over the shipped global model on real grooves, and ~30 hits per
+class beats 5 by another 3. The panel's ENROLL column drives
+`mouthflow enroll`:
+
+1. In Live, record **one audio clip per class**: only kicks (~12 s, ~30
+   hits), then only snares, then only closed hats. Open hat is optional.
+   One class per clip means the clip *is* the label — nothing to annotate,
+   nothing to swap.
+2. Select a clip, press its class button (`enroll_kick` / `enroll_snare` /
+   `enroll_hat` / `enroll_open`). The status line reports hits found and
+   what's still missing. Needs the forked `get_selected_clip` bridge, like
+   Transcribe Clip. Without Live: `uv run mouthflow enroll file kick x.wav`
+   or `enroll record kick`.
+3. `enroll_train` builds the model and prints a cross-validated sanity
+   number (same-clip hits, so a real groove lands a few points lower). From
+   then on every drums take classifies with your model. `enroll_status`
+   shows what's enrolled; `uv run mouthflow enroll reset --yes` clears it.
 
 ## Transcribe a clip (no re-recording)
 The pitched panels ship a **Transcribe Clip** button (auto-injected by
