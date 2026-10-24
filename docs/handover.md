@@ -1,11 +1,46 @@
 # Mouthflow — session handover
 
-Last updated: 2026-10-24 (branch `feat/enroll`, on top of PR #20).
+Last updated: 2026-10-24 (branch `feat/enroll`, on top of PR #20; PR #19 Pocket is open alongside).
 Read this first when picking up work.
 (Architecture overview for newcomers: [`ARCHITECTURE.md`](ARCHITECTURE.md);
 honest gap list: [`KNOWN-LIMITATIONS.md`](KNOWN-LIMITATIONS.md); audit findings
 + the forward plan: [`roadmap.md`](roadmap.md); voice-dataset design:
 [`corpus.md`](corpus.md).)
+
+**Catch-up checklist (added 2026-10-24 after a miss):** `git fetch` FIRST,
+then `git branch -r`, `gh pr list --state open --draft`, and read every open
+PR's description before summarising state. Merged history + main cannot see
+in-flight work; on 2026-10-22 a catch-up reported "last work = PR #18" while
+PR #19 (Pocket 05, the native rebuild, 10 commits, CI green) sat open as a
+draft.
+
+**2026-10-21 — UHNTISS Pocket 05 (PR #19, DRAFT, open, by Codex): the native
+realtime rebuild.** The set on this Mac runs it. Lives in
+`native/pocket/` (+ `m4l/pocket/`, `eval/*_auto.py`) on
+`feat/native-pocket-drums`; 0 conflicts with main as of 2026-10-24. Know:
+
+- **What it is:** a C++ Max external (`uhntiss.pocket05~.mxo`) — realtime
+  beatbox → synthesized kick/snare/hat + 2-bar looper with overdub/replace/
+  undo, 10 ms classification deadline, no Python/bridge/API key at play time.
+  Its README: "Python remains an offline research tool."
+- **Its own classifier:** three random forests over 17 features in a 10 ms
+  window (primary 300 trees, recovery, 48 kHz transient tracker), trained
+  with scikit-learn on René's isolated hits + 7 full takes, `live_6_uptempo`
+  held out (30/37 at normal level). **Teach K/S/H** = 3 examples per class,
+  3-NN, stored in the device's `pattr` blob. Open hats map to closed hat.
+- **Relation to mouthflow (this doc's main subject):** two stacks, not
+  connected. mouthflow = offline clip → Claude kit choice → quantised MIDI
+  clip (MouthflowDrums panel spawns the CLI); Pocket = realtime instrument.
+  Roadmap item 12 framed exactly this split (realtime loop + offline
+  "polish truth"). Models can't be shared (17 features/10 ms vs
+  123 features/200 ms); **data and evals can**: score Pocket's forests on
+  AVP (`eval/avp_eval.py`) — every Pocket number is one performer — and
+  feed `mouthflow enroll` clips (one class per clip, ~30 hits) into Teach
+  (3/class is below the 5/class that already loses 3 pts on AVP).
+- Codex's working copy + calibration project:
+  `~/Documents/Codex/2026-10-21/i-w-2/{work/uhntiss, outputs/}`. The 48 kHz
+  calibration take there (`CAL 48k … 0003`) has its snare and hat sections
+  swapped; Codex has not been told "recorded".
 
 **2026-10-24 — enrollment (`feat/enroll`): user calibration is a product
 flow now.** `mouthflow enroll` + the drums panel's ENROLL column:
@@ -187,6 +222,8 @@ NOW items.** Behaviour changes to know about:
   **1/2-bar loops** and trims whole empty lead-in bars.
 
 ## TL;DR
+(2026-10: there are TWO device lines now — the native realtime **Pocket** on PR #19, and the Python/M4L **mouthflow** panels below. See the Pocket block above.)
+
 Mouthflow is now an **umbrella product**: a shared "voice → MIDI → Ableton"
 engine with a registry of per-voice **devices**. Four voices ship today —
 **drums** (the original, unchanged behaviour), **bass**, **lead**, and
