@@ -27,3 +27,29 @@ jobs:
 
       - name: Run the eval oracle (gated — fails below targets)
         run: uv run python -m eval.run_eval
+
+      - name: Build the native Auto test tools
+        run: |
+          cmake -S native/pocket -B native/pocket/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build native/pocket/build --parallel
+
+      - name: Verify causal Auto on reserved vocal attacks
+        run: uv run python -m eval.test_native_auto
+
+      - name: Verify full real takes, capture timing and causality
+        run: uv run python -m eval.test_real_auto --build native/pocket/build --report native/pocket/build/real-takes.json
+
+      - name: Reject added breath-shaped noise triggers
+        run: uv run python -m eval.test_transient_auto --binary native/pocket/build/pocket_analyze --report native/pocket/build/noise-controls.json
+
+      - name: Verify 48k whole-source held-out transfer and model identity
+        run: uv run --with scikit-learn==1.8.0 python -m eval.heldout_auto --binary native/pocket/build/pocket_analyze --report native/pocket/build/heldout.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pocket-real-take-regression
+          path: |
+            native/pocket/build/real-takes.json
+            native/pocket/build/heldout.json
+            native/pocket/build/noise-controls.json
