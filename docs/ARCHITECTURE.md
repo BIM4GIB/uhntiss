@@ -50,7 +50,7 @@ The fields that matter:
 
 | Voice | Transcriber | Notes |
 |---|---|---|
-| drums | [`devices/drum/`](../mouthflow/devices/drum/) | Beatbox -> GM drums. Three-tier timbre classifier over the `all123` feature set in [`features.py`](../mouthflow/devices/drum/features.py): per-user k-NN (`drum_model.json`) → cross-performer MLP trained on AVP (`drum_global.json`) → heuristic. Octave-correct tempo + phase-aware, confidence-gated quantisation in [`tempo.py`](../mouthflow/devices/drum/tempo.py) |
+| drums | [`devices/drum/`](../mouthflow/devices/drum/) | Beatbox -> GM drums. Three-tier timbre classifier over the `all123` feature set in [`features.py`](../mouthflow/devices/drum/features.py): per-user k-NN (`~/.mouthflow/drum_model.json` from `mouthflow enroll`, else the packaged `drum_model.json`) → cross-performer MLP trained on AVP (`drum_global.json`) → heuristic. Octave-correct tempo + phase-aware, confidence-gated quantisation in [`tempo.py`](../mouthflow/devices/drum/tempo.py) |
 | bass | [`devices/pitched.py`](../mouthflow/devices/pitched.py) | `librosa.pyin` -> continuous f0 -> segmentation with hysteresis (`min_stable_s=0.08` — a pitch change must hold before it starts a new note, so vibrato/glides don't shatter one note) -> octave-snap to E1–E3 |
 | lead | same `PitchedTranscriber` | Bass and lead differ **only** by a `VoiceConfig` row (range, target octave G3–C6, finer grid) — no algorithm fork |
 | drone | [`devices/drone/`](../mouthflow/devices/drone/) | Stable pitch regions -> one held note, or a hummed sequence -> a ringing chord; loudness contour -> an `AutomationEnvelope` ([`contour.py`](../mouthflow/devices/drone/contour.py)) |

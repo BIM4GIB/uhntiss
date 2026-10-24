@@ -868,6 +868,138 @@ def retry_last(
         )
 
 
+# --- enroll: teach mouthflow YOUR drum sounds ---------------------------------------
+
+enroll_app = typer.Typer(
+    help=(
+        "Teach mouthflow YOUR kick, snare and hats (one class per clip, ~12 s / ~30 hits each). "
+        "The per-user model this writes beats the shipped global model by ~13 points on real grooves."
+    ),
+    no_args_is_help=True,
+)
+app.add_typer(enroll_app, name="enroll")
+
+_CLASS_ARG = typer.Argument(..., help="kick | snare | hat | hat_open (open hat is optional)")
+
+
+def _enroll_report_clip(entry: dict) -> None:
+    from mouthflow import enroll
+
+    cls, hits = entry["class"], entry["hits"]
+    note = ""
+    if hits < enroll.MIN_HITS:
+        note = f" — thin; add another {cls} clip (aim for {enroll.TARGET_HITS})"
+    elif hits < enroll.TARGET_HITS:
+        note = f" (aim for {enroll.TARGET_HITS}; add another clip if you like)"
+    _log(f"enrolled {cls}: {hits} hits from {entry['duration_s']}s{note}")
+    for line in enroll.format_status(enroll.status()):
+        _log(line)
+
+
+def _enroll_add(cls: str, path: Path, source: str) -> None:
+    from mouthflow import enroll
+
+    try:
+        entry = enroll.add_clip(cls, path, source=source)
+    except (ValueError, enroll.EnrollError) as exc:
+        _log(f"FAIL {exc}")
+        raise typer.Exit(code=2)
+    _enroll_report_clip(entry)
+
+
+@enroll_app.command("clip")
+def enroll_clip(
+    cls: str = _CLASS_ARG,
+    host: str = typer.Option("127.0.0.1"),
+    port: int = typer.Option(9877),
+) -> None:
+    """Enroll the audio clip currently SELECTED in Live as one drum class."""
+    with _connect_or_fail(host, port) as client:
+        try:
+            info = client.get_selected_clip()
+        except (AbletonError, OSError) as exc:
+            _log(f"could not read the selected clip ({exc}); is the forked bridge installed?")
+            raise typer.Exit(code=1)
+        path = info.get("file_path") if isinstance(info, dict) else None
+        if not (isinstance(info, dict) and info.get("is_audio") and path):
+            raise typer.BadParameter("select an AUDIO clip in Live's detail view first")
+        _log(f"selected clip: {info.get('name')} -> {path}")
+    _enroll_add(cls, Path(path), source="live-clip")
+
+
+@enroll_app.command("file")
+def enroll_file(cls: str = _CLASS_ARG, path: Path = typer.Argument(..., exists=True, dir_okay=False)) -> None:
+    """Enroll an audio file (any rate/channels) as one drum class."""
+    _enroll_add(cls, path, source="file")
+
+
+@enroll_app.command("record")
+def enroll_record(
+    cls: str = _CLASS_ARG,
+    duration: float = typer.Option(12.0, help="Seconds to record (~30 hits)."),
+    input: int | None = typer.Option(None, "--input", help="Input device index (see `input-devices`)."),
+    countin: int = typer.Option(2, "--countin", help="Count-in seconds (logged per second)."),
+) -> None:
+    """Record one drum class from the mic (play ONLY that sound, ~30 hits)."""
+    from mouthflow import enroll
+
+    try:
+        cls = enroll.normalise_class(cls)
+    except ValueError as exc:
+        _log(f"FAIL {exc}")
+        raise typer.Exit(code=2)
+    if countin > 0:
+        _count_in(countin)
+    _log(f"recording {cls} for {duration}s — only {cls} hits, keep your mic distance")
+    wav = capture.record(duration, input_device=input)  # lands in the take vault too
+    _enroll_add(cls, wav, source="mic")
+
+
+@enroll_app.command("train")
+def enroll_train() -> None:
+    """Build the per-user model from the enrolled clips (and print a sanity number)."""
+    from mouthflow import enroll
+
+    try:
+        rep = enroll.train()
+    except enroll.EnrollError as exc:
+        _log(f"FAIL {exc}")
+        raise typer.Exit(code=2)
+    hp = ", ".join(f"{c} {n}" for c, n in rep["hits_per_class"].items())
+    _log(f"trained on {rep['n']} hits ({hp})")
+    for c in rep["folded"]:
+        _log(f"{c}: fewer than {enroll.MIN_HITS} hits — folded into hat for now; add a clip to split it out")
+    if rep["thin"]:
+        _log(f"thin classes: {', '.join(rep['thin'])} — add a clip each for a sturdier model")
+    cv = rep["cv"]
+    if cv:
+        per = " ".join(f"{c} {v * 100:.0f}" for c, v in cv["per_class"].items())
+        _log(f"cross-validated {cv['accuracy'] * 100:.0f} % over {cv['folds']} folds ({per}) — "
+             "same-clip hits, so expect a real groove a few points lower")
+    _log(f"user model written: {rep['path']} — it now takes precedence for drums")
+
+
+@enroll_app.command("status")
+def enroll_status() -> None:
+    """What's enrolled so far, and whether a user model is installed."""
+    from mouthflow import enroll
+
+    for line in enroll.format_status(enroll.status()):
+        _log(line)
+
+
+@enroll_app.command("reset")
+def enroll_reset(yes: bool = typer.Option(False, "--yes", help="Really delete the clips + user model.")) -> None:
+    """Delete the enrollment clips and the user model (packaged model takes over again)."""
+    from mouthflow import enroll
+
+    if not yes:
+        _log("this deletes your enrolled clips and user model; pass --yes to confirm")
+        raise typer.Exit(code=2)
+    enroll.reset()
+    _log("enrollment cleared")
+
+
 @app.command("list-kits")
 def list_kits(
     device: str = typer.Option(_DEFAULT_DEVICE, "--device", help=_DEVICE_HELP),

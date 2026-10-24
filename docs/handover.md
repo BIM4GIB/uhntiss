@@ -1,11 +1,34 @@
 # Mouthflow — session handover
 
-Last updated: 2026-10-22 (branch `feat/avp-cross-performer`, on top of PR #18).
+Last updated: 2026-10-24 (branch `feat/enroll`, on top of PR #20).
 Read this first when picking up work.
 (Architecture overview for newcomers: [`ARCHITECTURE.md`](ARCHITECTURE.md);
 honest gap list: [`KNOWN-LIMITATIONS.md`](KNOWN-LIMITATIONS.md); audit findings
 + the forward plan: [`roadmap.md`](roadmap.md); voice-dataset design:
 [`corpus.md`](corpus.md).)
+
+**2026-10-24 — enrollment (`feat/enroll`): user calibration is a product
+flow now.** `mouthflow enroll` + the drums panel's ENROLL column:
+
+- **One class per clip.** Record a ~12 s clip of only kicks, only snares,
+  only hats (open hat optional) — in Live (select the clip, press its class
+  button; needs the `get_selected_clip` bridge like Transcribe Clip), from a
+  file (`enroll file kick x.wav`), or from the mic (`enroll record kick`).
+  The clip is the label; nothing to annotate, nothing to swap. Any
+  rate/channels are accepted (resampled to 44.1 k mono into
+  `~/.mouthflow/enroll/` + `manifest.json`).
+- **`enroll train`** extracts `all123`, cross-validates (stratified folds
+  over hits — optimistic, same-clip) and writes `~/.mouthflow/drum_model.json`
+  atomically. `classify._load_model` now prefers that file over the
+  packaged `mouthflow/drum_model.json` (your dev enrollment from
+  `eval/train_classifier`). `enroll status` / `enroll reset --yes`.
+- **Why these numbers:** AVP says ~30 hits/class → 83 % vs 80 % at 5/class,
+  and a separate open-hat class costs nothing on kick/snare/hat (83.4 %
+  either way; open vs closed separate at 72–87 %). `TARGET_HITS=30`,
+  `MIN_HITS=12` (warns "thin").
+- Tests isolate `ENROLL_DIR` + `_USER_MODEL_PATH` (conftest). 162 tests.
+  Not yet done in Live: pressing the ENROLL buttons on a real clip (the
+  CLI path was smoke-tested on the calibration one-shots under a fake HOME).
 
 **2026-10-22 — cross-performer drums (`feat/avp-cross-performer`).** The
 drum classifier finally has numbers from more than one voice, and it changed
@@ -37,14 +60,9 @@ because of them. Know about:
   roadmap's embedding+prototype recipe lost to plain k-NN; a per-take
   loudness column was neutral. Detected-onset protocol tracks these within
   2 pts (onset recall 96.2 %).
-- **Next: user calibration = enrollment.** AVP says ~30 hits per class gets
-  83 % vs 80 % at 5 per class, so the enrollment take is four one-class
-  clips (kick / snare / closed hat / open hat, ~12 s each) — one class per
-  clip cannot be swapped (today's 48k take swapped two sections). Build
-  `mouthflow enroll`: record or ingest the four clips, label by clip,
-  `train_classifier` → per-user model, show the held-out number. Then the
-  same flow for other people's voices is the first real test of the global
-  fallback → enrollment path.
+- **Next: user calibration = enrollment — DONE 2026-10-24** (see the block
+  above). Still open: enrolling a voice that isn't René's is the first real
+  test of the global-fallback → enrollment path.
 
 **2026-07-03/04 — PRs #13–#18: bass fixed on real takes, then a dataset
 pipeline so the next fixes are measured, not guessed.** Verified 2026-10-22:
@@ -281,6 +299,8 @@ uv run mouthflow record-stream --device bass            # open-ended take; 'stop
 uv run mouthflow transcribe-clip --device bass          # selected Live clip → Live (needs bridge fork)
 uv run mouthflow dry-run clip.wav --device drone --json # pipeline only, prints Plan
 uv run mouthflow retry-last                 # replay the last vaulted take (~/.mouthflow/takes/)
+uv run mouthflow enroll clip kick           # enroll the SELECTED Live clip as kicks (then snare, hat[, hat_open])
+uv run mouthflow enroll train               # -> ~/.mouthflow/drum_model.json (your voice beats the global model)
 uv run python -m eval.run_eval              # drum oracle — gated, exits non-zero on regression
 uv run pytest -q                            # full suite — must all pass (136)
 python m4l/generate.py --install            # regenerate stamped panels + sync, removes superseded files
@@ -374,7 +394,8 @@ cat datasets/manifest.jsonl                                  # per-row scores, r
 |---|---|
 | `mouthflow/signal.py` | shared DSP (onset/tempo/features/quantise/write_midi, `grid_fit`/`grid_phase` trust helpers) |
 | `mouthflow/devices/base.py`, `registry.py` | DeviceSpec + registry |
-| `mouthflow/devices/drum/` | drum transcriber + 3-tier classifier (`features.py` feature sets, `classify.py`), `drum_model.json` (per-user) + `drum_global.json` (AVP MLP) |
+| `mouthflow/devices/drum/` | drum transcriber + 3-tier classifier (`features.py` feature sets, `classify.py`), `drum_model.json` (packaged dev enrollment) + `drum_global.json` (AVP MLP); `~/.mouthflow/drum_model.json` wins when present |
+| `mouthflow/enroll.py` | per-user enrollment: one-class clips → hits → `~/.mouthflow/drum_model.json` (`mouthflow enroll …`) |
 | `eval/avp.py`, `eval/avp_eval.py`, `eval/train_global.py` | AVP loader, cross-performer eval matrix, global-model trainer |
 | `mouthflow/devices/pitched.py` | bass + lead transcriber (pyin) |
 | `mouthflow/devices/{bass,lead}/` | device specs + prompts |
