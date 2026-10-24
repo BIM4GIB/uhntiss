@@ -3,8 +3,9 @@
 Three tiers, best available wins:
 
 1. ``drum_model.json`` — the **per-user** k-NN trained on this performer's own
-   enrollment hits (``eval/train_classifier``). 83.8 % on AVP improvisations
-   after a ~30-hits-per-class enrollment; this is the product.
+   enrollment hits: ``~/.mouthflow/drum_model.json`` from ``mouthflow enroll``
+   first, else the packaged one (``eval/train_classifier``). 83 % on AVP
+   improvisations after a ~30-hits-per-class enrollment; this is the product.
 2. ``drum_global.json`` — a small MLP trained on the AVP cross-performer
    dataset (``eval/train_global``; CC BY 4.0, 25 amateurs on a MacBook mic).
    68.8 % leave-one-performer-out: what a fresh install gets before enrolling.
@@ -32,10 +33,14 @@ GM_PERC = 39  # reserved
 
 DROP = -1  # sentinel: silence rather than guess
 
-# Model files live at the package root (the trainers write them there).
+# Model files. The per-user k-NN is looked up in the user's state dir first
+# (written by `mouthflow enroll train`), then the packaged one (the dev
+# performer's enrollment, written by eval/train_classifier); the global MLP
+# ships in the package (eval/train_global).
 _PKG = Path(__file__).resolve().parents[2]
-_MODEL_PATH = _PKG / "drum_model.json"  # per-user k-NN (eval/train_classifier)
-_GLOBAL_PATH = _PKG / "drum_global.json"  # cross-performer MLP (eval/train_global)
+_USER_MODEL_PATH = Path.home() / ".mouthflow" / "drum_model.json"
+_MODEL_PATH = _PKG / "drum_model.json"
+_GLOBAL_PATH = _PKG / "drum_global.json"
 
 _UNSET = object()
 _MODEL = _UNSET  # lazily populated by _get_model() on first classify()
@@ -50,8 +55,12 @@ def _load_json(path: Path) -> dict | None:
 
 
 def _load_model() -> dict | None:
-    """Load the per-user trained model, or None if absent/invalid."""
-    return _load_json(_MODEL_PATH)
+    """Load the per-user model: the enrolled one if present, else the packaged one."""
+    for path in (_USER_MODEL_PATH, _MODEL_PATH):
+        m = _load_json(path)
+        if m:
+            return m
+    return None
 
 
 def _get_model() -> dict | None:
