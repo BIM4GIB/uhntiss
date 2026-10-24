@@ -27,6 +27,11 @@ voices (nearly everything → hat); Teach 71.7 %; 30-example profile 72.5 %;
 `all123` k-NN on the same onsets **81.1 %**. The gap is the feature
 vector/metric, not profile size — that's the cross-team question for Codex.
 Built device bundle for a first click: `m4l/pocket/build/` (gitignored).
+**Window study (same day, `eval/avp_window.py`):** the 10 ms decision is
+the ceiling (~73–74 % whatever the features); 3 causal slices to 80 ms
+reach 80.3 % (Teach-sized 76.4 vs 67.5). Recommendation in
+`pocket-integration.md`: keep the 10 ms audible decision, re-decide at
+80 ms for what the loop stores.
 
 **2026-10-21 — UHNTISS Pocket 05 (PR #19, DRAFT, open, by Codex): the native
 realtime rebuild.** The set on this Mac runs it. Lives in
