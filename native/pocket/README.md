@@ -1,15 +1,21 @@
-# UHNTISS Pocket 05 · Auto drums
+# UHNTISS Pocket 06 · personal voices and delayed loop decisions
 
 A local voice-to-drum instrument and two-bar looper for Ableton Live. Native C++
 handles detection, synthesis, transport and recording. Max for Live supplies the
 host connection and controls. Python remains an offline research tool.
 
-**Playable performance alpha.** Auto now uses a native, trained attack classifier
-and captures mixed kick/snare/hat performances without changing voices. The
-factory model uses non-reserved isolated recordings and seven full takes. The
-entire uptempo take stays outside training, including all derived audio. Different
-voices, mic positions and snare articulations can still need a short soundcheck.
-This is not a claim of stage reliability or performer endorsement.
+**Performance research alpha, not stage-qualified.** Pocket 06 accepts 2–16
+named sounds mapped to MIDI notes, with up to 30 enrollment examples each.
+The performer hears Auto at the same 10 ms deadline; the loop can revise the
+voice using up to 80 ms of causal audio. Neither path moves the detected onset
+or changes its measured velocity. Python builds profiles offline only.
+
+On AVP's 25 performers at 48 kHz, the new three-voice profile scores 70.5% live
+and 75.2% in the loop on identical matched candidates, with rejection counted
+as wrong. The fourth voice costs about one point in committed core accuracy at
+48 kHz; it improves it at 44.1 kHz. Personal noise enrollment helps one hum test
+but transfers poorly in the reverse direction. Real speech/breath and expert
+roll coverage remain release gates. See [the measured contract](../../docs/pocket-integration.md).
 
 ## Play
 
@@ -17,7 +23,7 @@ Requires macOS 11+, Ableton Live with Max for Live, and a mono mic input. The
 provided external is universal Apple Silicon/Intel. The portable core also builds
 on Linux; there is no Windows Max external in this release.
 
-1. Keep `UHNTISS Pocket.amxd`, `pocket-ui.js` and `uhntiss.pocket05~.mxo` together.
+1. Keep `UHNTISS Pocket.amxd`, `pocket-ui.js`, `pocket-profile.js` and `uhntiss.pocket06~.mxo` together.
    Drag the `.amxd` onto an **audio track**. No API key, bridge, Python, Node server,
    network connection or downloaded kit is needed to play.
 2. Select your mono mic channel in Live; set the track's Monitor to **In**. The
@@ -51,58 +57,68 @@ consistent synthesized kit and an exact repeating length, not rewritten rhythm.
 
 ## Personal Auto mode
 
-Choose Auto, press **Teach K**, and make three isolated kick sounds, then repeat
-with **Teach S** and **Teach H**. Leave a short gap between sounds. Each teaching
-button cancels an in-progress take and teaches the next three detected attacks;
-it leaves the committed loop intact. Record or Undo exits teaching. Teaching
-changes the profile, not the loop undo history. All three voices must have three
-examples before the profile is used. The profile and loop are stored with the
-Live device/set via a `pattr` blob.
+Record **one sound per clip**, preferably about 30 hits with at least 200 ms
+between attacks. Include quiet, normal and accented versions of the same
+articulation. Enroll each sound with its name and MIDI note, then run:
 
-Auto measures six log-energy bands in the early and late halves of a **10 ms**
-attack window, zero crossings, crest shape, and three power/context descriptors.
-The context uses the **preceding** 30 ms; it adds no lookahead. The primary
-300-tree model chooses a voice or rejection. A second model may recover a rejected
-window only when its voice and attack evidence are strong. A parallel, quieter
-tracker accepts only low-level hats, with primary attacks taking priority and a
-shared 35 ms minimum separation. At exactly **48 kHz**, a third tracker detects
-changes within individual frequency bands, recovering some quiet kicks, snares
-and hats masked by a louder tail. It uses six additional contrasts against past
-band energy, strict voice confidence, and the same raw-velocity cap of 0.22.
-All paths retain raw dynamics and detected onset timestamps. None boosts the
-audible input or changes the 10 ms classification deadline. Fixed voices and
-Teach retain their single-track path. State still uses the original 17 features.
+```sh
+uv run mouthflow enroll export-pocket --sr 48000
+# An enrolled `noise` class becomes rejection, never a sounding voice.
+# Additional breath/speech-only clips may be supplied with --reject-clip PATH.
+```
 
-Above 48 kHz, a separately calibrated primary forest replaces the normal-rate
-forest; it uses additional resampled, non-reserved isolated calibration hits.
-Only one primary forest runs per attack. Primary/recovery trees have depth at most
-12; the new 200-tree transient model has depth at most 14. The
-runtime remains fixed-storage C++ with no model download or rhythm grid.
+Use the Live Set's actual sample rate. Export reads the enrollment manifest;
+it does not record audio. It retains all examples up to 30, otherwise selecting
+representatives from enrollment alone. At least three complete, isolated
+80 ms attacks per playable voice are required. Scale, center and rejection
+radius come only from enrollment; query/take audio never fits the profile.
+The mislabeled CAL 48k 0003 take and the reserved uptempo take are not enrollment.
 
-The optional personal profile keeps all **nine examples** and uses three nearest
-examples to choose among accepted drums. It preserves factory noise rejection.
-Save your Set after teaching. State v4 preserves the 17-feature profile and accepts
-v2/v3 loop blobs with their timing unchanged; incompatible older voice profiles
-are reset. Replacing a device in Live does not itself transfer its old state.
-Keep the old device/Set if you need its take.
+Press **PROFILE**. A successful audio-thread acknowledgement shows the voice
+count; malformed files show an error and leave the old profile intact. A rate
+mismatch displays the required sample rate and falls back to factory Auto until
+a matching profile is loaded. Save the Set after loading. The canonical JSON
+is `~/.mouthflow/pocket_profile.json`; export also writes
+`uhntiss_pocket_profile.json` into each Max user Library. Keep these personal
+profile files local unless you intend to share your voice descriptors.
 
-Onset release must last 4 ms, suppressing a second trigger from a transient’s
-small trough. After a genuine quiet gap the slow detector baseline recovers,
-so the previous loud hit does not mask a soft one. The minimum onset separation
-between accepted hits is **35 ms**. Rejected precursors can re-arm sooner on a fresh rise. Open hats map to the closed-hat voice. Simultaneous overlapping
-vocal classes, continuous textures, speech rejection and speaker-bleed cancellation
-remain outside this version. Fixed voices remain available for deliberate layering.
+For named sounds, choose the destination MIDI track and channel under **MIDI TO**.
+Put a Drum Rack or other instrument on that track and map pads to the enrolled
+notes. **Level 0** silences the built-in kit while MIDI continues. The built-in
+synth supplies kick (35/36), snare (38/40) and hat (42/44/46); other notes need
+the routed instrument. MIDI is dispatched at the DSP vector boundary through
+Max's high-priority clock, independently of the 33 ms display poll. This adds
+host scheduling/buffer timing to external instruments; the sample-exact claim
+applies to the internal kit and stored event timing, not downstream MIDI.
 
-### Loading a profile built offline
+The three **Teach** buttons remain a quick three-hit soundcheck for the first
+three profile voices. Teaching cancels pending capture and replaces that voice's
+early examples; it disables the delayed classifier until a complete profile is
+exported again. Quick Teach on a fresh device and legacy v4 keep factory rejection. Teaching
+a voice in an imported v5 profile keeps its enrolled candidate policy.
+The v5 path lets personal examples classify primary candidates even when the
+factory forest rejects them; conservative quiet/transient helpers still use
+factory gating, so unseen quiet articulations can remain undetected.
 
-**PROFILE** (top row) loads a Teach profile that was built outside the device:
-`uv run mouthflow enroll export-pocket` records one clip per voice, runs this
-engine's own detector over them and keeps the three most representative hits
-per voice (see `docs/pocket-integration.md`). The external accepts the same
-payload as a `profile <156 values>` message — the v4 profile block, validated
-by `decodeProfile` — and persists it with the Set like a taught profile. On
-AVP (25 other performers) a 3-example profile scores ~72 % against the
-factory forests' ~48 %; the profile size is not the limiting factor there.
+V5 live classification uses three nearest 17-feature examples and a learned
+support radius. A personal reject bank uses a separate five-neighbour vote,
+requiring four negative neighbours; positive examples win ties. When sustained
+negative examples exist, the immediate gate uses richer features from the same
+first 10 ms. The loop uses five-neighbour classification over 0–10, 10–40 and
+40–80 ms slices, with signed Q4 features scaled from enrollment. A following
+candidate truncates the window; only complete slices enter the metric. Before
+40 ms, the provisional choice stands. Late rejection drops a stored event,
+and late relabeling never fires a second audible hit.
+
+State v5 stores each event's MIDI note independently of its current profile;
+loading a new mapping cannot retune an existing loop. It reads v2/v3 loops
+(resetting obsolete profiles) and exact 156-double v4 profiles. All queues,
+voice banks, FFT buffers and loop storage are bounded. Sixteen voices × thirty
+examples is the current capacity tradeoff to keep the complete Max state below
+32,767 atoms; larger vocabularies need a different state transport.
+
+The 35 ms shared onset separation remains. Overlapping vocal classes, reliable
+open-mic speech rejection and speaker-bleed cancellation are unresolved.
 
 ## Timing and recovery contract
 
@@ -118,7 +134,7 @@ factory forests' ~48 %; the profile size is not the limiting factor there.
 - A stop, seek or meter change during capture cancels the partial take and keeps
   the committed loop. An arrangement-loop wrap is treated as a seek: disable it
   or make it longer than the take while recording.
-- Classification that finishes just after the seam still belongs to the old
+- The up-to-80 ms loop decision that finishes after the seam still belongs to the old
   capture window. It remains part of the same undo transaction.
 - A take that would exceed 512 events rolls back instead of silently truncating.
   Closed-hat/snare/kick synthesis has 24 bounded voices with quietest-voice stealing.
@@ -137,6 +153,11 @@ cmake -S native/pocket -B native/pocket/build -DCMAKE_BUILD_TYPE=Release
 cmake --build native/pocket/build -j
 ctest --test-dir native/pocket/build --output-on-failure
 native/pocket/build/pocket_render pocket-demo.wav
+node --test m4l/pocket/build.test.mjs
+uv run python -m pytest tests/test_pocket.py
+uv run python -m eval.avp_pocket --sr 48000 --enrollment --report avp48.json
+uv run python -m eval.pocket_negatives --report negatives.json
+uv run python -m eval.pocket_benchmark --report benchmark.json
 ```
 
 Sanitizers: configure another build directory with `-DPOCKET_SANITIZE=ON`.

@@ -1,3 +1,4 @@
+import vm from 'node:vm';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtempSync,readFileSync,rmSync} from 'node:fs';
@@ -19,7 +20,21 @@ test('audio device packages the actual native path, controls and persistent stat
   for(const id of ['record','undo','clear','voice','mode','pad0','pad1','pad2'])assert.equal(boxes.get(id).parameter_enable,1);
   for(const line of p.lines) {assert.ok(boxes.has(line.patchline.source[0]));assert.ok(boxes.has(line.patchline.destination[0]));}
   const wired=(a,o,b,i=0)=>p.lines.some(l=>l.patchline.source[0]===a&&l.patchline.source[1]===o&&l.patchline.destination[0]===b&&l.patchline.destination[1]===i);
-  assert.ok(wired('in',0,'engine'));assert.ok(wired('phase',0,'engine',1));assert.ok(wired('sync',6,'hostbeat'));assert.ok(wired('engine',0,'out'));assert.ok(wired('engine',1,'out',1));
+  assert.ok(wired('loadprofile',0,'profile-js'));assert.ok(wired('profile-js',1,'display'));assert.ok(wired('engine',3,'note-unpack'));assert.equal(boxes.get('midi-routing').text,'live.routing');assert.ok(wired('midi-target-choose',0,'midi-routing'));assert.ok(wired('note-pack',0,'midi-format'));assert.ok(wired('in',0,'engine'));assert.ok(wired('phase',0,'engine',1));assert.ok(wired('sync',6,'hostbeat'));assert.ok(wired('engine',0,'out'));assert.ok(wired('engine',1,'out',1));
   assert.ok(!p.boxes.some(b=>/node\.script|shell|udpreceive|tcpclient/.test(b.box.text||'')));
  } finally {rmSync(out,{recursive:true,force:true});}
+});
+
+test('PROFILE int click sends v4/v5; failures stay visible and never claim installation',()=>{
+ const source=readFileSync(new URL('./pocket-profile.js',import.meta.url),'utf8');
+ let contents='', exists=true, messages=[];
+ const context=vm.createContext({post(){},outlet(...args){messages.push(args)},File:function(){this.isopen=exists;this.eof=contents.length;this.readstring=()=>contents;this.close=()=>{};}});
+ vm.runInContext(source,context);
+ assert.notEqual(context.msg_int.local,1);
+ const click=doc=>{contents=typeof doc==='string'?doc:JSON.stringify(doc);messages=[];context.msg_int(1);return messages;};
+ assert.equal(click({version:4,values:Array(156).fill(0)})[0].length,158);
+ const values=Array(24726).fill(0);values[0]=5;values[1]=3;
+ assert.equal(click({version:5,feature_version:3,values})[0].length,24728);
+ for(const doc of ['{broken', {version:5,feature_version:2,values}, {version:4,values:[0]}]) assert.deepEqual(click(doc),[[1,'profile_error']]);
+ exists=false;assert.deepEqual(click('{}'),[[1,'profile_error']]);
 });

@@ -274,6 +274,8 @@ def train(binary, cache):
         sklearn_version=sklearn.__version__,
         version=5,
         feature_version=3,
+        enrollment=dict(state_version=5, max_voices=16, max_examples=30, commit_features=120,
+                        commit_slices_ms=[0, 10, 40, 80], next_onset_truncation=True, negative_bank=30),
         features=17,
         window_ms=10,
         history_ms=30,

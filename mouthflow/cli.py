@@ -1031,6 +1031,7 @@ def enroll_export_pocket(
         raise typer.Exit(code=2)
     det = ", ".join(f"{c} {n}" for c, n in rep["detected"].items())
     _log(f"pocket detected {det} at {sr} Hz; kept up to 30 representatives per voice")
+    _log(f"personal rejection bank: {rep.get('reject_examples', 0)} examples")
     if rep.get("skipped"):
         sk = ", ".join(f"{c} ({n} hits)" for c, n in rep["skipped"].items())
         _log(f"not exported: {sk}")

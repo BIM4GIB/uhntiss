@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <memory>
 #include <mutex>
 #include <new>
 #include <vector>
@@ -52,7 +53,7 @@ struct Data {
   bool savedValid = false;
   uint64_t savedRevision = 0, appliedReceipt = 0, shownReceipt = 0;
   std::atomic<uint64_t> nextReceipt{1};
-  double sampleRate = 48000.;
+  double sampleRate = 48000., notifiedRate = 0.;
 };
 struct Object {
   t_pxobject object;
@@ -195,8 +196,10 @@ void perform(Object *x, t_object *, double **ins, long, double **outs, long,
                      outs[1][i]);
   Engine::MidiHit midi;
   bool emitted = false;
-  while (d.engine.popMidi(midi)) emitted = d.midi.push(midi) || emitted;
-  if (emitted) clock_delay(x->midiClock, 0.);
+  while (d.engine.popMidi(midi))
+    emitted = d.midi.push(midi) || emitted;
+  if (emitted)
+    clock_delay(x->midiClock, 0.);
   if (d.request.exchange(false, std::memory_order_relaxed)) {
     auto &snap = d.audioSnapshot;
     snap.profile = d.engine.profile();
@@ -229,7 +232,9 @@ void emitEvents(Object *x, const Loop &loop) {
   for (size_t i = 0; i < loop.count; ++i) {
     atom_setfloat(&atoms[i * 3], loop.events[i].beat);
     atom_setfloat(&atoms[i * 3 + 1], loop.events[i].velocity);
-    atom_setlong(&atoms[i * 3 + 2], loop.events[i].voice >= 0 ? loop.events[i].voice : int(loop.events[i].drum));
+    atom_setlong(&atoms[i * 3 + 2], loop.events[i].voice >= 0
+                                        ? loop.events[i].voice
+                                        : int(loop.events[i].drum));
   }
   outlet_anything(x->messages, gensym("events"), short(atoms.size()),
                   atoms.data());
@@ -256,16 +261,24 @@ void poll(Object *x) {
     atom_setlong(atoms + 8, v.learning);
     atom_setlong(atoms + 9, v.remaining);
     atom_setlong(atoms + 10, v.profile.ready());
-    atom_setlong(atoms + 11, v.profile.delayed() && v.profile.sampleRate == v.sampleRate);
+    atom_setlong(atoms + 11,
+                 v.profile.delayed() && v.profile.sampleRate == v.sampleRate);
     outlet_anything(x->messages, gensym("status"), 12, atoms);
-    if (v.receipt && v.receipt != d.shownReceipt) {
+    if ((v.receipt && v.receipt != d.shownReceipt) ||
+        (v.profile.sampleRate > 0. && d.notifiedRate != v.sampleRate)) {
       d.shownReceipt = v.receipt;
       t_atom receipt[3];
       atom_setlong(receipt, v.profile.voices);
       atom_setfloat(receipt + 1, v.profile.sampleRate);
       atom_setlong(receipt + 2, v.profile.rejects);
-      outlet_anything(x->messages, gensym(v.profile.sampleRate && v.profile.sampleRate != v.sampleRate ? "profile_rate_mismatch" : "profile_loaded"), 3, receipt);
+      outlet_anything(
+          x->messages,
+          gensym(v.profile.sampleRate && v.profile.sampleRate != v.sampleRate
+                     ? "profile_rate_mismatch"
+                     : "profile_loaded"),
+          3, receipt);
     }
+    d.notifiedRate = v.sampleRate;
     emitEvents(x, v.state == int(State::recording) ? v.take : v.active);
     if (!d.savedValid || v.revision != d.savedRevision) {
       d.saved = v.active;
@@ -277,7 +290,8 @@ void poll(Object *x) {
         atom_setsym(&voices[i * 2], gensym(v.profile.names[i].data()));
         atom_setlong(&voices[i * 2 + 1], v.profile.notes[i]);
       }
-      outlet_anything(x->messages, gensym("voices"), short(voices.size()), voices.data());
+      outlet_anything(x->messages, gensym("voices"), short(voices.size()),
+                      voices.data());
       object_notify((t_object *)x, gensym("modified"), nullptr);
     }
   }
@@ -287,17 +301,16 @@ void tick(Object *x) {
   qelem_set(x->qelem);
   clock_delay(x->clock, 33.);
 }
-// `profile <156 numbers>`: install a Teach profile built offline (the v4
-// profile block, see decodeProfile). Replaces the voice examples only; the
-// loop is untouched. Persists with the Set through the pattr state like a
-// taught profile does.
+// `profile <numbers>`: install a legacy v4 or versioned v5 enrollment. Replaces
+// the voice examples only; the loop is untouched. Persists with the Set through
+// the pattr state like a taught profile does.
 void profile(Object *x, t_symbol *, long argc, t_atom *argv) {
   if (argc <= 0 || argc > long(maxProfileValues)) {
     object_error((t_object *)x, "profile: invalid payload length %ld", argc);
     outlet_anything(x->messages, gensym("profile_error"), 0, nullptr);
     return;
   }
-  std::array<double, maxProfileValues> values{};
+  std::vector<double> values(size_t(argc), 0.);
   for (long i = 0; i < argc; ++i) {
     if (atom_gettype(argv + i) != A_LONG && atom_gettype(argv + i) != A_FLOAT) {
       object_error((t_object *)x, "profile: value %ld is not a number", i);
@@ -306,24 +319,24 @@ void profile(Object *x, t_symbol *, long argc, t_atom *argv) {
     }
     values[i] = atom_getfloat(argv + i);
   }
-  Command c;
-  c.action = Action::profile;
-  if (!decodeProfile(values.data(), size_t(argc), c.profile)) {
+  auto c = std::make_unique<Command>();
+  c->action = Action::profile;
+  if (!decodeProfile(values.data(), size_t(argc), c->profile)) {
     object_error((t_object *)x, "profile: invalid v4/v5 payload");
     outlet_anything(x->messages, gensym("profile_error"), 0, nullptr);
     return;
   }
-  c.receipt = x->data->nextReceipt.fetch_add(1);
-  if (!enqueue(x, c)) {
+  c->receipt = x->data->nextReceipt.fetch_add(1);
+  if (!enqueue(x, *c)) {
     outlet_anything(x->messages, gensym("profile_error"), 0, nullptr);
     return;
   }
   outlet_anything(x->messages, gensym("profile_queued"), 0, nullptr);
 }
 t_max_err getvalue(Object *x, long *argc, t_atom **argv) {
-  StateValues values;
+  auto values = std::make_unique<StateValues>();
   const long required =
-      long(encodeState(x->data->saved, x->data->savedProfile, values));
+      long(encodeState(x->data->saved, x->data->savedProfile, *values));
   if (!*argv || *argc < required) {
     if (*argv)
       sysmem_freeptr(*argv);
@@ -335,25 +348,25 @@ t_max_err getvalue(Object *x, long *argc, t_atom **argv) {
   }
   *argc = required;
   for (long i = 0; i < required; ++i)
-    atom_setfloat(*argv + i, values[i]);
+    atom_setfloat(*argv + i, (*values)[i]);
   return MAX_ERR_NONE;
 }
 t_max_err setvalue(Object *x, long argc, t_atom *argv) {
   if (argc < 0 || argc > long(maxStateValues))
     return MAX_ERR_GENERIC;
-  StateValues values{};
+  std::vector<double> values(size_t(argc), 0.);
   for (long i = 0; i < argc; ++i) {
     if (atom_gettype(argv + i) != A_LONG && atom_gettype(argv + i) != A_FLOAT)
       return MAX_ERR_GENERIC;
     values[i] = atom_getfloat(argv + i);
   }
-  Command c;
-  c.action = Action::restore;
-  if (!decodeState(values.data(), size_t(argc), c.loop, c.profile) ||
-      !enqueue(x, c))
+  auto c = std::make_unique<Command>();
+  c->action = Action::restore;
+  if (!decodeState(values.data(), size_t(argc), c->loop, c->profile) ||
+      !enqueue(x, *c))
     return MAX_ERR_GENERIC;
-  x->data->savedProfile = c.profile;
-  x->data->saved = c.loop;
+  x->data->savedProfile = c->profile;
+  x->data->saved = c->loop;
   x->data->savedValid = true;
   return MAX_ERR_NONE;
 }
@@ -364,7 +377,8 @@ void midiTick(Object *x) {
   for (int i = 0; i < 2047 && x->data->midi.pop(hit); ++i) {
     t_atom values[2];
     atom_setlong(values, hit.note);
-    atom_setlong(values + 1, std::clamp(int(std::round(hit.velocity * 127)), 1, 127));
+    atom_setlong(values + 1,
+                 std::clamp(int(std::round(hit.velocity * 127)), 1, 127));
     outlet_list(x->midiOut, nullptr, 2, values);
   }
 }
@@ -375,14 +389,16 @@ void assist(Object *, void *, long io, long index, char *text) {
                         : "Mic audio / record, undo, clear, tap, setting");
   else
     snprintf_zero(text, 256,
-                  index == 2 ? "Display/status messages"
-                             : (index ? "Right output" : "Left output"));
+                  index == 3   ? "MIDI note / velocity"
+                  : index == 2 ? "Display/status messages"
+                               : (index ? "Right output" : "Left output"));
 }
 void destroy(Object *x) {
   dsp_free(&x->object);
   if (x->clock)
     object_free(x->clock);
-  if (x->midiClock) object_free(x->midiClock);
+  if (x->midiClock)
+    object_free(x->midiClock);
   if (x->qelem)
     qelem_free(x->qelem);
   delete x->data;

@@ -35,7 +35,7 @@ function rect(x,y,w,h,c) {mgraphics.set_source_rgba(c);mgraphics.rectangle(x,y,w
 function text(str,x,y,size,c,bold) {mgraphics.set_source_rgba(c);mgraphics.select_font_face("Arial", "normal",bold?"bold":"normal");mgraphics.set_font_size(size);mgraphics.move_to(x,y);mgraphics.show_text(str);}
 function line(x,y,x2,y2,c,width) {mgraphics.set_source_rgba(c);mgraphics.set_line_width(width||1);mgraphics.move_to(x,y);mgraphics.line_to(x2,y2);mgraphics.stroke();}
 function paint() {
-    rect(0,0,980,169,[.055,.068,.062,1]);
+    rect(0,0,1155,169,[.055,.068,.062,1]);
     text("UHNTISS",16,27,23,ink,true);text("POCKET / 06",141,26,10,green,true);
     text("INPUT VOICE",740,24,9,muted,false);text("LOCAL",924,24,10,green,true);
     line(16,38,964,38,[.17,.21,.18,1],1);
@@ -67,6 +67,11 @@ function paint() {
     if(calibrated && state===0)help=voiceNames.length+" voices / 10 ms live"+(delayed?" / up to 80 ms loop decision":" / quick Teach");
     if(learning>=0)help="Make "+remaining+" isolated "+["B","PF","TS"][learning]+" sounds. Leave a short gap.";
     text(help,310,157,10,muted,false);
+    line(974,10,974,159,[.17,.21,.18,1],1);
+    text("MIDI TO",984,25,10,green,true);
+    text("Choose a rack track",984,122,9,muted,false);
+    text("Level 0 mutes the built-in kit",984,140,9,muted,false);
+    text("Mapped notes follow your loop",984,157,9,muted,false);
     text("INPUT",665,137,8,muted,true);
     rect(702,131,204,5,[.16,.2,.17,1]);rect(702,131,Math.min(1,level*3)*204,5,level>.9?orange:green);
     text(level>.9?"HOT":"",915,137,8,orange,true);

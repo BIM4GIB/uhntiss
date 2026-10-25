@@ -462,7 +462,7 @@ def export_pocket(binary: Path | str | None = None, sr: int = 48000, gate: float
             continue
         rows = read_rows(path)
         if cls == NOISE:
-            negatives.extend(rows[:, 4:21])
+            negatives.extend(rows)
         else:
             by_class.setdefault(cls, []).append(rows)
         sources.append({"class": cls, "path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
@@ -477,10 +477,10 @@ def export_pocket(binary: Path | str | None = None, sr: int = 48000, gate: float
         if not path.is_file():
             raise pocket.PocketError(f"rejection clip not found: {path}")
         rows = read_rows(path)
-        negatives.extend(rows[:, 4:21])
+        negatives.extend(rows)
         sources.append({"class": "__reject__", "path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
                         "pocket_hits": len(rows)})
-    doc = pocket.build_profile(voices, sr, np.asarray(negatives).reshape(-1, 17))
+    doc = pocket.build_profile(voices, sr, np.asarray(negatives).reshape(-1, 145))
     doc["source"] = {"kind": "mouthflow-enroll", "clips": sources,
                      "exported_at": datetime.now().isoformat(timespec="seconds")}
     doc["gate"] = gate

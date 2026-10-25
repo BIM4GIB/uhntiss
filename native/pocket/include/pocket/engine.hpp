@@ -6,7 +6,8 @@
 #include <cstdint>
 
 namespace pocket {
-constexpr int maxVoices = 16, maxExamples = 30, maxRejects = 12, featureVersion = 3;
+constexpr int maxVoices = 16, maxExamples = 30, maxRejects = 30,
+              featureVersion = 3;
 constexpr std::size_t maxEvents = 512;
 constexpr std::size_t undoDepth = 16;
 constexpr double loopBeats = 8.; // Deliberate first release: two bars of 4/4.
@@ -27,7 +28,8 @@ struct Event {
   float velocity = .8f;
   Drum drum = Drum::kick;
   int voice = -1; // -1 for legacy pad events; otherwise enrollment index.
-  int note = -1;  // Stored with the hit: profile remapping cannot retune an old loop.
+  int note =
+      -1; // Stored with the hit: profile remapping cannot retune an old loop.
 };
 struct Loop {
   std::array<Event, maxEvents> events{};
@@ -80,29 +82,41 @@ Drum classifyAttack(const Features &features,
                     double sampleRate = 48000.) noexcept;
 Drum classifyTransientAttack(const TransientFeatures &features) noexcept;
 struct Profile {
-  int voices = 3, rejects = 0;
+  int voices = 3, rejects = 0, lateRejects = 0;
   double sampleRate = 0.; // Zero: v4 compatibility, early-only Teach.
   std::array<std::array<Features, maxExamples>, maxVoices> examples{};
   std::array<int, maxVoices> count{};
-  std::array<std::array<char, 25>, maxVoices> names{{{{'k','i','c','k'}}, {{'s','n','a','r','e'}}, {{'h','a','t'}}}};
+  std::array<std::array<char, 25>, maxVoices> names{
+      {{{'k', 'i', 'c', 'k'}}, {{'s', 'n', 'a', 'r', 'e'}}, {{'h', 'a', 't'}}}};
   std::array<int, maxVoices> notes{{36, 38, 42}};
-  std::array<std::array<std::array<std::int8_t, 120>, maxExamples>, maxVoices> late{};
+  std::array<std::array<std::array<std::int8_t, 120>, maxExamples>, maxVoices>
+      late{};
   std::array<int, maxVoices> lateCount{};
   SliceFeatures scale{}, center{};
-  std::array<double, maxVoices> radius{}; // Early squared distance; 0 disables open-set radius.
+  std::array<double, maxVoices>
+      radius{}; // Early squared distance; 0 disables open-set radius.
   std::array<Features, maxRejects> negative{};
+  std::array<std::array<std::int8_t, 120>, maxRejects> negativeLate{};
+  std::array<int, maxRejects> negativeSlices{};
   void add(Drum drum, const Features &features) noexcept;
   Drum classify(const Detection &detection) const noexcept; // v4 API
-  int classifyVoice(const Detection &detection) const noexcept; // -1 rejects
+  int classifyVoice(const Detection &detection,
+                    const Slices *rich = nullptr) const noexcept; // -1 rejects
   int classifyLate(const Slices &features, int provisional) const noexcept;
   bool ready() const noexcept {
-    if (voices < 2 || voices > maxVoices) return false;
-    for (int d = 0; d < voices; ++d) if (count[d] < 3 || count[d] > maxExamples) return false;
+    if (voices < 2 || voices > maxVoices)
+      return false;
+    for (int d = 0; d < voices; ++d)
+      if (count[d] < 3 || count[d] > maxExamples)
+        return false;
     return true;
   }
   bool delayed() const noexcept {
-    if (!ready() || sampleRate <= 0.) return false;
-    for (int d = 0; d < voices; ++d) if (lateCount[d] < 3 || lateCount[d] > maxExamples) return false;
+    if (!ready() || sampleRate <= 0.)
+      return false;
+    for (int d = 0; d < voices; ++d)
+      if (lateCount[d] < 3 || lateCount[d] > maxExamples)
+        return false;
     return true;
   }
 };
@@ -111,7 +125,7 @@ struct Profile {
 class AttackTracker {
 public:
   // candidates is an offline research policy: collect a model-independent
-  // superset of attacks. The Engine only uses automatic or fixedVoice.
+  // superset of attacks. Engine enrollment uses a separate causal policy.
   enum class Policy {
     automatic,
     fixedVoice,
@@ -227,9 +241,13 @@ public:
   // Timestamped trigger also makes MIDI/pad input follow the same capture path.
   void hit(Drum drum, float velocity, double onsetBeat,
            bool sound = true) noexcept;
-  struct MidiHit { int note = 0; float velocity = 0.f; };
+  struct MidiHit {
+    int note = 0;
+    float velocity = 0.f;
+  };
   bool popMidi(MidiHit &hit) noexcept;
-  void hitVoice(int voice, float velocity, double onsetBeat, bool sound = true) noexcept;
+  void hitVoice(int voice, float velocity, double onsetBeat,
+                bool sound = true) noexcept;
   const Loop &loop() const noexcept { return active_; }
   const Loop &capture() const noexcept { return take_; }
   State state() const noexcept { return state_; }
@@ -263,7 +281,12 @@ private:
   Detector detector_{};
   Kit kit_{};
   SliceExtractor slices_{};
-  struct Pending { Detection hit{}; int voice = -1; std::int64_t start = 0, end = 0; bool active = false; } pending_{};
+  struct Pending {
+    Detection hit{};
+    int voice = -1;
+    std::int64_t start = 0, end = 0;
+    bool active = false;
+  } pending_{};
   std::array<MidiHit, 1024> midi_{};
   int midiRead_ = 0, midiWrite_ = 0;
   Loop active_{}, take_{};

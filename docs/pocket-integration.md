@@ -20,41 +20,105 @@ If Pocket changes `pocket::model::scale`, the 17 features, or the profile
 layout, `mouthflow/pocket.py` and `tests/test_pocket.py` must change in the
 same PR — the Python replica is pinned to them.
 
-## Interfaces
+## Current interfaces — Pocket 06, feature version 3, state v5
 
-**1. Detection stream** — `native/pocket/build/pocket_analyze <sr> [gate] [policy]`
-reads mono float32 PCM on stdin and prints one CSV row per detection:
-`beat, drum, velocity, time_s, f1..f17`. `drum` 0/1/2 = kick/snare/hat,
-3 = rejected. Python: `mouthflow.pocket.analyze` / `accepted`.
+The original v4 **156-double payload remains accepted unchanged**, and the
+filename on Max's search path remains `uhntiss_pocket_profile.json`.
 
-**2. Neighbour metric** — `pocket::model::scale` (17 doubles in
-`attack_model.hpp`, the *first* array; `recovery` and `highrate` have their
-own). `Profile::classify` = 3 nearest examples by Σ((a−b)/scale)², weight
-1/(1+d), argmax. Python replica: `mouthflow.pocket.vote` (ties follow the
-C++ insertion order; `tests/test_pocket.py` pins it).
+1. `pocket_analyze <sr> [gate] [policy]` consumes mono float32. Its first four
+   columns are **onset seconds**, factory label, velocity, **decision seconds**,
+   followed by the original 17 features. `slices` and `enrollment` append 120
+   features, three observed sample lengths, and the observed window end: 145
+   columns. The end is not a dispatch timestamp. `enrollment` uses the same
+   candidate policy and next-onset truncation as the v5 engine.
+2. V4/quick Teach retains weighted 3-NN over `pocket::model::scale`. V5 keeps
+   that live metric across 2–16 named voices, each with up to 30 examples.
+   A separate five-neighbour personal noise vote requires four negatives.
+   Rich noise rejection uses only 0–10 ms live; commit uses completed causal
+   slices up to 80 ms. Commit classification is uniform 5-NN, scaled/centered
+   on enrollment and quantized to signed Q4. Python and C++ replicas are tested.
+3. V5 profile header: `[5, 3, N, earlyRejects, sampleRate, richRejects]`, then
+   120 scales and 120 centers. Each voice occupies 1,440 doubles: note;
+   24 ASCII name bytes; early count, late count, radius, two reserved zeros;
+   30×17 early doubles; 30×120 signed bytes packed four per uint32-valued double.
+   Early negatives follow (`earlyRejects×17`), then rich negatives
+   (`richRejects×31`: complete-slice mask 1/3/7 plus 30 packed words).
+   Current export keeps full-window negatives (mask 7). Counts are at most 30.
+   Maximum payload: 24,726 doubles. State adds `[5, anchor, eventCount]` and
+   five values per event `(beat, velocity, built-in drum, voice index, MIDI note)`;
+   maximum state: 27,289 doubles. Invalid imports fail transactionally.
+4. `profile <numbers>` accepts v4 or v5; `profile_loaded` comes only after the
+   audio thread applies it. PROFILE's `msg_int` is public (the earlier `.local`
+   flag made the button inert). JSON writing is atomic; JS errors are visible.
+   Exported named sounds retain their MIDI mappings; `noise` and `--reject-clip`
+   train rejection, never a playable voice. Quick Teach does not train 80 ms
+   features. Re-export after using it to restore the delayed model.
+5. Audio-effect MIDI is routed with `live.routing` and `midiout` to a selected
+   track. External notes use a vector-boundary high-priority clock, not the UI
+   poll. Internal synthesis and stored timestamps remain sample-exact.
+   Routing reference: [Cycling ’74 live.routing](https://docs.cycling74.com/legacy/max8/refpages/live.routing).
 
-**3. Profile payload** — the v4 state's profile block alone:
-`3 × (count, 3 × 17 features)` = **156 doubles** (`pocket::profileValues`).
-- Native: `decodeProfile(values, count, profile)` in `state.hpp` (same
-  validation as `decodeState`'s v4 branch; loop untouched).
-- Max: the external accepts **`profile <156 numbers>`** (`A_GIMME`); it
-  queues `Action::profile → engine.setProfile` and updates `savedProfile`, so
-  the pattr `loop_state` persists it with the Set exactly like a taught one.
-- File: `~/.mouthflow/pocket_profile.json` (canonical) **and** a copy named
-  `uhntiss_pocket_profile.json` in every `~/Documents/Max */Library/` — Max
-  resolves a bare filename through its search path, so the device needs no
-  home-directory logic. Shape: `{"version": 4, "values": [156], "sample_rate",
-  "pick", "source": {...}}`.
-- Device: the **PROFILE** button (top row, left of INPUT VOICE) →
-  `js pocket-profile.js` reads the file and sends `profile …` to the engine.
-  *Not yet clicked in a real Live session — the external compiles and the
-  patch generates; first click is on the test plan.*
+## Current measurements (2026-10-25)
 
-**4. Enrollment → profile** — `uv run mouthflow enroll export-pocket [--sr 48000]`
-runs Pocket's own detector over every enrolled clip (one class per clip,
-see `mouthflow/enroll.py`), labels detections by the clip, and keeps the
-**3 medoids per voice** in Pocket's metric. Open-hat clips count as hats
-(Pocket maps open to closed).
+**Timestamp correction:** earlier evaluations matched/extracted at CSV column 3,
+which is the decision time, approximately 10 ms after the detected onset.
+Both AVP evaluators now use column 0. Historical tables below are retained as
+research history, not the shipping result. The corrected untruncated window
+study at 48 kHz is 73.0 → 78.8%; it is not a measurement of this bounded runtime.
+
+| `eval.avp_pocket` protocol | 44.1 kHz | 48 kHz |
+|---|---:|---:|
+| factory:rep | 52.6 | 52.1 |
+| factory:improv | 37.8 | 37.5 |
+| factory:all | 47.6 | 47.2 |
+| teach3-first | 71.7 | 71.8 |
+| teach3-medoid | 70.8 | 70.6 |
+| profile30, original metric | 72.6 | 73.1 |
+| all123-knn, same onsets | 83.1 | 83.7 |
+| v5, 3 voices, live10 | 70.0 | 70.5 |
+| v5, 3 voices, loop80 | 74.5 | 75.2 |
+| v5, 4 voices, live10 (core K/S/H) | 69.8 | 70.2 |
+| v5, 4 voices, loop80 (core K/S/H) | 75.2 | 74.2 |
+
+The v5 protocol trains on **whole one-class repetition clips**, including
+unmatched detections, and tests only the same performer's improvisations.
+Matched rejections count as wrong. Scales, radii, medoids and quantization never
+use test audio. The older Teach rows filter training hits through annotation
+matches, so compare live10 against loop80 within the v5 protocol.
+
+At 48 kHz, 1,398/1,433 annotations match candidates; accepting/rematching the
+three-voice live decisions retains 1,336, with 289 extra accepted candidates.
+At 44.1 kHz those counts are 1,394, 1,315 and 239. Window truncations are 419/1,715
+and 120/1,663 candidates respectively. Rematching accepted candidates can choose
+a neighbouring onset, so rejected counts on the original match are a separate
+measure. All 3,378 improvisation candidate predictions per vocabulary agree
+between native and Python. See `native/pocket/enrollment-avp-*.json` for denominators.
+The fourth class is not free at 48 kHz; no universal zero-cost claim is justified.
+
+Personal noise audit (four isolated calibration classes; one hum trains, the
+other tests; no held-out drum enrollment):
+
+| negative enrollment → test | live false/min, before → after | loop false/min after |
+|---|---:|---:|
+| b01 → b02 | 34.3 → 5.7 | 0.0 |
+| b02 → b01 | 112.8 → 99.8 | 95.4 |
+
+Neither fold adds a missed annotated drum hit on the two audited fixtures:
+51 matched hits retained out of 62 annotations, for both live and loop decisions.
+That is a small, signal-assisted audit, not independent human ground truth.
+Humming does not validate speech or breath. Partial negative fragments were
+excluded from the rich bank after a development probe suppressed real kicks;
+these clips therefore are development holdouts, not an untouched final test.
+The permanently reserved uptempo take and mislabeled CAL 48k 0003 are excluded
+from all profile fitting. Stage qualification still requires fresh one-class
+calibration and independent breath/speech/expert-roll takes.
+
+The maximum-bank benchmark (16×30 positives +30 negatives, 512-event playback,
+concurrent recording, 64-sample blocks) measured worst blocks of 0.48/0.34 ms at
+48/96 kHz on this Mac (budgets 1.33/0.67 ms) after model prefaulting in DSP setup. It is a local CPU
+measurement, not a round-trip latency or host dropout guarantee.
+
+## Historical research and original asks
 
 ## What the numbers say (AVP, 25 performers, `eval/avp_pocket.py`, 2026-10-24)
 

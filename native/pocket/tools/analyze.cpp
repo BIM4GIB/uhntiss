@@ -20,15 +20,20 @@ int main(int argc, char **argv) {
   bool active = false;
   const auto emit = [&]() {
     const auto features = extractor.extract(start, end);
-    std::cout << pending.beat << "," << int(pending.drum) << "," << pending.velocity << "," << decision;
-    for (auto f : pending.features) std::cout << "," << f;
-    for (auto f : features.values) std::cout << "," << f;
-    for (auto n : features.samples) std::cout << "," << n;
+    std::cout << pending.beat << "," << int(pending.drum) << ","
+              << pending.velocity << "," << decision;
+    for (auto f : pending.features)
+      std::cout << "," << f;
+    for (auto f : features.values)
+      std::cout << "," << f;
+    for (auto n : features.samples)
+      std::cout << "," << n;
     std::cout << "," << double(end) / sr << "\n";
     active = false;
   };
   pocket::Detector d;
-  const auto policy = mode == "enrollment" ? pocket::Detector::Policy::enrolled : argc > 3 && std::string(argv[3]) == "transient"
+  const auto policy = mode == "enrollment" ? pocket::Detector::Policy::enrolled
+                      : argc > 3 && std::string(argv[3]) == "transient"
                           ? pocket::Detector::Policy::transientCandidates
                       : argc > 3 && std::string(argv[3]) == "candidates"
                           ? pocket::Detector::Policy::candidates
@@ -44,10 +49,15 @@ int main(int argc, char **argv) {
 
     if (complete && slices) {
       if (mode == "enrollment" || hit.drum != pocket::Drum::noise) {
-        if (active) { end = std::min(end, std::int64_t(i) + 1 - int(std::round(.010 * sr))); emit(); }
-        pending = hit; decision = double(i) / sr;
+        if (active) {
+          end = std::min(end, std::int64_t(i) + 1 - int(std::round(.010 * sr)));
+          emit();
+        }
+        pending = hit;
+        decision = double(i) / sr;
         start = std::int64_t(i) + 1 - int(std::round(.010 * sr));
-        end = start + int(std::round(.080 * sr)); active = true;
+        end = start + int(std::round(.080 * sr));
+        active = true;
       }
     } else if (complete) {
       std::cout << hit.beat << "," << int(hit.drum) << "," << hit.velocity
@@ -62,10 +72,14 @@ int main(int argc, char **argv) {
     if (active && extractor.position() >= end) {
       const int age = d.pendingAge();
       const auto boundary = extractor.position() - age;
-      if (age && boundary > start) end = std::min(end, boundary);
+      if (age && boundary > start)
+        end = std::min(end, boundary);
       emit();
     }
     ++i;
   }
-  if (active) { end = std::min(end, extractor.position()); emit(); }
+  if (active) {
+    end = std::min(end, extractor.position());
+    emit();
+  }
 }

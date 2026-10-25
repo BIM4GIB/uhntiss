@@ -1,3 +1,28 @@
+# Pocket 06 validation
+
+Current enrollment results and limitations are in
+[the shared contract](../../docs/pocket-integration.md#current-measurements-2026-10-25).
+Reports: `enrollment-avp-48000.json`, `enrollment-avp-44100.json`,
+`enrollment-negatives.json`, `enrollment-benchmark.json`.
+
+Native tests cover v2/v3/v4 migration, maximum v5 state, malformed imports,
+named MIDI voices, exact 10 ms audible / 80 ms stored deadlines, 50 ms rolls,
+seam tails, clear/undo/restore/rate changes, no late retrigger and zero audio-path
+allocations. ASan/UBSan pass. Python verifies native spectral parity and
+quantized classifier/rejection parity. JS checks the actual PROFILE int handler.
+
+Host status: the universal Pocket 06 QA device loaded on a separate test track
+and the local Live bridge remains responsive. The UI-control interface timed out
+before PROFILE could be clicked. PROFILE installation, host pattr persistence
+and routed custom-note delivery are therefore **not yet verified in Live**.
+`qa/build-profile-smoke.mjs` builds a harness that waits for the button click;
+it is excluded from the playable candidate bundle. Keep this change in draft
+until that host test passes. The candidate does not replace the existing device.
+
+Factory model hashes and reserved sources are unchanged from Pocket 05. The
+following historical validation remains relevant to the fallback factory path;
+it is not evidence of cross-performer or open-mic stage reliability.
+
 # Pocket 05 · quiet transient recovery — 2026-10-21
 
 This release recovers some quiet kicks, snares and hats at 48 kHz. **The hard
