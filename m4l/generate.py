@@ -286,6 +286,11 @@ def _inject_controls(maxpat: dict, pitched: bool = True) -> None:
         msg("obj-284", "enroll_custom", [720, 660, 110, 20], [658, 120, 56, 22])
         wire("obj-284", _NODE_INLET)
         comment("obj-285", "your sound · note", [860, 660, 120, 18], [546, 144, 120, 14])
+        # ignore my voice: the second column has free rows below record start/stop
+        # on the drums panel (the pitched fields live there on the other panels).
+        msg("obj-286", "enroll_noise", [720, 690, 110, 20], [330, 96, 100, 22])
+        wire("obj-286", _NODE_INLET)
+        comment("obj-287", "ignore my voice (sing/talk/breathe clip)", [860, 690, 220, 18], [436, 99, 200, 16])
 
     boxes.extend(add_b)
     lines.extend(add_l)

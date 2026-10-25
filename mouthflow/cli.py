@@ -880,7 +880,9 @@ enroll_app = typer.Typer(
 app.add_typer(enroll_app, name="enroll")
 
 _CLASS_ARG = typer.Argument(
-    ..., help="kick | snare | hat | hat_open, or YOUR sound's name (new names need --note N or --note auto)"
+    ...,
+    help="kick | snare | hat | hat_open | noise (= your voice: sing/talk/breathe, never a drum), "
+    "or YOUR sound's name (new names need --note N or --note auto)",
 )
 _NOTE_OPT = typer.Option(
     None, "--note", help="MIDI note for a NEW sound (e.g. 37), or 'auto' for the next free GM percussion note."
@@ -891,6 +893,11 @@ def _enroll_report_clip(entry: dict) -> None:
     from mouthflow import enroll
 
     cls, hits = entry["class"], entry["hits"]
+    if cls == enroll.NOISE:
+        _log(f"enrolled noise (ignore): {hits} voice/breath onsets from {entry['duration_s']}s — these will never trigger drums")
+        for line in enroll.format_status(enroll.status()):
+            _log(line)
+        return
     note = ""
     if hits < enroll.MIN_HITS:
         note = f" — thin; add another {cls} clip (aim for {enroll.TARGET_HITS})"
@@ -974,7 +981,10 @@ def enroll_record(
         raise typer.Exit(code=2)
     if countin > 0:
         _count_in(countin)
-    _log(f"recording {cls} for {duration}s — only {cls} hits, keep your mic distance")
+    if cls == enroll.NOISE:
+        _log(f"recording your VOICE for {duration}s — sing, talk, breathe; NO drum sounds")
+    else:
+        _log(f"recording {cls} for {duration}s — only {cls} hits, keep your mic distance")
     wav = capture.record(duration, input_device=input)  # lands in the take vault too
     _enroll_add(cls, wav, source="mic")
 
@@ -991,6 +1001,8 @@ def enroll_train() -> None:
         raise typer.Exit(code=2)
     hp = ", ".join(f"{c} {n}" for c, n in rep["hits_per_class"].items())
     _log(f"trained on {rep['n']} hits ({hp})")
+    if not rep.get("noise_hits"):
+        _log("tip: `enroll record noise --duration 20` (sing, talk, breathe) teaches it to ignore your voice")
     for c in rep["folded"]:
         _log(f"{c}: fewer than {enroll.MIN_HITS} hits — folded into hat for now; add a clip to split it out")
     if rep["thin"]:

@@ -124,3 +124,23 @@ def test_shipped_model_files_are_consistent():
             assert np.asarray(m["W1"]).shape == (len(m["mean"]), m["hidden"])
             assert set(m["classes"]) == set(m["pitches"])
             assert m["source"]["license"] == "CC BY 4.0"
+
+
+def test_noise_needs_a_supermajority(monkeypatch):
+    """3 of 5 nearest say noise, 2 say kick -> kick (noise_min_votes 4); 4 of 5 -> DROP."""
+    d = len(F.FEATURES)
+    y = _click()
+    base = np.array(F.drum_features(y, SR, 0.0))
+
+    def model(n_noise_near):
+        ex = [base.tolist()] * 5  # five equidistant exemplars; label mix decides
+        labels = ["noise"] * n_noise_near + ["kick"] * (5 - n_noise_near)
+        return {"type": "knn", "k": 5, "feature_set": "drum10", "mean": [0.0] * d, "std": [1.0] * d,
+                "classes": {"kick": GM_KICK, "noise": drum_classify.DROP}, "exemplars": ex,
+                "labels": labels, "rms_floor": 0.005, "noise_min_votes": 4}
+
+    f = signal.features_at(y, SR, 0.0)
+    monkeypatch.setattr(drum_classify, "_MODEL", model(3))
+    assert _classify(y, SR, 0.0, f) == GM_KICK
+    monkeypatch.setattr(drum_classify, "_MODEL", model(4))
+    assert _classify(y, SR, 0.0, f) == drum_classify.DROP
