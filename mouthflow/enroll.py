@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import tempfile
 from collections import Counter
@@ -42,14 +43,22 @@ import numpy as np
 from mouthflow import signal
 from mouthflow.devices.drum import classify as drum_classify
 
-# class -> GM pitch. kick/snare/hat are required; hat_open is optional.
-CLASSES: dict[str, int] = {
+# Built-in sounds -> GM pitch. Any OTHER name is a user sound: a performer's
+# vocabulary is not three drums (the bar is a virtuoso with twenty), so
+# `add_clip("rimshot", …, note=37)` registers a new class in the manifest and
+# the k-NN emits that note. `classes()` is the live table.
+BUILTIN_CLASSES: dict[str, int] = {
     "kick": drum_classify.GM_KICK,
     "snare": drum_classify.GM_SNARE,
     "hat": drum_classify.GM_HAT_CLOSED,
     "hat_open": drum_classify.GM_HAT_OPEN,
 }
-REQUIRED = ("kick", "snare", "hat")
+CORE = ("kick", "snare", "hat")  # what a stock kit + the planner expect; advisory, not required
+MIN_CLASSES = 2  # a model needs something to tell apart
+# Free GM percussion notes handed out when a new sound is added without --note
+# (a Drum Rack pad exists for each; the performer can remap with `enroll map`).
+AUTO_NOTES = (37, 39, 41, 43, 45, 47, 48, 49, 50, 51, 53, 54, 56, 57, 59, 60, 61, 62, 63, 64)
+_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,23}$")
 _ALIASES = {
     "k": "kick", "kd": "kick", "bd": "kick", "bass": "kick",
     "s": "snare", "sd": "snare", "sn": "snare",
@@ -73,12 +82,67 @@ class EnrollError(RuntimeError):
     """A user-facing enrollment problem (missing class, no hits, …)."""
 
 
-def normalise_class(name: str) -> str:
-    key = name.strip().lower().replace(" ", "_")
-    key = _ALIASES.get(key, key)
-    if key not in CLASSES:
-        raise ValueError(f"unknown drum class {name!r}; use one of {', '.join(CLASSES)}")
+def _canonical(name: str) -> str:
+    key = name.strip().lower().replace(" ", "_").replace("-", "_")
+    return _ALIASES.get(key, key)
+
+
+def classes() -> dict[str, int]:
+    """Live class table: built-ins (possibly remapped) + the manifest's user sounds."""
+    table = dict(BUILTIN_CLASSES)
+    for name, spec in _load_manifest().get("classes", {}).items():
+        try:
+            table[name] = int(spec["note"] if isinstance(spec, dict) else spec)
+        except (KeyError, TypeError, ValueError):
+            continue
+    return table
+
+
+def normalise_class(name: str, note: int | str | None = None) -> str:
+    """Resolve a class name; register a NEW user sound when ``note`` is given.
+
+    ``note`` may be a MIDI number or ``"auto"`` (next free GM percussion note).
+    Unknown names without a note raise, so a typo can't silently create a class.
+    """
+    key = _canonical(name)
+    table = classes()
+    if key in table:
+        return key
+    if note is None:
+        known = ", ".join(sorted(table))
+        raise ValueError(
+            f"unknown sound {name!r}; known: {known}. To add it as a new sound pass a MIDI note "
+            f"(e.g. --note 37) or --note auto"
+        )
+    if not _NAME_RE.match(key):
+        raise ValueError(f"sound name {name!r} must be letters/digits/underscore, start with a letter, max 24 chars")
+    set_class_note(key, note)
     return key
+
+
+def set_class_note(name: str, note: int | str) -> int:
+    """Map a sound to a MIDI note (new user sound, or remap any class). Returns the note."""
+    key = _canonical(name)
+    table = classes()
+    if isinstance(note, str) and note.strip().lower() == "auto":
+        used = set(table.values())
+        free = [n for n in AUTO_NOTES if n not in used]
+        if not free:
+            raise ValueError("no free auto notes left; pass an explicit --note")
+        midi = free[0]
+    else:
+        try:
+            midi = int(note)
+        except (TypeError, ValueError):
+            raise ValueError(f"note must be a MIDI number 0-127 or 'auto', got {note!r}")
+        if not 0 <= midi <= 127:
+            raise ValueError(f"note must be 0-127, got {midi}")
+    if key not in table and not _NAME_RE.match(key):
+        raise ValueError(f"sound name {name!r} must be letters/digits/underscore, start with a letter, max 24 chars")
+    m = _load_manifest()
+    m.setdefault("classes", {})[key] = {"note": midi}
+    _save_manifest(m)
+    return midi
 
 
 # --- manifest ---------------------------------------------------------------------
@@ -91,10 +155,11 @@ def _load_manifest() -> dict:
     try:
         m = json.loads(_manifest_path().read_text())
         if isinstance(m, dict) and isinstance(m.get("clips"), list):
+            m.setdefault("classes", {})
             return m
     except (OSError, ValueError):
         pass
-    return {"clips": []}
+    return {"clips": [], "classes": {}}
 
 
 def _save_manifest(m: dict) -> None:
@@ -137,11 +202,15 @@ def _load_audio(path: Path) -> np.ndarray:
 
 # --- public API -------------------------------------------------------------------
 
-def add_clip(cls: str, src: Path, source: str = "file") -> dict:
-    """Ingest one one-class clip: detect hits, copy into the enroll dir, record it."""
+def add_clip(cls: str, src: Path, source: str = "file", note: int | str | None = None) -> dict:
+    """Ingest one one-class clip: detect hits, copy into the enroll dir, record it.
+
+    ``note`` registers ``cls`` as a new user sound (MIDI number or "auto") when
+    it isn't known yet; known names ignore it (use ``set_class_note`` to remap).
+    """
     import soundfile as sf
 
-    cls = normalise_class(cls)
+    cls = normalise_class(cls, note)
     src = Path(src)
     if not src.exists():
         raise EnrollError(f"audio file not found: {src}")
@@ -159,6 +228,7 @@ def add_clip(cls: str, src: Path, source: str = "file") -> dict:
     sf.write(dest, y, SR, subtype="PCM_16")
     entry = {
         "class": cls,
+        "note": classes()[cls],
         "path": str(dest),
         "source": str(src),
         "kind": source,
@@ -173,22 +243,25 @@ def add_clip(cls: str, src: Path, source: str = "file") -> dict:
 
 
 def status() -> dict:
-    """Hits per class, clip counts, readiness, and the installed user model (if any)."""
+    """Hits per class (with notes), readiness, and the installed user model (if any)."""
     m = _load_manifest()
-    per: dict[str, dict] = {c: {"clips": 0, "hits": 0} for c in CLASSES}
+    table = classes()
+    per: dict[str, dict] = {c: {"clips": 0, "hits": 0, "note": n, "builtin": c in BUILTIN_CLASSES} for c, n in table.items()}
     for e in m["clips"]:
         c = e.get("class")
         if c in per and Path(e.get("path", "")).exists():
             per[c]["clips"] += 1
             per[c]["hits"] += int(e.get("hits", 0))
-    missing = [c for c in REQUIRED if per[c]["hits"] == 0]
-    thin = [c for c in CLASSES if 0 < per[c]["hits"] < MIN_HITS]
+    recorded = [c for c, v in per.items() if v["hits"] > 0]
+    core_missing = [c for c in CORE if per[c]["hits"] == 0]
+    thin = [c for c in per if 0 < per[c]["hits"] < MIN_HITS]
     model = drum_classify._load_json(drum_classify._USER_MODEL_PATH)
     return {
         "classes": per,
-        "missing": missing,
+        "recorded": recorded,
+        "missing": core_missing,  # advisory: what a stock kit / the planner expect
         "thin": thin,
-        "ready": not missing,
+        "ready": len(recorded) >= MIN_CLASSES,
         "model": (model or {}).get("source") if model else None,
         "model_path": str(drum_classify._USER_MODEL_PATH),
     }
@@ -197,29 +270,34 @@ def status() -> dict:
 def format_status(st: dict) -> list[str]:
     lines = []
     for c, v in st["classes"].items():
+        if v["hits"] == 0 and not v["builtin"]:
+            continue  # a mapped-but-unrecorded user sound
         tag = "" if v["hits"] >= TARGET_HITS else (f" (aim for {TARGET_HITS})" if v["hits"] else "")
-        opt = " [optional]" if c not in REQUIRED else ""
-        lines.append(f"{c:9s} {v['hits']:3d} hits in {v['clips']} clip(s){tag}{opt}")
-    if st["missing"]:
-        lines.append(f"missing: {', '.join(st['missing'])} — record them, then `enroll train`")
-    elif st["model"]:
+        kind = "" if v["builtin"] else " [your sound]"
+        lines.append(f"{c:12s} note {v['note']:3d}  {v['hits']:3d} hits in {v['clips']} clip(s){tag}{kind}")
+    if not st["ready"]:
+        lines.append(f"record at least {MIN_CLASSES} sounds (one clip each), then `enroll train`")
+    elif st["missing"]:
+        lines.append(f"note: no {', '.join(st['missing'])} yet — a stock kit expects them; your own sounds still train")
+    if st["ready"] and st["model"]:
         acc = st["model"].get("cv_accuracy")
         lines.append(
             f"user model installed ({st['model'].get('enrolled_at', '?')}"
             + (f", cv {acc * 100:.0f} %" if acc is not None else "")
             + ")"
         )
-    else:
-        lines.append("all required classes recorded — run `enroll train`")
+    elif st["ready"]:
+        lines.append("ready — run `enroll train`")
     return lines
 
 
 def _rows() -> list[tuple[np.ndarray, float, str]]:
     m = _load_manifest()
     rows: list[tuple[np.ndarray, float, str]] = []
+    table = classes()
     for e in m["clips"]:
         p = Path(e.get("path", ""))
-        if not p.exists() or e.get("class") not in CLASSES:
+        if not p.exists() or e.get("class") not in table:
             continue
         y = _load_audio(p)
         rows.extend((y, t, e["class"]) for t in _hits(y, SR))
@@ -268,20 +346,22 @@ def train(k: int = K, folds: int = 5, seed: int = 0) -> dict:
 
     rows = _rows()
     have = Counter(lab for _, _, lab in rows)
-    missing = [c for c in REQUIRED if not have.get(c)]
-    if missing:
+    if len(have) < MIN_CLASSES:
+        got = ", ".join(sorted(have)) or "nothing"
         raise EnrollError(
-            f"missing {', '.join(missing)} — record one clip per class first (`enroll status`)"
+            f"need at least {MIN_CLASSES} sounds with hits to train (have: {got}) — "
+            f"record one clip per sound first (`enroll status`)"
         )
-    # A thin OPTIONAL class hurts more than it helps: 6 open-hat exemplars
+    # A thin open-hat class hurts more than it helps: 6 open-hat exemplars
     # against 19 closed ones turned a real groove's hats mostly "open". Fold
     # it into closed hat (AVP merges them anyway) until there are enough.
+    # User sounds have nowhere to fold; they stay and are reported as thin.
     folded: list[str] = []
-    for opt in [c for c in CLASSES if c not in REQUIRED]:
-        if 0 < have.get(opt, 0) < MIN_HITS:
-            rows = [(y, t, "hat" if lab == opt else lab) for y, t, lab in rows]
-            folded.append(opt)
+    if 0 < have.get("hat_open", 0) < MIN_HITS and have.get("hat", 0):
+        rows = [(y, t, "hat" if lab == "hat_open" else lab) for y, t, lab in rows]
+        folded.append("hat_open")
     have = Counter(lab for _, _, lab in rows)
+    table = classes()
     names, fn = FEATURE_SETS[FEATURE_SET]
     X = np.array([fn(y, SR, t) for y, t, _ in rows], dtype=float)
     X[~np.isfinite(X)] = 0.0
@@ -299,7 +379,7 @@ def train(k: int = K, folds: int = 5, seed: int = 0) -> dict:
         "features": names,
         "mean": np.round(mean, 6).tolist(),
         "std": np.round(std, 6).tolist(),
-        "classes": {c: CLASSES[c] for c in sorted(have)},
+        "classes": {c: table[c] for c in sorted(have)},
         "exemplars": np.round(Z, 5).tolist(),
         "labels": labels,
         "rms_floor": RMS_FLOOR,
@@ -358,12 +438,17 @@ def export_pocket(binary: Path | str | None = None, sr: int = 48000, gate: float
     by_drum: dict[int, list[np.ndarray]] = {0: [], 1: [], 2: []}
     detected: dict[str, int] = {}
     used_clips: list[dict] = []
+    pocket_drum = {"kick": 0, "snare": 1, "hat": 2, "hat_open": 2}
+    skipped: dict[str, int] = {}  # Pocket's Profile holds exactly three voices
     for e in m["clips"]:
         path = Path(e.get("path", ""))
         cls = e.get("class")
-        if not path.exists() or cls not in CLASSES:
+        if not path.exists() or cls not in classes():
             continue
-        drum = {"kick": 0, "snare": 1, "hat": 2, "hat_open": 2}[cls]
+        if cls not in pocket_drum:
+            skipped[cls] = skipped.get(cls, 0) + int(e.get("hits", 0))
+            continue
+        drum = pocket_drum[cls]
         y = _load_audio(path)
         if sr != SR:
             y = librosa.resample(y, orig_sr=SR, target_sr=sr).astype(np.float32)
@@ -382,5 +467,5 @@ def export_pocket(binary: Path | str | None = None, sr: int = 48000, gate: float
                        "exported_at": datetime.now().isoformat(timespec="seconds")},
         },
     )
-    return {"written": doc["written"], "detected": detected,
+    return {"written": doc["written"], "detected": detected, "skipped": skipped,
             "hits_per_drum": {CLASSES_BY_DRUM[d]: int(len(v)) for d, v in by_drum.items()}}

@@ -38,6 +38,9 @@
  *   enroll_kick / enroll_snare / enroll_hat / enroll_open
  *                          enroll the SELECTED audio clip as that drum class
  *                          (one class per clip; ~12 s / ~30 hits each)
+ *   enroll_class <name>    name of YOUR sound for enroll_custom (e.g. rimshot)
+ *   enroll_note <n|auto>   MIDI note for a new sound (default auto)
+ *   enroll_custom          enroll the SELECTED clip as that named sound
  *   enroll_train           build the per-user drum model from the enrolled clips
  *   enroll_status          what's enrolled so far
  *   record_start           begin an open-ended mic recording
@@ -79,6 +82,8 @@ const state = {
   key: "", // force key for correction (e.g. "C", "F#"); "" = auto-detect
   scale: "", // force scale (major|minor|...); "" = auto
   plan: "starter_lead", // dataset recording plan; per-voice panels bake theirs
+  enrollClass: "", // name of the performer's own sound for enroll_custom
+  enrollNote: "auto", // MIDI note for a new sound ("auto" = next free GM percussion note)
 };
 
 // The pitched note-correction + bar-fit flags shared by every pipeline call.
@@ -380,6 +385,19 @@ function enrollClip(cls) {
   runCmd(["run", "mouthflow", "enroll", "clip", cls]);
 }
 
+// Your own sound: name + MIDI note from the panel fields. The CLI registers a
+// new class on first use and the k-NN emits that note from then on.
+function enrollCustom() {
+  const name = (state.enrollClass || "").trim().toLowerCase().replace(/[^a-z0-9_]/g, "_");
+  if (!name) {
+    status("type a name for your sound first (e.g. rimshot)");
+    return;
+  }
+  const note = (state.enrollNote || "auto").toString().trim() || "auto";
+  status(`enrolling selected clip as ${name} (note ${note})…`);
+  runCmd(["run", "mouthflow", "enroll", "clip", name, "--note", note]);
+}
+
 function listInputs() {
   runCli(["input-devices"], {
     onLine: () => {},
@@ -478,6 +496,9 @@ Max.addHandler("enroll_kick", () => enrollClip("kick"));
 Max.addHandler("enroll_snare", () => enrollClip("snare"));
 Max.addHandler("enroll_hat", () => enrollClip("hat"));
 Max.addHandler("enroll_open", () => enrollClip("hat_open"));
+Max.addHandler("enroll_class", (...a) => (state.enrollClass = a.join(" ").trim()));
+Max.addHandler("enroll_note", (...a) => (state.enrollNote = a.join(" ").trim() || "auto"));
+Max.addHandler("enroll_custom", enrollCustom);
 Max.addHandler("enroll_train", () => runCmd(["run", "mouthflow", "enroll", "train"]));
 Max.addHandler("enroll_status", () => runCmd(["run", "mouthflow", "enroll", "status"]));
 // start/stop recording (performer-controlled length)
@@ -499,4 +520,4 @@ Max.addHandler("cancel", () => {
   }
 });
 
-status("mouthflow lead ready · 48a03a6");
+status("mouthflow lead ready · 5cdd93b");

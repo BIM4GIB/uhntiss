@@ -139,7 +139,8 @@ The prebuilt panel wires Generate / duration / count-in / hint / **kit dropdown
 `transcribe_clip` · `generate` · `bars <auto|off|1|2|4|8|16>` · `correct <0|1>` ·
 `key <C|F#|…>` · `scale <major|minor|…>` · `record_start` · `record_stop` ·
 `record <0|1>` · `cancel` · `enroll_kick` · `enroll_snare` · `enroll_hat` ·
-`enroll_open` · `enroll_train` · `enroll_status`
+`enroll_open` · `enroll_class <name>` · `enroll_note <n|auto>` · `enroll_custom` ·
+`enroll_train` · `enroll_status`
 
 ## Outlet reference (script → patch)
 `status <text>` · `level <dBFS>` (live input meter while record-streaming;
@@ -176,6 +177,15 @@ class beats 5 by another 3. The panel's ENROLL column drives
    number (same-clip hits, so a real groove lands a few points lower). From
    then on every drums take classifies with your model. `enroll_status`
    shows what's enrolled; `uv run mouthflow enroll reset --yes` clears it.
+4. **Your own sounds (row 4).** A performer's vocabulary is not three drums.
+   Type a name in the left field (e.g. `rimshot`), optionally a MIDI note in
+   the small field (blank = `auto`, the next free GM percussion pad), select
+   the clip, press `enroll_custom`. The sound becomes a class the model emits
+   on that note, named your way in the planner summary. Remap later with
+   `uv run mouthflow enroll map rimshot 37`. Training needs at least two
+   sounds; kick/snare/hat are what a stock kit expects but are not required.
+   Pocket's Teach profile holds exactly kick/snare/hat, so `export-pocket`
+   reports your extra sounds as not exported.
 
 ## Transcribe a clip (no re-recording)
 The pitched panels ship a **Transcribe Clip** button (auto-injected by

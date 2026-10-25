@@ -20,7 +20,7 @@ _FALLBACK_INSTRUMENTS = (
     "query:Drums#Kit-Core%20Kit",
 )
 
-_GM_NAMES = {36: "kick", 38: "snare", 42: "hat_closed", 46: "hat_open", 39: "perc"}
+from mouthflow.devices.drum.classify import note_names as _note_names
 
 
 def drum_plan_summary(t: Transcription) -> dict:
@@ -29,7 +29,8 @@ def drum_plan_summary(t: Transcription) -> dict:
     The planner adds the common fields (tempo, bars); this contributes the
     drum vocabulary. Mirrors plan._hit_histogram so behaviour is unchanged.
     """
-    hist = Counter(_GM_NAMES.get(h.midi_note, str(h.midi_note)) for h in t.hits)
+    names = _note_names()  # GM defaults + the performer's own sound names
+    hist = Counter(names.get(h.midi_note, str(h.midi_note)) for h in t.hits)
     return {"hit_count": len(t.hits), "hit_histogram": dict(hist)}
 
 

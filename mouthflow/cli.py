@@ -879,7 +879,12 @@ enroll_app = typer.Typer(
 )
 app.add_typer(enroll_app, name="enroll")
 
-_CLASS_ARG = typer.Argument(..., help="kick | snare | hat | hat_open (open hat is optional)")
+_CLASS_ARG = typer.Argument(
+    ..., help="kick | snare | hat | hat_open, or YOUR sound's name (new names need --note N or --note auto)"
+)
+_NOTE_OPT = typer.Option(
+    None, "--note", help="MIDI note for a NEW sound (e.g. 37), or 'auto' for the next free GM percussion note."
+)
 
 
 def _enroll_report_clip(entry: dict) -> None:
@@ -891,16 +896,16 @@ def _enroll_report_clip(entry: dict) -> None:
         note = f" — thin; add another {cls} clip (aim for {enroll.TARGET_HITS})"
     elif hits < enroll.TARGET_HITS:
         note = f" (aim for {enroll.TARGET_HITS}; add another clip if you like)"
-    _log(f"enrolled {cls}: {hits} hits from {entry['duration_s']}s{note}")
+    _log(f"enrolled {cls} (note {entry['note']}): {hits} hits from {entry['duration_s']}s{note}")
     for line in enroll.format_status(enroll.status()):
         _log(line)
 
 
-def _enroll_add(cls: str, path: Path, source: str) -> None:
+def _enroll_add(cls: str, path: Path, source: str, note: str | None = None) -> None:
     from mouthflow import enroll
 
     try:
-        entry = enroll.add_clip(cls, path, source=source)
+        entry = enroll.add_clip(cls, path, source=source, note=note)
     except (ValueError, enroll.EnrollError) as exc:
         _log(f"FAIL {exc}")
         raise typer.Exit(code=2)
@@ -910,10 +915,11 @@ def _enroll_add(cls: str, path: Path, source: str) -> None:
 @enroll_app.command("clip")
 def enroll_clip(
     cls: str = _CLASS_ARG,
+    note: str | None = _NOTE_OPT,
     host: str = typer.Option("127.0.0.1"),
     port: int = typer.Option(9877),
 ) -> None:
-    """Enroll the audio clip currently SELECTED in Live as one drum class."""
+    """Enroll the audio clip currently SELECTED in Live as one sound."""
     with _connect_or_fail(host, port) as client:
         try:
             info = client.get_selected_clip()
@@ -924,18 +930,36 @@ def enroll_clip(
         if not (isinstance(info, dict) and info.get("is_audio") and path):
             raise typer.BadParameter("select an AUDIO clip in Live's detail view first")
         _log(f"selected clip: {info.get('name')} -> {path}")
-    _enroll_add(cls, Path(path), source="live-clip")
+    _enroll_add(cls, Path(path), source="live-clip", note=note)
 
 
 @enroll_app.command("file")
-def enroll_file(cls: str = _CLASS_ARG, path: Path = typer.Argument(..., exists=True, dir_okay=False)) -> None:
-    """Enroll an audio file (any rate/channels) as one drum class."""
-    _enroll_add(cls, path, source="file")
+def enroll_file(
+    cls: str = _CLASS_ARG,
+    path: Path = typer.Argument(..., exists=True, dir_okay=False),
+    note: str | None = _NOTE_OPT,
+) -> None:
+    """Enroll an audio file (any rate/channels) as one sound."""
+    _enroll_add(cls, path, source="file", note=note)
+
+
+@enroll_app.command("map")
+def enroll_map(cls: str = _CLASS_ARG, note: str = typer.Argument(..., help="MIDI note 0-127 or 'auto'")) -> None:
+    """Map a sound (new or existing) to the MIDI note the drum clip should emit."""
+    from mouthflow import enroll
+
+    try:
+        midi = enroll.set_class_note(cls, note)
+    except ValueError as exc:
+        _log(f"FAIL {exc}")
+        raise typer.Exit(code=2)
+    _log(f"{enroll._canonical(cls)} -> note {midi}  (retrain with `enroll train` for the model to emit it)")
 
 
 @enroll_app.command("record")
 def enroll_record(
     cls: str = _CLASS_ARG,
+    note: str | None = _NOTE_OPT,
     duration: float = typer.Option(12.0, help="Seconds to record (~30 hits)."),
     input: int | None = typer.Option(None, "--input", help="Input device index (see `input-devices`)."),
     countin: int = typer.Option(2, "--countin", help="Count-in seconds (logged per second)."),
@@ -944,7 +968,7 @@ def enroll_record(
     from mouthflow import enroll
 
     try:
-        cls = enroll.normalise_class(cls)
+        cls = enroll.normalise_class(cls, note)
     except ValueError as exc:
         _log(f"FAIL {exc}")
         raise typer.Exit(code=2)
@@ -994,6 +1018,9 @@ def enroll_export_pocket(
         raise typer.Exit(code=2)
     det = ", ".join(f"{c} {n}" for c, n in rep["detected"].items())
     _log(f"pocket detected {det} at {sr} Hz; kept 3 medoids per voice")
+    if rep.get("skipped"):
+        sk = ", ".join(f"{c} ({n} hits)" for c, n in rep["skipped"].items())
+        _log(f"not exported: {sk} — Pocket's profile holds exactly kick/snare/hat today")
     for w in rep["written"]:
         _log(f"wrote {w}")
     _log("in the Pocket device press PROFILE to load it (it then persists with the Set)")

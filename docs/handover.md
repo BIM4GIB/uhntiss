@@ -1,6 +1,6 @@
 # Mouthflow — session handover
 
-Last updated: 2026-10-24 (branch `feat/pocket-avp-enroll` = PR #19 + main + `feat/enroll` + the Pocket wiring).
+Last updated: 2026-10-25 (branch `feat/enroll-n-class`; everything through PR #26 is on main).
 Read this first when picking up work.
 (Architecture overview for newcomers: [`ARCHITECTURE.md`](ARCHITECTURE.md);
 honest gap list: [`KNOWN-LIMITATIONS.md`](KNOWN-LIMITATIONS.md); audit findings
@@ -13,6 +13,24 @@ PR's description before summarising state. Merged history + main cannot see
 in-flight work; on 2026-10-22 a catch-up reported "last work = PR #18" while
 PR #19 (Pocket 05, the native rebuild, 10 commits, CI green) sat open as a
 draft.
+
+**2026-10-25 — product bar + N-class enrollment (`feat/enroll-n-class`).**
+René: "I want this project to be something Beardyman would use" — a
+virtuoso live-looper with twenty sounds, sung basslines and an open mic.
+That reorders the roadmap: realtime (Pocket) is the stage product, the
+performer's own vocabulary beats three GM drums, breath/speech rejection and
+stage reliability are table stakes, the LLM kit-choice layer is demoted.
+First consequence shipped: **enrollment takes any user-named sound** mapped
+to a MIDI note (`enroll clip rimshot --note 37|auto`, `enroll map`, panel
+row 4 with name + note fields + `enroll_custom`). The class table lives in
+the enrollment manifest; the k-NN emits the note; `classify.note_names()`
+feeds the performer's names into the planner histogram (built-in trio keeps
+GM names so prompts stay stable). Training needs ≥2 sounds; kick/snare/hat
+advisory. `export-pocket` hands over kick/snare/hat only and reports the
+rest — Pocket's 3-voice Profile is the ask in `pocket-integration.md`,
+alongside the roll caveat on the 80 ms delayed decision. 175 tests.
+Verified end to end on real one-shots: a fourth sound on note 56 reaches
+the MIDI clip and shows under its own name in the plan summary.
 
 **2026-10-24 (late) — bass dataset: the harness was measuring the
 performer's octave, not the tracker (`feat/bass-dataset-register`).**

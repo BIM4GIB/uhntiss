@@ -91,7 +91,9 @@ def _tool_schema() -> dict[str, Any]:
 
 
 def _hit_histogram(transcription: Transcription) -> dict[str, int]:
-    names = {36: "kick", 38: "snare", 42: "hat_closed", 46: "hat_open", 39: "perc"}
+    from mouthflow.devices.drum.classify import note_names
+
+    names = note_names()  # GM defaults + the performer's own sound names
     counts = Counter(names.get(h.midi_note, str(h.midi_note)) for h in transcription.hits)
     return dict(counts)
 
