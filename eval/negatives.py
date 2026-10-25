@@ -12,7 +12,9 @@ Negative sources (``collect``):
   hum             onsets in hummed bass takes (datasets/bass/*.hum.wav)
   reference       onsets in the synthesized bass references (sustained tones)
   breath-synth    band-limited noise swells (Pocket's breath-control recipe)
-  speech          LibriSpeech dev-clean if present under datasets/librispeech/
+  speech          LibriSpeech dev-clean under datasets/librispeech/ (CC BY 4.0;
+                  curl -L -o datasets/librispeech/dev-clean.tar.gz
+                  https://www.openslr.org/resources/12/dev-clean.tar.gz && tar -xzf …)
 
 Protocol (``evaluate``): leave-one-performer-out on AVP for the drum classes
 PLUS leave-one-SOURCE-out on the negatives — the gate is scored on a negative
@@ -21,7 +23,13 @@ source it never trained on, so "it learned René's hum" can't pass as
 hits the gate let through), AVP hits lost to the gate, and false triggers per
 minute on the held-out negative source.
 
-Run: ``uv run python -m eval.negatives [--thresholds 0.5 0.7 0.9]``
+Findings (2026-10-25): talking gives 212 false hits/min (Pocket 170/min).
+A global gate rejects speech 230 -> 40/min and hums -> 2.5/min held out,
+but silences 60-70 % of the performer's real fixture hits (``--fixtures``),
+so the product path is the per-user ``noise`` enrollment sound, whose clip
+must include talking as well as singing and breathing.
+
+Run: ``uv run python -m eval.negatives [--thresholds 0.5 0.7 0.9] [--fixtures]``
 """
 
 from __future__ import annotations
@@ -219,11 +227,34 @@ def evaluate(thresholds: list[float], margin: bool = False) -> None:
         print(line, flush=True)
 
 
+def fixture_retention(thresholds: list[float]) -> None:
+    """The global gate's cost on THIS performer: real onsets on the drum oracle's fixture
+    takes that a gate trained on AVP + every negative source would silence.
+    (2026-10-25: ~50 % at any threshold — why the shipped noise class is per-user.)"""
+    import librosa
+
+    neg = collect()
+    rows = avp.load("Personal")
+    Xp = featurize(rows, FEATURE_SET, "gt")
+    yp = np.array([r["label"] for r in rows])
+    m = MLP4().fit(np.vstack([Xp, neg["X"]]), np.concatenate([yp, np.full(len(neg["X"]), "noise")]))
+    print(f"\nglobal gate trained on AVP + all negatives ({', '.join(sorted(set(neg['source'])))}):")
+    for f in sorted(glob.glob(str(REPO / "tests" / "fixtures" / "clips" / "*.wav"))):
+        y, sr = librosa.load(f, sr=signal._SR, mono=True)
+        ons = _onsets(y, sr)
+        X = np.array([extract(FEATURE_SET, y, sr, t) for t in ons])
+        X[~np.isfinite(X)] = 0.0
+        pr = m.proba(X)
+        cells = "  ".join(f"@{thr}: {int(_gate(pr, thr, False).sum()):2d}/{len(ons)} real onsets silenced" for thr in thresholds)
+        print(f"  {Path(f).name:24s} {cells}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--thresholds", type=float, nargs="*", default=[0.5, 0.7, 0.9])
     ap.add_argument("--recollect", action="store_true")
     ap.add_argument("--margin", action="store_true", help="also require no confident drum class")
+    ap.add_argument("--fixtures", action="store_true", help="also report real onsets silenced on this performer's fixture takes")
     args = ap.parse_args()
     if not avp.available():
         print("AVP dataset needed (eval/avp.py)")
@@ -231,6 +262,8 @@ def main() -> int:
     if args.recollect:
         collect(force=True)
     evaluate(args.thresholds, margin=args.margin)
+    if args.fixtures:
+        fixture_retention(args.thresholds)
     return 0
 
 
