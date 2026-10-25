@@ -52,7 +52,15 @@ BUILTIN_CLASSES: dict[str, int] = {
     "snare": drum_classify.GM_SNARE,
     "hat": drum_classify.GM_HAT_CLOSED,
     "hat_open": drum_classify.GM_HAT_OPEN,
+    # "noise" = everything the mic hears that must NOT become a drum: the
+    # performer singing, talking, breathing. Its verdict is DROP. Measured
+    # 2026-10-25: a global noise class dropped half of this performer's real
+    # hits; a per-user one from a single hum take cut false triggers on the
+    # other hum take 76 -> 12/min with zero real hits lost.
+    "noise": drum_classify.DROP,
 }
+NOISE = "noise"
+NOISE_MIN_VOTES = 4  # of K: silencing a real hit costs more than one sung note getting through
 CORE = ("kick", "snare", "hat")  # what a stock kit + the planner expect; advisory, not required
 MIN_CLASSES = 2  # a model needs something to tell apart
 # Free GM percussion notes handed out when a new sound is added without --note
@@ -66,6 +74,8 @@ _ALIASES = {
     "closed": "hat", "closedhat": "hat", "hihat": "hat", "hi-hat": "hat", "hats": "hat",
     "o": "hat_open", "open": "hat_open", "hho": "hat_open", "hat-open": "hat_open",
     "openhat": "hat_open", "open_hat": "hat_open", "oh": "hat_open",
+    "voice": "noise", "sing": "noise", "singing": "noise", "talk": "noise", "speech": "noise",
+    "breath": "noise", "breathing": "noise", "hum": "noise", "ignore": "noise", "not_a_drum": "noise",
 }
 
 ENROLL_DIR = Path.home() / ".mouthflow" / "enroll"
@@ -252,7 +262,7 @@ def status() -> dict:
         if c in per and Path(e.get("path", "")).exists():
             per[c]["clips"] += 1
             per[c]["hits"] += int(e.get("hits", 0))
-    recorded = [c for c, v in per.items() if v["hits"] > 0]
+    recorded = [c for c, v in per.items() if v["hits"] > 0 and c != NOISE]
     core_missing = [c for c in CORE if per[c]["hits"] == 0]
     thin = [c for c in per if 0 < per[c]["hits"] < MIN_HITS]
     model = drum_classify._load_json(drum_classify._USER_MODEL_PATH)
@@ -274,7 +284,12 @@ def format_status(st: dict) -> list[str]:
             continue  # a mapped-but-unrecorded user sound
         tag = "" if v["hits"] >= TARGET_HITS else (f" (aim for {TARGET_HITS})" if v["hits"] else "")
         kind = "" if v["builtin"] else " [your sound]"
-        lines.append(f"{c:12s} note {v['note']:3d}  {v['hits']:3d} hits in {v['clips']} clip(s){tag}{kind}")
+        if c == NOISE:
+            note_s, kind = "DROP   ", " [ignore: sing/talk/breathe]"
+            tag = "" if v["hits"] else " — record 20 s of your voice so singing never triggers drums"
+        else:
+            note_s = f"note {v['note']:3d}"
+        lines.append(f"{c:12s} {note_s}  {v['hits']:3d} hits in {v['clips']} clip(s){tag}{kind}")
     if not st["ready"]:
         lines.append(f"record at least {MIN_CLASSES} sounds (one clip each), then `enroll train`")
     elif st["missing"]:
@@ -346,7 +361,7 @@ def train(k: int = K, folds: int = 5, seed: int = 0) -> dict:
 
     rows = _rows()
     have = Counter(lab for _, _, lab in rows)
-    if len(have) < MIN_CLASSES:
+    if len([c for c in have if c != NOISE]) < MIN_CLASSES:
         got = ", ".join(sorted(have)) or "nothing"
         raise EnrollError(
             f"need at least {MIN_CLASSES} sounds with hits to train (have: {got}) — "
@@ -383,6 +398,7 @@ def train(k: int = K, folds: int = 5, seed: int = 0) -> dict:
         "exemplars": np.round(Z, 5).tolist(),
         "labels": labels,
         "rms_floor": RMS_FLOOR,
+        "noise_min_votes": NOISE_MIN_VOTES,
         "source": {
             "kind": "enrollment",
             "enrolled_at": datetime.now().isoformat(timespec="seconds"),
@@ -399,7 +415,8 @@ def train(k: int = K, folds: int = 5, seed: int = 0) -> dict:
         "path": str(drum_classify._USER_MODEL_PATH),
         "n": len(rows),
         "hits_per_class": {c: int(have[c]) for c in sorted(have)},
-        "thin": [c for c in have if have[c] < MIN_HITS],
+        "thin": [c for c in have if have[c] < MIN_HITS and c != NOISE],
+        "noise_hits": int(have.get(NOISE, 0)),
         "folded": folded,
         "cv": cv,
     }
@@ -446,7 +463,8 @@ def export_pocket(binary: Path | str | None = None, sr: int = 48000, gate: float
         if not path.exists() or cls not in classes():
             continue
         if cls not in pocket_drum:
-            skipped[cls] = skipped.get(cls, 0) + int(e.get("hits", 0))
+            if cls != NOISE:  # Pocket has its own noise handling; a 'noise' Teach voice is the ask in the contract doc
+                skipped[cls] = skipped.get(cls, 0) + int(e.get("hits", 0))
             continue
         drum = pocket_drum[cls]
         y = _load_audio(path)

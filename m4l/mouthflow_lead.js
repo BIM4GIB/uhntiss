@@ -41,6 +41,7 @@
  *   enroll_class <name>    name of YOUR sound for enroll_custom (e.g. rimshot)
  *   enroll_note <n|auto>   MIDI note for a new sound (default auto)
  *   enroll_custom          enroll the SELECTED clip as that named sound
+ *   enroll_noise           enroll the SELECTED clip as your VOICE (sing/talk/breathe -> never a drum)
  *   enroll_train           build the per-user drum model from the enrolled clips
  *   enroll_status          what's enrolled so far
  *   record_start           begin an open-ended mic recording
@@ -499,6 +500,7 @@ Max.addHandler("enroll_open", () => enrollClip("hat_open"));
 Max.addHandler("enroll_class", (...a) => (state.enrollClass = a.join(" ").trim()));
 Max.addHandler("enroll_note", (...a) => (state.enrollNote = a.join(" ").trim() || "auto"));
 Max.addHandler("enroll_custom", enrollCustom);
+Max.addHandler("enroll_noise", () => enrollClip("noise"));
 Max.addHandler("enroll_train", () => runCmd(["run", "mouthflow", "enroll", "train"]));
 Max.addHandler("enroll_status", () => runCmd(["run", "mouthflow", "enroll", "status"]));
 // start/stop recording (performer-controlled length)
@@ -520,4 +522,4 @@ Max.addHandler("cancel", () => {
   }
 });
 
-status("mouthflow lead ready · 5cdd93b");
+status("mouthflow lead ready · e516aff");

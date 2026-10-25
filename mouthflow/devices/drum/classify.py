@@ -89,7 +89,18 @@ def _knn_predict(model: dict, audio, sr: int, t: float) -> int:
         range(len(ex)),
         key=lambda i: sum((ex[i][j] - z[j]) ** 2 for j in range(len(z))),
     )
-    label = Counter(labels[i] for i in order[:k]).most_common(1)[0][0]
+    votes = Counter(labels[i] for i in order[:k])
+    label = votes.most_common(1)[0][0]
+    # A "noise" class maps to DROP (-1): the hit is silenced. Silencing a real
+    # hit costs more than letting a sung note through, so noise needs a
+    # supermajority (default 4 of 5); a weaker plurality falls back to the
+    # best drum vote. Measured on a thin enrollment: 3/5 lost 8 of 77 real
+    # hits, 4/5 lost 4, while still rejecting 14 of 16 sung onsets.
+    need = int(model.get("noise_min_votes", 4))
+    if label == "noise" and votes["noise"] < min(need, k):
+        drums = [(n, c) for n, c in votes.most_common() if n != "noise"]
+        if drums:
+            label = drums[0][0]
     return int(model["classes"][label])
 
 
@@ -148,7 +159,7 @@ def note_names() -> dict[int, str]:
     return names
 
 
-_BUILTIN_SOUNDS = {"kick", "snare", "hat", "hat_open", "clap", "perc"}
+_BUILTIN_SOUNDS = {"kick", "snare", "hat", "hat_open", "clap", "perc", "noise"}
 
 
 def _classify_heuristic(f: dict[str, float]) -> int:

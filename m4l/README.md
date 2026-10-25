@@ -140,7 +140,7 @@ The prebuilt panel wires Generate / duration / count-in / hint / **kit dropdown
 `key <C|F#|…>` · `scale <major|minor|…>` · `record_start` · `record_stop` ·
 `record <0|1>` · `cancel` · `enroll_kick` · `enroll_snare` · `enroll_hat` ·
 `enroll_open` · `enroll_class <name>` · `enroll_note <n|auto>` · `enroll_custom` ·
-`enroll_train` · `enroll_status`
+`enroll_noise` · `enroll_train` · `enroll_status`
 
 ## Outlet reference (script → patch)
 `status <text>` · `level <dBFS>` (live input meter while record-streaming;
@@ -186,6 +186,17 @@ class beats 5 by another 3. The panel's ENROLL column drives
    sounds; kick/snare/hat are what a stock kit expects but are not required.
    Pocket's Teach profile holds exactly kick/snare/hat, so `export-pocket`
    reports your extra sounds as not exported.
+5. **Ignore my voice.** Record ~20 s of yourself singing, talking and
+   breathing into a clip (no drum sounds), select it, press `enroll_noise`
+   (second column, under the record buttons), then `enroll_train`. Those
+   onsets become a `noise` class whose verdict is DROP: a sung bassline with
+   the drum detector open no longer rains kicks. Measured on this
+   performer: 76 → 12 false hits/min on a *different* hum take, zero real
+   hits lost with a full (~30 hits/sound) enrollment. With a thin one
+   (8-second one-shots) the noise class took ~10 % of real hits, so the
+   verdict needs 4 of 5 neighbours (`noise_min_votes`), which halves that
+   loss. (A global "not a drum" class was tried first and dropped half of
+   the performer's real hits — this has to be per voice.)
 
 ## Transcribe a clip (no re-recording)
 The pitched panels ship a **Transcribe Clip** button (auto-injected by

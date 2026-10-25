@@ -140,6 +140,33 @@ repeatable sounds, sung basslines, an open mic on stage.
    window degrades gracefully rather than failing. AVP amateurs rarely roll
    — this needs René's or a pro's roll takes to measure.
 
+## The negative set: open-mic rejection (`eval/negatives.py`, 2026-10-25)
+
+Baseline on hummed bass takes (singing, no drums): mouthflow drums device
+**72 false hits/min**, Pocket **37/min** — both call sung notes kicks and
+snares. Two designs measured:
+
+| design | hums, false/min | synth bass, false/min | performer's real hits dropped |
+|---|---|---|---|
+| none | 76 | 64 | 0 |
+| global 4-class MLP noise gate (AVP-unmatched + hums + synth), held-out source | 10–20 | 7–15 | **~50 %** (16/34, 18/43 on his fixtures) |
+| same gate trained without his audio | — | — | still ~50 % |
+| **per-user `noise` class** (k-NN, one hum take → tested on the other) | **11–13** | — | **0 / 77** |
+
+A global "not a drum" class punishes whichever voice it hasn't seen (and
+the performer whose hums it *has* seen); a per-user one from a single
+~20 s voice clip rejects singing an order of magnitude better with nothing
+lost. Shipped on the Python side as the built-in `noise` sound (verdict
+DROP; `enroll record noise --duration 20`, panel `enroll_noise`).
+
+**Ask for Pocket:** the same clip could teach a 4th "noise" Teach voice
+(k examples, vote → reject) — Pocket's forest noise class was trained on
+synthetic breath controls and does not cover singing (37/min). The audio
+to measure with is local: `datasets/bass/b01.hum.wav`, `b02.hum.wav`
+(René's machine; `datasets/` is gitignored — copy, don't commit).
+Synthetic breath swells did not generalise in either direction; real
+breath/speech negatives are still wanted (LibriSpeech is the candidate).
+
 ## How a change travels
 
 - Pocket changes features/metric/state → bump `feature_version` in

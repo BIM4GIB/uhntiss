@@ -1,6 +1,6 @@
 # Mouthflow — session handover
 
-Last updated: 2026-10-25 (branch `feat/enroll-n-class`; everything through PR #26 is on main).
+Last updated: 2026-10-25 (branch `feat/enroll-noise`; everything through PR #27 is on main).
 Read this first when picking up work.
 (Architecture overview for newcomers: [`ARCHITECTURE.md`](ARCHITECTURE.md);
 honest gap list: [`KNOWN-LIMITATIONS.md`](KNOWN-LIMITATIONS.md); audit findings
@@ -13,6 +13,23 @@ PR's description before summarising state. Merged history + main cannot see
 in-flight work; on 2026-10-22 a catch-up reported "last work = PR #18" while
 PR #19 (Pocket 05, the native rebuild, 10 commits, CI green) sat open as a
 draft.
+
+**2026-10-25 — open-mic rejection = the `noise` sound (`feat/enroll-noise`).**
+On hummed bass takes the drums device fired 72 false hits/min (Pocket
+37/min): a live looper singing a bassline gets a kick per note. Measured
+two fixes (`eval/negatives.py`, leave-one-source-out): a **global** noise
+class in the AVP MLP cut hums to 10–20/min but dropped ~half of René's
+real hits (even trained without his audio) — dead. A **per-user** noise
+class (k-NN exemplars from ONE hum take) cut the OTHER hum take 76 →
+12/min with 0 of 77 real fixture hits lost. Shipped: built-in `noise`
+sound (aliases voice/sing/talk/breath/hum/ignore) → verdict DROP;
+`enroll record noise --duration 20`, panel `enroll_noise`; noise never
+counts toward the 2-sound minimum, never folds, not exported to Pocket
+(ask filed in `pocket-integration.md`). Noise needs a 4-of-5 vote
+(`noise_min_votes`): on a THIN one-shot enrollment plain majority lost 8/77
+real hits, 4/5 lost 4 while still rejecting 14/16 sung onsets; with the
+full 260-exemplar enrollment nothing is lost either way. Synthetic breath swells didn't
+generalise either way; real breath/speech negatives still wanted.
 
 **2026-10-25 — product bar + N-class enrollment (`feat/enroll-n-class`).**
 René: "I want this project to be something Beardyman would use" — a

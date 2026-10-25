@@ -227,3 +227,57 @@ def test_cli_custom_sound_and_map(tmp_path):
     res = r.invoke(app, ["enroll", "map", "rimshot", "37"])
     assert res.exit_code == 0 and "rimshot -> note 37" in res.output
     assert enroll.classes()["rimshot"] == 37
+
+
+def _hum(seconds=4.0, seed=3):
+    """A sung/hummed note stream: sustained low tones with soft onsets (never a drum)."""
+    rng = np.random.default_rng(seed)
+    n = int(seconds * SR)
+    y = np.zeros(n, dtype=np.float32)
+    t0 = 0.1
+    while t0 < seconds - 0.5:
+        dur = rng.uniform(0.3, 0.5)
+        f = rng.choice([82.0, 98.0, 110.0, 123.0])
+        s0, s1 = int(t0 * SR), int((t0 + dur) * SR)
+        tt = np.arange(s1 - s0) / SR
+        env = np.minimum(1.0, tt / 0.04) * np.minimum(1.0, (dur - tt) / 0.04)
+        y[s0:s1] += (0.5 * np.sin(2 * np.pi * f * tt) + 0.15 * np.sin(2 * np.pi * 2 * f * tt)) * env
+        t0 += dur + rng.uniform(0.05, 0.15)
+    return y.astype(np.float32)
+
+
+def test_noise_class_silences_the_voice_and_keeps_drums(tmp_path, monkeypatch):
+    for kind in ("kick", "snare", "hat"):
+        enroll.add_clip(kind, _write(tmp_path, kind, hits=12))
+    hum = tmp_path / "voice.wav"
+    sf.write(hum, _hum(seed=3), SR, subtype="PCM_16")
+    e = enroll.add_clip("voice", hum)  # alias -> noise, no note needed
+    assert e["class"] == "noise" and e["note"] == drum_classify.DROP and e["hits"] >= 4
+    st = enroll.status()
+    assert st["ready"] and "noise" not in st["recorded"]
+    assert any(line.startswith("noise") and "DROP" in line for line in enroll.format_status(st))
+    rep = enroll.train()
+    assert rep["noise_hits"] >= 4 and "noise" not in rep["thin"]
+    m = json.loads(drum_classify._USER_MODEL_PATH.read_text())
+    assert m["classes"]["noise"] == drum_classify.DROP
+    monkeypatch.setattr(drum_classify, "_MODEL", drum_classify._UNSET)
+    # a different hum is silenced…
+    y = _hum(seed=11)
+    hits = enroll._hits(y, SR)
+    preds = [drum_classify._classify(y, SR, t, signal.features_at(y, SR, t)) for t in hits]
+    assert preds.count(drum_classify.DROP) >= len(preds) * 0.75, preds
+    # …and real drum hits still sound
+    for kind, pitch in (("kick", 36), ("snare", 38), ("hat", 42)):
+        yk = _clip(kind, hits=3, seed=7)
+        pk = [drum_classify._classify(yk, SR, t, signal.features_at(yk, SR, t)) for t in enroll._hits(yk, SR)]
+        assert pk.count(pitch) >= 2, (kind, pk)
+
+
+def test_noise_alone_does_not_count_as_a_sound(tmp_path):
+    enroll.add_clip("kick", _write(tmp_path, "kick"))
+    hum = tmp_path / "voice.wav"
+    sf.write(hum, _hum(), SR, subtype="PCM_16")
+    enroll.add_clip("noise", hum)
+    assert not enroll.status()["ready"]
+    with pytest.raises(enroll.EnrollError, match="at least 2 sounds"):
+        enroll.train()
