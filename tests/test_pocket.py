@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import shutil
+import subprocess
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -80,7 +82,8 @@ def _fake_analyze(drum_of_path):
         rows = []
         for i in range(10):
             feats = rng.normal(0, 0.05, 17) + drum * 2.0
-            rows.append([0.0, drum, 0.6, 0.2 + i * 0.5, *feats])
+            rows.append([0.2 + i * 0.5, drum, 0.6, 0.21 + i * 0.5, *feats,
+                         *rng.normal(drum * 2.0, .05, 120), 480, 1440, 1920, .28 + i * .5])
         return np.array(rows)
 
     return fake
@@ -116,14 +119,15 @@ def test_export_pocket_builds_profile_from_enrollment(tmp_path, monkeypatch):
     enroll.add_clip("rimshot", tmp_path / "snare.wav", note=37)  # a user sound Pocket can't hold
     enroll.add_clip("noise", tmp_path / "hat.wav")  # the voice clip: not a Pocket voice, not "skipped" either
     rep = enroll.export_pocket(sr=48000)
-    assert rep["hits_per_drum"] == {"kick": 10, "snare": 10, "hat": 10}
-    assert "rimshot" in rep["skipped"] and "noise" not in rep["skipped"]
+    assert rep["hits_per_drum"] == {"kick": 10, "snare": 10, "hat": 10, "rimshot": 10}
+    assert not rep["skipped"]
     doc = json.loads(pocket.profile_path().read_text())  # isolated by conftest
-    assert doc["version"] == 4 and len(doc["values"]) == 156 and doc["pick"] == "medoid"
-    # drum blocks carry the class-centred features
-    assert abs(np.mean(doc["values"][1:52]) - 0.0) < 0.1
-    assert abs(np.mean(doc["values"][53:104]) - 2.0) < 0.1
-    assert abs(np.mean(doc["values"][105:156]) - 4.0) < 0.1
+    assert doc["version"] == 5 and doc["feature_version"] == pocket.FEATURE_VERSION == 3
+    assert [v["name"] for v in doc["voices"]] == ["kick", "snare", "hat", "rimshot"]
+    assert doc["voices"][-1]["note"] == 37
+    assert doc["reject_examples"] == 10
+    assert len(doc["values"]) == 245 + 4 * pocket.VOICE_VALUES + 10 * 17
+
 
 
 @pytest.mark.skipif(not pocket.BINARY.exists(), reason="pocket_analyze not built")
@@ -139,3 +143,56 @@ def test_real_binary_detects_clicks_and_emits_17_features():
     acc = pocket.accepted(rows)
     assert 1 <= len(acc) <= 8
     assert np.all(np.isfinite(acc[:, 4:]))
+
+
+def enrollment_rows(d, n=30, sr=48000):
+    rng = np.random.default_rng(901 + d)
+    x = np.zeros((n, 145))
+    x[:, 0] = .2 + np.arange(n) * .4
+    x[:, 1] = 3  # Factory rejects: enrollment still owns the labels.
+    x[:, 2] = .5
+    x[:, 3] = x[:, 0] + .01 - 1/sr
+    x[:, 4:21] = rng.normal(d * 4, .1, (n, 17))
+    x[:, 21:141] = rng.normal(d * 3, .1, (n, 120))
+    x[:, 141:144] = np.round(np.array([.01, .03, .04]) * sr)
+    x[:, 144] = x[:, 0] + .08
+    return x
+
+
+def test_v5_keeps_all_named_voices_and_enrollment_bank():
+    voices = [{"name": f"voice_{d}", "note": d + 36, "rows": enrollment_rows(d, 30)} for d in range(4)]
+    doc = pocket.build_profile(voices, 48000)
+    assert len(doc["values"]) == 245 + 4 * pocket.VOICE_VALUES
+    assert doc["values"][245 + 25:245 + 27] == [30, 30]
+    for d, voice in enumerate(voices):
+        pred = pocket.predict_profile(doc, voice["rows"])
+        assert np.all(pred == d)
+    # An explicit negative is never turned into a delayed loop hit.
+    row = voices[3]["rows"][0]
+    rejected = pocket.build_profile(voices, 48000, row[4:21].reshape(1, 17))
+    assert pocket.predict_profile(rejected, row.reshape(1, -1)).tolist() == [[-1, -1]]
+    # Building the profile cannot inspect, mutate or standardize query rows.
+    query = enrollment_rows(2)
+    before = json.dumps(doc, sort_keys=True)
+    pocket.predict_profile(doc, query * 1.1)
+    assert json.dumps(doc, sort_keys=True) == before
+
+
+def test_v5_rejects_bad_enrollment_before_writing():
+    voices = [{"name": f"voice_{d}", "note": 36 + d, "rows": enrollment_rows(d)} for d in range(2)]
+    voices[0]["rows"][0, 7] = np.nan
+    with pytest.raises(pocket.PocketError, match="finite"):
+        pocket.build_profile(voices, 48000)
+    voices[0]["rows"] = enrollment_rows(0)
+    voices[0]["name"] = "bad name"
+    with pytest.raises(pocket.PocketError, match="names"):
+        pocket.build_profile(voices, 48000)
+
+
+def test_atomic_profile_write_leaves_no_partial_copy(tmp_path, monkeypatch):
+    monkeypatch.setattr(pocket, "max_library_dirs", lambda: [])
+    path = tmp_path / "profile.json"
+    path.write_text('{"original": true}')
+    with pytest.raises(ValueError):
+        pocket.write_profile_document({"bad": float("nan")}, path)
+    assert json.loads(path.read_text()) == {"original": True}

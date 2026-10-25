@@ -20,6 +20,7 @@ struct Command {
   float velocity = .85f;
   Loop loop{};
   Profile profile{};
+  uint64_t receipt = 0;
 };
 struct Snapshot {
   Loop active{}, take{};
@@ -28,12 +29,14 @@ struct Snapshot {
   int state = 0, undo = 0, drum = -1;
   bool running = false;
   double position = 0., level = 0.;
-  uint64_t revision = 0, serial = 0;
+  uint64_t revision = 0, serial = 0, receipt = 0;
+  double sampleRate = 48000.;
 };
 struct Data {
   Engine engine;
   HostClock hostClock;
-  Queue<Command, 128> commands;
+  Queue<Command, 8> commands;
+  Queue<Engine::MidiHit, 2048> midi;
   Queue<Snapshot, 4> snapshots;
   std::mutex producers; // Only message threads enter this mutex.
   std::atomic<double> ppq{0.}, input{1.}, output{.75}, threshold{.010},
@@ -41,11 +44,15 @@ struct Data {
   std::atomic<int> voice{-1};
   std::atomic<bool> running{false}, fourFour{true}, monitor{true},
       playback{true}, overdub{false}, request{true};
+  Command audioCommand{};
+  Snapshot audioSnapshot{};
   Snapshot shown{};
   Loop saved{};
   Profile savedProfile{};
   bool savedValid = false;
-  uint64_t savedRevision = 0;
+  uint64_t savedRevision = 0, appliedReceipt = 0, shownReceipt = 0;
+  std::atomic<uint64_t> nextReceipt{1};
+  double sampleRate = 48000.;
 };
 struct Object {
   t_pxobject object;
@@ -53,6 +60,8 @@ struct Object {
   void *messages;
   void *clock;
   void *qelem;
+  void *midiOut;
+  void *midiClock;
 };
 t_class *pocketClass = nullptr;
 bool enqueue(Object *x, const Command &command) {
@@ -147,9 +156,9 @@ void perform(Object *x, t_object *, double **ins, long, double **outs, long,
   s.mode =
       d.overdub.load(std::memory_order_relaxed) ? Mode::overdub : Mode::replace;
   d.engine.setSettings(s);
-  Command c;
+  auto &c = d.audioCommand;
   // Bounded work even if MIDI floods the control queue.
-  for (int i = 0; i < 127 && d.commands.pop(c); ++i) {
+  for (int i = 0; i < 7 && d.commands.pop(c); ++i) {
     switch (c.action) {
     case Action::record:
       d.engine.arm();
@@ -172,6 +181,7 @@ void perform(Object *x, t_object *, double **ins, long, double **outs, long,
       break;
     case Action::profile:
       d.engine.setProfile(c.profile);
+      d.appliedReceipt = c.receipt;
       break;
     }
   }
@@ -183,9 +193,15 @@ void perform(Object *x, t_object *, double **ins, long, double **outs, long,
   for (long i = 0; i < frames; ++i)
     d.engine.process(ins[0][i], d.hostClock.next(ins[1][i]), outs[0][i],
                      outs[1][i]);
+  Engine::MidiHit midi;
+  bool emitted = false;
+  while (d.engine.popMidi(midi)) emitted = d.midi.push(midi) || emitted;
+  if (emitted) clock_delay(x->midiClock, 0.);
   if (d.request.exchange(false, std::memory_order_relaxed)) {
-    Snapshot snap;
+    auto &snap = d.audioSnapshot;
     snap.profile = d.engine.profile();
+    snap.receipt = d.appliedReceipt;
+    snap.sampleRate = d.sampleRate;
     snap.learning = d.engine.learning();
     snap.remaining = d.engine.learnRemaining();
     snap.active = d.engine.loop();
@@ -204,6 +220,7 @@ void perform(Object *x, t_object *, double **ins, long, double **outs, long,
 }
 void dsp(Object *x, t_object *dsp64, short *, double sr, long, long) {
   x->data->engine.prepare(sr);
+  x->data->sampleRate = sr;
   x->data->hostClock.reset();
   object_method(dsp64, gensym("dsp_add64"), x, perform, 0, nullptr);
 }
@@ -212,7 +229,7 @@ void emitEvents(Object *x, const Loop &loop) {
   for (size_t i = 0; i < loop.count; ++i) {
     atom_setfloat(&atoms[i * 3], loop.events[i].beat);
     atom_setfloat(&atoms[i * 3 + 1], loop.events[i].velocity);
-    atom_setlong(&atoms[i * 3 + 2], int(loop.events[i].drum));
+    atom_setlong(&atoms[i * 3 + 2], loop.events[i].voice >= 0 ? loop.events[i].voice : int(loop.events[i].drum));
   }
   outlet_anything(x->messages, gensym("events"), short(atoms.size()),
                   atoms.data());
@@ -227,7 +244,7 @@ void poll(Object *x) {
   }
   if (changed) {
     auto &v = d.shown;
-    t_atom atoms[11];
+    t_atom atoms[12];
     atom_setlong(atoms, v.state);
     atom_setlong(atoms + 1, v.running);
     atom_setfloat(atoms + 2, v.position);
@@ -239,13 +256,28 @@ void poll(Object *x) {
     atom_setlong(atoms + 8, v.learning);
     atom_setlong(atoms + 9, v.remaining);
     atom_setlong(atoms + 10, v.profile.ready());
-    outlet_anything(x->messages, gensym("status"), 11, atoms);
+    atom_setlong(atoms + 11, v.profile.delayed() && v.profile.sampleRate == v.sampleRate);
+    outlet_anything(x->messages, gensym("status"), 12, atoms);
+    if (v.receipt && v.receipt != d.shownReceipt) {
+      d.shownReceipt = v.receipt;
+      t_atom receipt[3];
+      atom_setlong(receipt, v.profile.voices);
+      atom_setfloat(receipt + 1, v.profile.sampleRate);
+      atom_setlong(receipt + 2, v.profile.rejects);
+      outlet_anything(x->messages, gensym(v.profile.sampleRate && v.profile.sampleRate != v.sampleRate ? "profile_rate_mismatch" : "profile_loaded"), 3, receipt);
+    }
     emitEvents(x, v.state == int(State::recording) ? v.take : v.active);
     if (!d.savedValid || v.revision != d.savedRevision) {
       d.saved = v.active;
       d.savedProfile = v.profile;
       d.savedValid = true;
       d.savedRevision = v.revision;
+      std::vector<t_atom> voices(v.profile.voices * 2);
+      for (int i = 0; i < v.profile.voices; ++i) {
+        atom_setsym(&voices[i * 2], gensym(v.profile.names[i].data()));
+        atom_setlong(&voices[i * 2 + 1], v.profile.notes[i]);
+      }
+      outlet_anything(x->messages, gensym("voices"), short(voices.size()), voices.data());
       object_notify((t_object *)x, gensym("modified"), nullptr);
     }
   }
@@ -260,29 +292,33 @@ void tick(Object *x) {
 // loop is untouched. Persists with the Set through the pattr state like a
 // taught profile does.
 void profile(Object *x, t_symbol *, long argc, t_atom *argv) {
-  if (argc != long(profileValues)) {
-    object_error((t_object *)x, "profile: expected %ld values, got %ld",
-                 long(profileValues), argc);
+  if (argc <= 0 || argc > long(maxProfileValues)) {
+    object_error((t_object *)x, "profile: invalid payload length %ld", argc);
+    outlet_anything(x->messages, gensym("profile_error"), 0, nullptr);
     return;
   }
-  std::array<double, profileValues> values{};
+  std::array<double, maxProfileValues> values{};
   for (long i = 0; i < argc; ++i) {
     if (atom_gettype(argv + i) != A_LONG && atom_gettype(argv + i) != A_FLOAT) {
       object_error((t_object *)x, "profile: value %ld is not a number", i);
+      outlet_anything(x->messages, gensym("profile_error"), 0, nullptr);
       return;
     }
     values[i] = atom_getfloat(argv + i);
   }
   Command c;
   c.action = Action::profile;
-  if (!decodeProfile(values.data(), values.size(), c.profile)) {
-    object_error((t_object *)x,
-                 "profile: rejected (needs 3 finite examples per voice)");
+  if (!decodeProfile(values.data(), size_t(argc), c.profile)) {
+    object_error((t_object *)x, "profile: invalid v4/v5 payload");
+    outlet_anything(x->messages, gensym("profile_error"), 0, nullptr);
     return;
   }
-  if (!enqueue(x, c))
+  c.receipt = x->data->nextReceipt.fetch_add(1);
+  if (!enqueue(x, c)) {
+    outlet_anything(x->messages, gensym("profile_error"), 0, nullptr);
     return;
-  x->data->savedProfile = c.profile;
+  }
+  outlet_anything(x->messages, gensym("profile_queued"), 0, nullptr);
 }
 t_max_err getvalue(Object *x, long *argc, t_atom **argv) {
   StateValues values;
@@ -321,6 +357,17 @@ t_max_err setvalue(Object *x, long argc, t_atom *argv) {
   x->data->savedValid = true;
   return MAX_ERR_NONE;
 }
+// A high-priority clock drains note events after the DSP vector. This is
+// separate from the 33 ms display poll; never invoke message boxes in perform.
+void midiTick(Object *x) {
+  Engine::MidiHit hit;
+  for (int i = 0; i < 2047 && x->data->midi.pop(hit); ++i) {
+    t_atom values[2];
+    atom_setlong(values, hit.note);
+    atom_setlong(values + 1, std::clamp(int(std::round(hit.velocity * 127)), 1, 127));
+    outlet_list(x->midiOut, nullptr, 2, values);
+  }
+}
 void assist(Object *, void *, long io, long index, char *text) {
   if (io == ASSIST_INLET)
     snprintf_zero(text, 256,
@@ -335,6 +382,7 @@ void destroy(Object *x) {
   dsp_free(&x->object);
   if (x->clock)
     object_free(x->clock);
+  if (x->midiClock) object_free(x->midiClock);
   if (x->qelem)
     qelem_free(x->qelem);
   delete x->data;
@@ -343,7 +391,7 @@ void *create(t_symbol *, long, t_atom *) {
   auto *x = (Object *)object_alloc(pocketClass);
   if (!x)
     return nullptr;
-  x->clock = x->qelem = nullptr;
+  x->clock = x->qelem = x->midiClock = nullptr;
   dsp_setup(&x->object, 2);
   x->data = new (std::nothrow) Data;
   if (!x->data) {
@@ -351,17 +399,19 @@ void *create(t_symbol *, long, t_atom *) {
     return nullptr;
   }
   x->object.z_misc |= Z_NO_INPLACE;
+  x->midiOut = outlet_new(x, nullptr);
   x->messages = outlet_new(x, nullptr);
   outlet_new(x, "signal");
   outlet_new(x, "signal");
   x->qelem = qelem_new(x, (method)poll);
   x->clock = clock_new(x, (method)tick);
+  x->midiClock = clock_new(x, (method)midiTick);
   clock_delay(x->clock, 33.);
   return x;
 }
 } // namespace
 extern "C" C74_EXPORT void ext_main(void *) {
-  auto *c = class_new("uhntiss.pocket05~", (method)create, (method)destroy,
+  auto *c = class_new("uhntiss.pocket06~", (method)create, (method)destroy,
                       sizeof(Object), nullptr, A_GIMME, 0);
   class_addmethod(c, (method)dsp, "dsp64", A_CANT, 0);
   class_addmethod(c, (method)assist, "assist", A_CANT, 0);

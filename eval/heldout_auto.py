@@ -50,6 +50,7 @@ def compile_fold(folder, header, transient_header):
     (include / "engine.hpp").write_bytes(
         (ROOT / "native/pocket/include/pocket/engine.hpp").read_bytes()
     )
+    (include / "slices.hpp").write_bytes((ROOT / "native/pocket/include/pocket/slices.hpp").read_bytes())
     (source / "engine.cpp").write_text(
         (ROOT / "native/pocket/src/engine.cpp").read_text()
         + "\nnamespace pocket { const char* compiledAuditSignature() noexcept { return model::auditSignature; } }\n"

@@ -13,7 +13,7 @@ test('audio device packages the actual native path, controls and persistent stat
   assert.equal(data.subarray(0,4).toString(),'ampf');assert.equal(data.subarray(8,12).toString(),'aaaa');assert.equal(data.subarray(24,28).toString(),'ptch');assert.equal(data.readUInt32LE(28),data.length-32);assert.equal(data.at(-1),0);
   const p=JSON.parse(data.subarray(32,-1)).patcher;
   const boxes=new Map(p.boxes.map(b=>[b.box.id,b.box]));
-  assert.equal(boxes.get('engine').text,'uhntiss.pocket05~');
+  assert.equal(boxes.get('engine').text,'uhntiss.pocket06~');
   assert.equal(boxes.get('loop-state').saved_attribute_attributes.valueof.parameter_type,3);
   assert.equal(boxes.get('display').background,1);
   for(const id of ['record','undo','clear','voice','mode','pad0','pad1','pad2'])assert.equal(boxes.get(id).parameter_enable,1);

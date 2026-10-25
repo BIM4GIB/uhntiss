@@ -273,7 +273,7 @@ def train(binary, cache):
     info = dict(
         sklearn_version=sklearn.__version__,
         version=5,
-        feature_version=2,
+        feature_version=3,
         features=17,
         window_ms=10,
         history_ms=30,

@@ -60,7 +60,7 @@ int main() {
     Loop after;
     Profile restored;
     check(decodeState(values.data(), size, after, restored),
-          "v4 loop/profile state decodes");
+          "v5 loop/profile state decodes");
     check(after.anchor == before.anchor &&
               after.events[0].beat == before.events[0].beat &&
               after.events[0].velocity == before.events[0].velocity,
@@ -107,18 +107,22 @@ int main() {
             f[j] = .1 * double(d + 1) + .01 * double(i) + .001 * double(j);
           taught.add(Drum(d), f);
         }
-      StateValues full{};
-      const auto fullSize = encodeState({}, taught, full);
-      check(fullSize == 3 + profileValues, "empty loop + profile is 3 + profileValues");
+      std::array<double, profileValues> full{};
+      size_t at = 0;
+      for (int d = 0; d < 3; ++d) {
+        full[at++] = taught.count[d];
+        for (int k = 0; k < 3; ++k) for (auto f : taught.examples[d][k]) full[at++] = f;
+      }
+      check(at == 156, "v4 interchange remains exactly 156 values");
       Profile got;
-      check(decodeProfile(full.data() + 3, profileValues, got) &&
+      check(decodeProfile(full.data(), profileValues, got) &&
                 got.ready() && got.examples == taught.examples,
             "decodeProfile installs all nine examples");
-      check(!decodeProfile(full.data() + 3, profileValues - 1, got),
+      check(!decodeProfile(full.data(), profileValues - 1, got),
             "decodeProfile rejects a short payload");
       std::array<double, profileValues> bad{};
       for (size_t i = 0; i < profileValues; ++i)
-        bad[i] = full[3 + i];
+        bad[i] = full[i];
       bad[5] = NAN;
       check(!decodeProfile(bad.data(), bad.size(), got),
             "decodeProfile rejects a non-finite feature");

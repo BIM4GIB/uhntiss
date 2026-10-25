@@ -1,4 +1,6 @@
 #include "pocket/engine.hpp"
+#include "pocket/state.hpp"
+#include <fstream>
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -16,6 +18,13 @@ int main(int argc, char **argv) {
   for (int i = 0; i < 512; ++i)
     loop.append({i / 64., .5f, pocket::Drum(i % 3)});
   e.restore(loop);
+  if (argc > 2) {
+    std::ifstream file(argv[2]); std::vector<double> values; double value;
+    while (file >> value) values.push_back(value);
+    pocket::Profile profile;
+    if (!pocket::decodeProfile(values.data(), values.size(), profile)) return 2;
+    e.setProfile(profile); e.arm();
+  }
   std::vector<double> blocks;
   std::array<float, 64> input{};
   uint64_t samples = 0;

@@ -24,7 +24,12 @@ function button(id,label,x,y,w,h,command,{toggle=false,on=label,initial=0,accent
 }
 box('display','jsui',{filename:'pocket-ui.js',jsarguments:[],numinlets:1,numoutlets:0,border:0,ignoreclick:1,background:1,presentation:1,presentation_rect:[0,0,980,169],patching_rect:[20,20,980,169]});
 obj('in','plugin~');obj('phase','plugphasor~');obj('sync','plugsync~');
-obj('engine','uhntiss.pocket05~',{varname:'pocket_engine'});obj('out','plugout~');
+obj('engine','uhntiss.pocket06~',{varname:'pocket_engine'});obj('out','plugout~');
+// The fourth outlet is a high-priority MIDI stream, independent of UI polling.
+obj('note-unpack','unpack i i');obj('note-length','makenote 100 30');
+obj('note-pack','pack i i');obj('midi-format','midiformat');obj('midi-out','midiout');
+wire('engine',3,'note-unpack');wire('note-unpack',1,'note-length',1);wire('note-unpack',0,'note-length');
+wire('note-length',1,'note-pack',1);wire('note-length',0,'note-pack');wire('note-pack',0,'midi-format');wire('midi-format',0,'midi-out');
 wire('in',0,'engine');wire('phase',0,'engine',1);wire('engine',0,'out');wire('engine',1,'out',1);wire('engine',2,'display');
 obj('hostbeat','prepend hostbeat');obj('running','prepend running');obj('meter','prepend meter');
 wire('sync',6,'hostbeat');wire('sync',0,'running');wire('sync',4,'meter');
@@ -56,7 +61,7 @@ obj('load','live.thisdevice');obj('init','t b b b b b b b b b b');wire('load',0,
 ['voice','mode','monitor','playback',...knobs.map(k=>k[0])].forEach((id,i)=>{box('read-'+id,'message',{text:'outputvalue'});wire('init',i,'read-'+id);wire('read-'+id,0,id);});
 obj('banks','live.banks',{banks:{0:['record','undo','mode','clear','input','threshold','tone','output'],1:['pad0','pad1','pad2','voice','decay','drive','monitor','playback']}});
 boxes.push(boxes.shift()); // Max stores frontmost boxes first; the canvas belongs behind controls.
-const patch={patcher:{fileversion:1,appversion:{major:9,minor:1,revision:0,architecture:'x64',modernui:1},classnamespace:'box',rect:[100,100,1000,700],openinpresentation:1,default_fontsize:12,default_fontface:0,default_fontname:'Arial',bgcolor:[.055,.068,.062,1],devicewidth:980,boxes,lines,parameters,dependency_cache:[{name:'pocket-ui.js',type:'TEXT',implicit:1},{name:'pocket-profile.js',type:'TEXT',implicit:1},{name:'uhntiss.pocket05~.mxo',type:'iLaX'}],autosave:0}};
+const patch={patcher:{fileversion:1,appversion:{major:9,minor:1,revision:0,architecture:'x64',modernui:1},classnamespace:'box',rect:[100,100,1000,700],openinpresentation:1,default_fontsize:12,default_fontface:0,default_fontname:'Arial',bgcolor:[.055,.068,.062,1],devicewidth:980,boxes,lines,parameters,dependency_cache:[{name:'pocket-ui.js',type:'TEXT',implicit:1},{name:'pocket-profile.js',type:'TEXT',implicit:1},{name:'uhntiss.pocket06~.mxo',type:'iLaX'}],autosave:0}};
 const json=JSON.stringify(patch,null,2);
 fs.writeFileSync(path.join(out,'UHNTISS Pocket.maxpat'),json+'\n');
 const payload=Buffer.from(json+'\0');
