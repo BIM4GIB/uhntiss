@@ -274,6 +274,18 @@ def _inject_controls(maxpat: dict, pitched: bool = True) -> None:
         msg("obj-276", "enroll_status", [820, 560, 100, 20], [616, 92, 76, 22])
         for b in ("obj-270", "obj-271", "obj-273", "obj-274", "obj-275", "obj-276"):
             wire(b, _NODE_INLET)
+        # Your own sound (row 4): name field -> prepend enroll_class, note field ->
+        # prepend enroll_note, button -> enroll_custom. A performer's vocabulary is
+        # not three drums; any name + a MIDI note becomes a class the k-NN emits.
+        textedit("obj-280", [720, 600, 120, 22], [546, 120, 70, 22])
+        newobj("obj-281", "prepend enroll_class", [720, 630, 140, 22])
+        wire("obj-280", "obj-281"); wire("obj-281", _NODE_INLET)
+        textedit("obj-282", [880, 600, 60, 22], [620, 120, 34, 22])
+        newobj("obj-283", "prepend enroll_note", [880, 630, 140, 22])
+        wire("obj-282", "obj-283"); wire("obj-283", _NODE_INLET)
+        msg("obj-284", "enroll_custom", [720, 660, 110, 20], [658, 120, 56, 22])
+        wire("obj-284", _NODE_INLET)
+        comment("obj-285", "your sound · note", [860, 660, 120, 18], [546, 144, 120, 14])
 
     boxes.extend(add_b)
     lines.extend(add_l)

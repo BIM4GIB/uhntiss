@@ -94,10 +94,47 @@ def test_silent_clip_is_rejected(tmp_path):
         enroll.add_clip("hat", p)
 
 
-def test_train_requires_the_three_core_classes(tmp_path):
+def test_train_requires_at_least_two_sounds(tmp_path):
     enroll.add_clip("kick", _write(tmp_path, "kick"))
-    with pytest.raises(enroll.EnrollError, match="snare, hat"):
+    with pytest.raises(enroll.EnrollError, match="at least 2 sounds.*have: kick"):
         enroll.train()
+
+
+def test_user_sound_registers_with_note_and_shows_in_status(tmp_path):
+    with pytest.raises(ValueError, match="unknown sound 'rimshot'"):
+        enroll.add_clip("rimshot", _write(tmp_path, "snare"))  # no note -> refuse (typo guard)
+    e = enroll.add_clip("rimshot", _write(tmp_path, "snare"), note=37)
+    assert e["class"] == "rimshot" and e["note"] == 37
+    assert enroll.classes()["rimshot"] == 37
+    st = enroll.status()
+    assert st["classes"]["rimshot"]["hits"] > 0 and not st["classes"]["rimshot"]["builtin"]
+    assert any("rimshot" in line and "note  37" in line and "your sound" in line for line in enroll.format_status(st))
+
+
+def test_auto_note_picks_next_free_gm_percussion_note(tmp_path):
+    e1 = enroll.add_clip("tongue_click", _write(tmp_path, "hat"), note="auto")
+    e2 = enroll.add_clip("lip_buzz", _write(tmp_path, "kick"), note="auto")
+    assert e1["note"] == enroll.AUTO_NOTES[0] and e2["note"] == enroll.AUTO_NOTES[1]
+    with pytest.raises(ValueError, match="letters/digits/underscore"):
+        enroll.set_class_note("bad name!", 60)
+    with pytest.raises(ValueError, match="0-127"):
+        enroll.set_class_note("too_high", 200)
+
+
+def test_map_remaps_and_model_emits_user_note(tmp_path, monkeypatch):
+    enroll.add_clip("kick", _write(tmp_path, "kick", hits=12))
+    enroll.add_clip("tss", _write(tmp_path, "hat", hits=12), note=37)  # a hat-like custom sound
+    assert enroll.set_class_note("tss", 56) == 56  # remap to cowbell
+    rep = enroll.train()
+    assert set(rep["hits_per_class"]) == {"kick", "tss"}
+    m = json.loads(drum_classify._USER_MODEL_PATH.read_text())
+    assert m["classes"] == {"kick": 36, "tss": 56}
+    monkeypatch.setattr(drum_classify, "_MODEL", drum_classify._UNSET)
+    y = _clip("hat", hits=3, seed=9)
+    preds = [drum_classify._classify(y, SR, t, signal.features_at(y, SR, t)) for t in enroll._hits(y, SR)]
+    assert preds.count(56) >= 2, preds
+    # summaries name the sound the way the performer did
+    assert drum_classify.note_names()[56] == "tss"
 
 
 def test_train_writes_user_model_that_the_classifier_prefers(tmp_path, monkeypatch):
@@ -148,7 +185,7 @@ def test_reset_removes_clips_and_model(tmp_path):
     assert drum_classify._USER_MODEL_PATH.exists()
     enroll.reset()
     assert not drum_classify._USER_MODEL_PATH.exists() and not enroll.ENROLL_DIR.exists()
-    assert enroll.status()["missing"] == list(enroll.REQUIRED)
+    assert enroll.status()["missing"] == list(enroll.CORE) and not enroll.status()["ready"]
 
 
 def test_cli_file_status_train_reset(tmp_path):
@@ -172,10 +209,21 @@ def test_cli_file_status_train_reset(tmp_path):
 def test_cli_rejects_unknown_class(tmp_path):
     r = CliRunner(mix_stderr=True)
     res = r.invoke(app, ["enroll", "file", "cowbell", str(_write(tmp_path, "kick"))])
-    assert res.exit_code == 2 and "unknown drum class" in res.output
+    assert res.exit_code == 2 and "unknown sound" in res.output and "--note" in res.output
 
 
 def test_cli_train_before_clips_fails_cleanly():
     r = CliRunner(mix_stderr=True)
     res = r.invoke(app, ["enroll", "train"])
-    assert res.exit_code == 2 and "missing kick, snare, hat" in res.output
+    assert res.exit_code == 2 and "at least 2 sounds" in res.output
+
+
+def test_cli_custom_sound_and_map(tmp_path):
+    r = CliRunner(mix_stderr=True)
+    res = r.invoke(app, ["enroll", "file", "rimshot", str(_write(tmp_path, "snare"))])
+    assert res.exit_code == 2 and "unknown sound" in res.output
+    res = r.invoke(app, ["enroll", "file", "rimshot", str(_write(tmp_path, "snare")), "--note", "auto"])
+    assert res.exit_code == 0 and f"enrolled rimshot (note {enroll.AUTO_NOTES[0]})" in res.output
+    res = r.invoke(app, ["enroll", "map", "rimshot", "37"])
+    assert res.exit_code == 0 and "rimshot -> note 37" in res.output
+    assert enroll.classes()["rimshot"] == 37

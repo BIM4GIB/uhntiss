@@ -128,6 +128,29 @@ def _classify(audio, sr: int, t: float, f: dict[str, float]) -> int:
     return _classify_heuristic(f)
 
 
+GM_NAMES = {36: "kick", 38: "snare", 42: "hat_closed", 46: "hat_open", 39: "perc"}
+
+
+def note_names() -> dict[int, str]:
+    """MIDI note -> sound name for summaries: GM defaults, overridden by the
+    active per-user model's own classes (user sounds keep the name the
+    performer gave them)."""
+    names = dict(GM_NAMES)
+    model = _get_model()
+    if model and isinstance(model.get("classes"), dict):
+        for name, note in model["classes"].items():
+            if name in _BUILTIN_SOUNDS:
+                continue  # kick/snare/hat keep their GM names so planner summaries stay stable
+            try:
+                names[int(note)] = str(name)
+            except (TypeError, ValueError):
+                continue
+    return names
+
+
+_BUILTIN_SOUNDS = {"kick", "snare", "hat", "hat_open", "clap", "perc"}
+
+
 def _classify_heuristic(f: dict[str, float]) -> int:
     """Hand-tuned fallback classifier. Returns a GM pitch or DROP.
 

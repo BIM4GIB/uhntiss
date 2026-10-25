@@ -118,6 +118,28 @@ hit stays at 10 ms; the recorded loop gets +8 points across performers.
 If a re-label must also correct the sounding voice, that is a voice-steal/
 crossfade question on the synth side, not a classifier one.
 
+## Two asks for Pocket from the product bar (2026-10-25)
+
+The bar is "something Beardyman would use": a virtuoso with twenty
+repeatable sounds, sung basslines, an open mic on stage.
+
+1. **N voices, not 3.** mouthflow enrollment now takes any user-named
+   sound mapped to a MIDI note (`enroll clip rimshot --note 37`); the k-NN
+   emits it and the planner sees the performer's name for it. Pocket's
+   `Profile` is `examples[3][3]`, so `export-pocket` can only hand over
+   kick/snare/hat and reports the rest as skipped. Evidence that more
+   classes don't cost the core three: on AVP a 4-class per-user k-NN (open
+   hat split out) scores identically on kick/snare/hat (83.4 %) and
+   separates open from closed hats at 72–87 %. A Profile of N voices × k
+   examples (k = 3 still fine) is the native change; the state blob needs a
+   version bump.
+2. **Rolls bound the delayed decision.** A pro rolls at 50–100 ms per hit.
+   The 80 ms re-decision recommended above must truncate its window at the
+   next detected onset (the 40–80 ms slice would otherwise contain the next
+   hit); the 0–10/10–40 slices alone scored 76.9 % on AVP, so a truncated
+   window degrades gracefully rather than failing. AVP amateurs rarely roll
+   — this needs René's or a pro's roll takes to measure.
+
 ## How a change travels
 
 - Pocket changes features/metric/state → bump `feature_version` in

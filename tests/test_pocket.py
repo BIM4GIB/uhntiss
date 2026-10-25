@@ -109,12 +109,14 @@ def test_export_pocket_builds_profile_from_enrollment(tmp_path, monkeypatch):
     orig_load = enroll._load_audio
 
     def load_and_tag(path):
-        current["current"] = {"kick": 0, "snare": 1, "hat": 2}[path.name.split("-")[0]]
+        current["current"] = {"kick": 0, "snare": 1, "hat": 2, "rimshot": 1}[path.stem.split("-")[0]]
         return orig_load(path)
 
     monkeypatch.setattr(enroll, "_load_audio", load_and_tag)
+    enroll.add_clip("rimshot", tmp_path / "snare.wav", note=37)  # a user sound Pocket can't hold
     rep = enroll.export_pocket(sr=48000)
     assert rep["hits_per_drum"] == {"kick": 10, "snare": 10, "hat": 10}
+    assert "rimshot" in rep["skipped"]
     doc = json.loads(pocket.profile_path().read_text())  # isolated by conftest
     assert doc["version"] == 4 and len(doc["values"]) == 156 and doc["pick"] == "medoid"
     # drum blocks carry the class-centred features
