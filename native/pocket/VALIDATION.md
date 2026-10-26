@@ -31,6 +31,10 @@ controlled notes at velocities 57/67/77/88/98/108 and custom note 37 at velocity
 47 from restored-loop playback. `profile-host-smoke-061.json` includes both sides.
 A fresh instance also passed with the final deferred port/configuration query;
 `profile-startup-smoke-061.json` records its populated MIDI destination list.
+The playable build was installed in the Ableton User Library; the user confirmed
+“4 VOICES / PROFILE READY” on MF Takes bass after the recorder harnesses were
+removed. The source and receiver tracks were returned to muted and transport
+was stopped. The receiving MIDI track used Monitor In during the test.
 These are pad-driven host tests, not fresh-take accuracy or round-trip latency
 measurements. Pattr blob get/set was tested; saving and reopening the whole
 Live Set was not exercised during this session. The dedicated QA and reader patches are excluded

@@ -147,5 +147,13 @@
       "velocity": 47,
       "at": 1792977921487
     }
-  ]
+  ],
+  "installed_player": {
+    "track": "MF Takes bass",
+    "profile_ready_confirmed_by_user": true,
+    "voices": 4,
+    "muted": true,
+    "transport_running": false,
+    "qa_recorder_harness_removed": true
+  }
 }

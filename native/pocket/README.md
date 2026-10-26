@@ -89,7 +89,8 @@ profile files local unless you intend to share your voice descriptors.
 
 For named sounds, choose the destination MIDI track and channel under **MIDI TO**.
 Put a Drum Rack or other instrument on that track and map pads to the enrolled
-notes. **Level 0** silences the built-in kit while MIDI continues. The built-in
+notes. Keep the receiving track active and set Monitor to **In** (or arm it
+with Monitor **Auto**). **Level 0** silences the built-in kit while MIDI continues. The built-in
 synth supplies kick (35/36), snare (38/40) and hat (42/44/46); other notes need
 the routed instrument. MIDI is dispatched at the DSP vector boundary through
 Max's high-priority clock, independently of the 33 ms display poll. This adds
