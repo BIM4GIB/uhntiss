@@ -1,4 +1,4 @@
-# UHNTISS Pocket 06 · personal voices and delayed loop decisions
+# UHNTISS Pocket 06.1 · personal voices and delayed loop decisions
 
 A local voice-to-drum instrument and two-bar looper for Ableton Live. Native C++
 handles detection, synthesis, transport and recording. Max for Live supplies the
@@ -23,7 +23,7 @@ Requires macOS 11+, Ableton Live with Max for Live, and a mono mic input. The
 provided external is universal Apple Silicon/Intel. The portable core also builds
 on Linux; there is no Windows Max external in this release.
 
-1. Keep `UHNTISS Pocket.amxd`, `pocket-ui.js`, `pocket-profile.js` and `uhntiss.pocket06~.mxo` together.
+1. Keep `UHNTISS Pocket.amxd`, `pocket061-ui.js`, `pocket061-profile.js` and `uhntiss.pocket061~.mxo` together.
    Drag the `.amxd` onto an **audio track**. No API key, bridge, Python, Node server,
    network connection or downloaded kit is needed to play.
 2. Select your mono mic channel in Live; set the track's Monitor to **In**. The
@@ -74,6 +74,11 @@ representatives from enrollment alone. At least three complete, isolated
 radius come only from enrollment; query/take audio never fits the profile.
 The mislabeled CAL 48k 0003 take and the reserved uptempo take are not enrollment.
 
+Pocket 06.1 fixes large JSON loading: Max's single `readstring` can truncate
+at 32,767 characters even while advancing to EOF. The loader reads small
+chunks instead. Its scripts and native external use version-specific names
+so older Pocket devices can stay loaded alongside this build.
+
 Press **PROFILE**. A successful audio-thread acknowledgement shows the voice
 count; malformed files show an error and leave the old profile intact. A rate
 mismatch displays the required sample rate and falls back to factory Auto until
@@ -84,7 +89,8 @@ profile files local unless you intend to share your voice descriptors.
 
 For named sounds, choose the destination MIDI track and channel under **MIDI TO**.
 Put a Drum Rack or other instrument on that track and map pads to the enrolled
-notes. **Level 0** silences the built-in kit while MIDI continues. The built-in
+notes. Keep the receiving track active and set Monitor to **In** (or arm it
+with Monitor **Auto**). **Level 0** silences the built-in kit while MIDI continues. The built-in
 synth supplies kick (35/36), snare (38/40) and hat (42/44/46); other notes need
 the routed instrument. MIDI is dispatched at the DSP vector boundary through
 Max's high-priority clock, independently of the 33 ms display poll. This adds

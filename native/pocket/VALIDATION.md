@@ -11,13 +11,34 @@ seam tails, clear/undo/restore/rate changes, no late retrigger and zero audio-pa
 allocations. ASan/UBSan pass. Python verifies native spectral parity and
 quantized classifier/rejection parity. JS checks the actual PROFILE int handler.
 
-Host status: the universal Pocket 06 QA device loaded on a separate test track
-and the local Live bridge remains responsive. The UI-control interface timed out
-before PROFILE could be clicked. PROFILE installation, host pattr persistence
-and routed custom-note delivery are therefore **not yet verified in Live**.
-`qa/build-profile-smoke.mjs` builds a harness that waits for the button click;
-it is excluded from the playable candidate bundle. Keep this change in draft
-until that host test passes. The candidate does not replace the existing device.
+## Pocket 06.1 host verification — 2026-10-26
+
+Live 12.4.3 / bundled Max 9.1.4, 48 kHz. An actual PROFILE click loaded four
+voices with 30 personal rejection examples; the audio thread acknowledged it.
+The host harness captured six pad hits, cleared/undid/restored the v5 pattr
+blob (7,262 values), then replayed custom note 37 at beat 0.127891. This checks
+host serialization and native MIDI-outlet replay, not acoustic classification.
+The fixed 10/80 ms deadlines and roll timing remain native-core test results.
+
+The first real click exposed Max File truncation: a 73,668-byte JSON returned
+32,767 characters while moving the file position to 73,668. Pocket 06.1 reads
+chunks below this per-call limit. `profile-reader-runtime.json` reproduces the
+old failure and the complete 7,229-value output in Max's actual JS runtime.
+The mock now models this cursor jump and ordinary short reads.
+
+MIDI receiver verification passes: a separate MIDI effect received the six
+controlled notes at velocities 57/67/77/88/98/108 and custom note 37 at velocity
+47 from restored-loop playback. `profile-host-smoke-061.json` includes both sides.
+A fresh instance also passed with the final deferred port/configuration query;
+`profile-startup-smoke-061.json` records its populated MIDI destination list.
+The playable build was installed in the Ableton User Library; the user confirmed
+“4 VOICES / PROFILE READY” on MF Takes bass after the recorder harnesses were
+removed. The source and receiver tracks were returned to muted and transport
+was stopped. The receiving MIDI track used Monitor In during the test.
+These are pad-driven host tests, not fresh-take accuracy or round-trip latency
+measurements. Pattr blob get/set was tested; saving and reopening the whole
+Live Set was not exercised during this session. The dedicated QA and reader patches are excluded
+from the playable bundle. JS/native resource names are versioned for coexistence.
 
 Factory model hashes and reserved sources are unchanged from Pocket 05. The
 following historical validation remains relevant to the fallback factory path;

@@ -1,0 +1,13 @@
+{
+  "pass": true,
+  "values": 7229,
+  "version": 5,
+  "feature_version": 3,
+  "file_bytes": 73668,
+  "legacy_single_read_characters": 32767,
+  "legacy_single_read_position": 73668,
+  "legacy_parse_success": false,
+  "max_version": "9.1.4",
+  "date": "2026-10-26",
+  "scope": "Real Max JS File reader and outlet message; not a Live/DSP test."
+}

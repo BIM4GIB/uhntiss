@@ -58,6 +58,26 @@ filename on Max's search path remains `uhntiss_pocket_profile.json`.
    poll. Internal synthesis and stored timestamps remain sample-exact.
    Routing reference: [Cycling ’74 live.routing](https://docs.cycling74.com/legacy/max8/refpages/live.routing).
 
+## Host import follow-up — Pocket 06.1 (2026-10-26)
+
+The first Live PROFILE click exposed a real Max File limit: one read returned
+32,767 characters from a 73,668-byte JSON but advanced all the way to EOF.
+The loader now requests 2,048-byte chunks. A standalone Max runtime regression
+shows the old parse failing and the fixed script emitting all 7,229 values.
+An actual Live click then passed four-voice installation, six-hit capture,
+Clear/Undo, v5 pattr restoration and custom-note replay at its exact beat offset.
+A separate MIDI receiver then received the complete controlled sequence and
+custom note 37 with the expected velocities. A fresh-instance test also confirms
+the final deferred port/configuration query populates the MIDI destination list.
+This checks pattr blob restoration; a whole-Set disk save/reopen is not claimed.
+
+Pocket 06.1 packages `uhntiss.pocket061~`, `pocket061-ui.js` and
+`pocket061-profile.js` so previous versions can remain in the same Set.
+State v5, feature_version 3, the v4 payload and Python export contracts are
+unchanged. MIDI routing initialization waits for `live.thisdevice`, then queries
+the port on the low-priority thread. The classifier and AVP results below are
+unchanged by this host-only fix.
+
 ## Current measurements (2026-10-25)
 
 **Timestamp correction:** earlier evaluations matched/extracted at CSV column 3,

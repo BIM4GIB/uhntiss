@@ -1,0 +1,159 @@
+{
+  "pass": true,
+  "detail": "PROFILE acknowledged; capture, clear, undo, pattr restore and custom-note replay checked",
+  "profile": {
+    "voices": 4,
+    "sample_rate": 48000,
+    "rejects": 30
+  },
+  "state": {
+    "version": 5,
+    "events": 6,
+    "values": 7262,
+    "custom_note": 37,
+    "custom_beat": 0.127891
+  },
+  "midi": [
+    {
+      "note": 38,
+      "velocity": 14,
+      "ms": 9351
+    },
+    {
+      "note": 36,
+      "velocity": 14,
+      "ms": 29934
+    },
+    {
+      "note": 42,
+      "velocity": 12,
+      "ms": 30014
+    },
+    {
+      "note": 42,
+      "velocity": 16,
+      "ms": 35512
+    },
+    {
+      "note": 38,
+      "velocity": 18,
+      "ms": 35631
+    },
+    {
+      "note": 36,
+      "velocity": 57,
+      "ms": 784846
+    },
+    {
+      "note": 38,
+      "velocity": 67,
+      "ms": 785197
+    },
+    {
+      "note": 42,
+      "velocity": 77,
+      "ms": 785549
+    },
+    {
+      "note": 36,
+      "velocity": 88,
+      "ms": 785895
+    },
+    {
+      "note": 38,
+      "velocity": 98,
+      "ms": 786245
+    },
+    {
+      "note": 42,
+      "velocity": 108,
+      "ms": 786597
+    },
+    {
+      "note": 38,
+      "velocity": 67,
+      "ms": 789197
+    },
+    {
+      "note": 37,
+      "velocity": 47,
+      "ms": 792685
+    }
+  ],
+  "routing": {
+    "types": [
+      "1-MIDI",
+      "MF Ref starter_bass 1",
+      "MF Ref starter_bass 2",
+      "MF Ref starter_bass 3",
+      "Pocket MIDI probe",
+      "No Output"
+    ],
+    "selected": [
+      4
+    ],
+    "device_class": [
+      "MxDeviceAudioEffect"
+    ],
+    "midi_outputs": [
+      "id",
+      7
+    ]
+  },
+  "host": {
+    "live": "12.4.3",
+    "max": "9.1.4",
+    "date": "2026-10-26"
+  },
+  "routed_delivery_verified": true,
+  "receiver": [
+    {
+      "note": 36,
+      "velocity": 57,
+      "at": 1792977913648
+    },
+    {
+      "note": 38,
+      "velocity": 67,
+      "at": 1792977913999
+    },
+    {
+      "note": 42,
+      "velocity": 77,
+      "at": 1792977914351
+    },
+    {
+      "note": 36,
+      "velocity": 88,
+      "at": 1792977914697
+    },
+    {
+      "note": 38,
+      "velocity": 98,
+      "at": 1792977915047
+    },
+    {
+      "note": 42,
+      "velocity": 108,
+      "at": 1792977915400
+    },
+    {
+      "note": 38,
+      "velocity": 67,
+      "at": 1792977918000
+    },
+    {
+      "note": 37,
+      "velocity": 47,
+      "at": 1792977921487
+    }
+  ],
+  "installed_player": {
+    "track": "MF Takes bass",
+    "profile_ready_confirmed_by_user": true,
+    "voices": 4,
+    "muted": true,
+    "transport_running": false,
+    "qa_recorder_harness_removed": true
+  }
+}

@@ -427,7 +427,7 @@ void *create(t_symbol *, long, t_atom *) {
 }
 } // namespace
 extern "C" C74_EXPORT void ext_main(void *) {
-  auto *c = class_new("uhntiss.pocket06~", (method)create, (method)destroy,
+  auto *c = class_new("uhntiss.pocket061~", (method)create, (method)destroy,
                       sizeof(Object), nullptr, A_GIMME, 0);
   class_addmethod(c, (method)dsp, "dsp64", A_CANT, 0);
   class_addmethod(c, (method)assist, "assist", A_CANT, 0);

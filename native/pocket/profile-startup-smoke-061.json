@@ -1,0 +1,98 @@
+{
+  "pass": true,
+  "detail": "PROFILE acknowledged; capture, clear, undo, pattr restore and custom-note replay checked",
+  "profile": {
+    "voices": 4,
+    "sample_rate": 48000,
+    "rejects": 30
+  },
+  "state": {
+    "version": 5,
+    "events": 6,
+    "values": 7262,
+    "custom_note": 37,
+    "custom_beat": 0.127891
+  },
+  "midi": [
+    {
+      "note": 42,
+      "velocity": 11,
+      "ms": 68156
+    },
+    {
+      "note": 36,
+      "velocity": 57,
+      "ms": 76332
+    },
+    {
+      "note": 38,
+      "velocity": 67,
+      "ms": 76684
+    },
+    {
+      "note": 42,
+      "velocity": 77,
+      "ms": 77036
+    },
+    {
+      "note": 36,
+      "velocity": 88,
+      "ms": 77385
+    },
+    {
+      "note": 38,
+      "velocity": 98,
+      "ms": 77735
+    },
+    {
+      "note": 42,
+      "velocity": 108,
+      "ms": 78087
+    },
+    {
+      "note": 38,
+      "velocity": 67,
+      "ms": 80687
+    },
+    {
+      "note": 37,
+      "velocity": 47,
+      "ms": 84172
+    }
+  ],
+  "routing": {
+    "types": [
+      "1-MIDI",
+      "MF Ref starter_bass 1",
+      "MF Ref starter_bass 2",
+      "MF Ref starter_bass 3",
+      "Pocket MIDI probe",
+      "No Output"
+    ],
+    "initial_types": [
+      "Ext. Out",
+      "MF Takes bass",
+      "3-Audio",
+      "Pocket 06 test",
+      "A-Reverb",
+      "B-Delay",
+      "No Output"
+    ],
+    "selected": [
+      5
+    ],
+    "device_class": [
+      "MxDeviceAudioEffect"
+    ],
+    "midi_outputs": [
+      "id",
+      10
+    ]
+  },
+  "host": {
+    "live": "12.4.3",
+    "max": "9.1.4",
+    "date": "2026-10-26"
+  },
+  "scope": "Fresh instance with final startup wiring; native MIDI outlet only; no receiver routing selected."
+}
