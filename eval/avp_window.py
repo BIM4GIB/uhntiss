@@ -54,8 +54,8 @@ def window_features(y: np.ndarray, sr: int, t: float, win_ms: float, pre_ms: flo
     """Causal features over [t, t + win_ms): log-mel shape (24) + MFCC (13) + zcr + centroid + pre-context ratio."""
     from scipy.fftpack import dct
 
-    s = int(t * sr)
-    n = max(32, int(win_ms / 1000.0 * sr))
+    s = int(round(t * sr))
+    n = max(32, int(round(win_ms / 1000.0 * sr)))
     fr = y[s : s + n]
     if len(fr) < n:
         fr = np.pad(fr, (0, n - len(fr)))
@@ -101,7 +101,7 @@ def detect_and_match(binary, sr: int, gate: float, modality: str):
         y_in = librosa.resample(y, orig_sr=y_sr, target_sr=sr) if sr != y_sr else y
         det = pocket.accepted(pocket.analyze(binary, y_in, sr, gate))
         gt_t = np.array([r["t"] for r in frows])
-        pairs = _match(det[:, 3], gt_t) if len(det) else []
+        pairs = _match(det[:, 0], gt_t) if len(det) else []
         files[f] = {
             "participant": frows[0]["participant"],
             "kind": frows[0]["kind"],
@@ -163,14 +163,14 @@ def main() -> int:
     print(f"{'Pocket 17 (10 ms causal + 30 ms context)':44s} {_fmt(res):>24s}")
     from mouthflow.devices.drum.features import extract
 
-    res = enrollment_accuracy(files, lambda fi, i: np.array(extract("all123", fi["audio"], fi["sr"], float(fi["det"][i, 3]))))
+    res = enrollment_accuracy(files, lambda fi, i: np.array(extract("all123", fi["audio"], fi["sr"], float(fi["det"][i, 0]))))
     print(f"{'all123 (up to 200 ms, non-causal design)':44s} {_fmt(res):>24s}")
     for w in args.windows:
         t1 = time.time()
-        res = enrollment_accuracy(files, lambda fi, i, w=w: window_features(fi["audio"], fi["sr"], float(fi["det"][i, 3]), w))
+        res = enrollment_accuracy(files, lambda fi, i, w=w: window_features(fi["audio"], fi["sr"], float(fi["det"][i, 0]), w))
         print(f"{f'window {w:g} ms causal (logmel+mfcc+zcr+cent+pre)':44s} {_fmt(res):>24s}   {time.time() - t1:.0f}s", flush=True)
     for edges in ((0, 10, 40), (0, 10, 40, 80), (0, 10, 40, 120), (0, 30, 90, 200)):
-        res = enrollment_accuracy(files, lambda fi, i, e=edges: sliced_features(fi["audio"], fi["sr"], float(fi["det"][i, 3]), e))
+        res = enrollment_accuracy(files, lambda fi, i, e=edges: sliced_features(fi["audio"], fi["sr"], float(fi["det"][i, 0]), e))
         label = "/".join(str(x) for x in edges[1:])
         print(f"{f'slices 0-{label} ms causal (same family x{len(edges) - 1})':44s} {_fmt(res):>24s}", flush=True)
     # Teach-sized enrollment (3 per voice, 3 nearest) for the two candidates vs Pocket's own features
@@ -178,8 +178,8 @@ def main() -> int:
     print(f"{'3 examples per voice, 3-NN (Teach-sized)':44s} {'acc (per class)':>24s}")
     for name, fn in (
         ("Pocket 17", lambda fi, i: fi["det"][i, 4:]),
-        ("window 10 ms causal", lambda fi, i: window_features(fi["audio"], fi["sr"], float(fi["det"][i, 3]), 10)),
-        ("slices 0-10/40/80 ms causal", lambda fi, i: sliced_features(fi["audio"], fi["sr"], float(fi["det"][i, 3]), (0, 10, 40, 80))),
+        ("window 10 ms causal", lambda fi, i: window_features(fi["audio"], fi["sr"], float(fi["det"][i, 0]), 10)),
+        ("slices 0-10/40/80 ms causal", lambda fi, i: sliced_features(fi["audio"], fi["sr"], float(fi["det"][i, 0]), (0, 10, 40, 80))),
     ):
         res = enrollment_accuracy(files, fn, per_class=3, k=3)
         print(f"{name:44s} {_fmt(res):>24s}", flush=True)

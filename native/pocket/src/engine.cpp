@@ -57,7 +57,9 @@ Clock HostClock::next(double p) noexcept {
 bool Loop::append(Event e) noexcept {
   if (count == maxEvents || !std::isfinite(e.beat) ||
       !std::isfinite(e.velocity) || e.beat < 0. || e.beat >= loopBeats ||
-      int(e.drum) < 0 || int(e.drum) > 2)
+      int(e.drum) < 0 || int(e.drum) > 3 || e.voice < -1 ||
+      e.voice >= maxVoices || e.note < -1 || e.note > 127 ||
+      (e.drum == Drum::noise && e.note < 0))
     return false;
   e.velocity = float(clamp(e.velocity, .02, 1.));
   auto i = count++;
@@ -106,7 +108,7 @@ struct Neighbours {
       }
   }
   Drum choose() const noexcept {
-    std::array<double, 3> votes{};
+    std::array<double, maxVoices> votes{};
     for (size_t i = 0; i < distance.size(); ++i)
       votes[drum[i]] += 1. / (1. + distance[i]);
     return Drum(std::max_element(votes.begin(), votes.end()) - votes.begin());
@@ -159,7 +161,7 @@ Drum classifyTransientAttack(const TransientFeatures &features) noexcept {
 }
 void Profile::add(Drum drum, const Features &features) noexcept {
   const auto d = int(drum);
-  if (d < 0 || d > 2)
+  if (d < 0 || d >= voices)
     return;
   for (double f : features)
     if (!std::isfinite(f))
@@ -169,13 +171,153 @@ void Profile::add(Drum drum, const Features &features) noexcept {
   count[d] = std::min(i + 1, 3);
 }
 Drum Profile::classify(const Detection &detection) const noexcept {
-  if (!ready() || detection.drum == Drum::noise)
-    return detection.drum;
+  const auto voice = classifyVoice(detection);
+  return voice < 0 || voice > 2 ? Drum::noise : Drum(voice);
+}
+int Profile::classifyVoice(const Detection &detection,
+                           const Slices *rich) const noexcept {
+  if (!ready() || (sampleRate == 0. && detection.drum == Drum::noise))
+    return detection.drum == Drum::noise ? -1 : int(detection.drum);
   Neighbours n;
-  for (int d = 0; d < 3; ++d)
-    for (int i = 0; i < 3; ++i)
-      n.add(detection.features, examples[d][i], d, d * 3 + i);
-  return n.choose();
+  for (int d = 0; d < voices; ++d)
+    for (int i = 0; i < count[d]; ++i)
+      n.add(detection.features, examples[d][i], d, d * maxExamples + i);
+  const auto choice = int(n.choose());
+  // A per-user reject class competes in a separate 5-neighbour vote.
+  // Require four negative neighbours: one similar breath must not erase a
+  // real ghost hit. Positive examples win exact distance ties.
+  std::array<double, 5> nearest{{1e30, 1e30, 1e30, 1e30, 1e30}};
+  std::array<bool, 5> isNoise{};
+  const auto consider = [&](const Features &features, bool noise) {
+    double distance = 0.;
+    for (size_t j = 0; j < Features{}.size(); ++j) {
+      const double delta =
+          (detection.features[j] - features[j]) / model::scale[j];
+      distance += delta * delta;
+    }
+    for (int i = 0; i < 5; ++i)
+      if (distance < nearest[i]) {
+        for (int k = 4; k > i; --k) {
+          nearest[k] = nearest[k - 1];
+          isNoise[k] = isNoise[k - 1];
+        }
+        nearest[i] = distance;
+        isNoise[i] = noise;
+        break;
+      }
+  };
+  if (rich && delayed() && lateRejects >= 4) {
+    std::array<double, 40> normalized{};
+    for (int j = 0; j < 40; ++j)
+      normalized[j] = (rich->values[j] - center[j]) / scale[j];
+    const auto considerRich = [&](const std::array<std::int8_t, 120> &features,
+                                  bool noise) {
+      double distance = 0.;
+      for (int j = 0; j < 40; ++j) {
+        const double delta = normalized[j] - double(features[j]) * .0625;
+        distance += delta * delta;
+      }
+      for (int i = 0; i < 5; ++i)
+        if (distance < nearest[i]) {
+          for (int k = 4; k > i; --k) {
+            nearest[k] = nearest[k - 1];
+            isNoise[k] = isNoise[k - 1];
+          }
+          nearest[i] = distance;
+          isNoise[i] = noise;
+          break;
+        }
+    };
+    for (int d = 0; d < voices; ++d)
+      for (int i = 0; i < lateCount[d]; ++i)
+        considerRich(late[d][i], false);
+    for (int i = 0; i < lateRejects; ++i)
+      if (negativeSlices[i] == 7)
+        considerRich(negativeLate[i], true);
+    if (std::count(isNoise.begin(), isNoise.end(), true) >= 4)
+      return -1;
+  } else if (rejects >= 4) {
+    for (int d = 0; d < voices; ++d)
+      for (int i = 0; i < count[d]; ++i)
+        consider(examples[d][i], false);
+    for (int i = 0; i < rejects; ++i)
+      consider(negative[i], true);
+    if (std::count(isNoise.begin(), isNoise.end(), true) >= 4)
+      return -1;
+  }
+  double supported = 1e30;
+  for (size_t i = 0; i < n.distance.size(); ++i)
+    if (n.drum[i] == choice)
+      supported = std::min(supported, n.distance[i]);
+  if (radius[choice] > 0. && supported > radius[choice])
+    return -1;
+  return choice;
+}
+int Profile::classifyLate(const Slices &features,
+                          int provisional) const noexcept {
+  if (!delayed())
+    return provisional;
+  std::array<double, 5> distances{{1e30, 1e30, 1e30, 1e30, 1e30}};
+  std::array<int, 5> labels{};
+  const int expected[] = {int(std::round(.010 * sampleRate)),
+                          int(std::round(.030 * sampleRate)),
+                          int(std::round(.040 * sampleRate))};
+  // A shortened FFT has a different spectral/energy distribution. Compare
+  // completed slices only, never a 5 ms tail against a 40 ms enrollment tail.
+  if (features.samples[1] < expected[1])
+    return provisional;
+  const int dimensions = features.samples[2] >= expected[2] ? 120 : 80;
+  SliceFeatures normalized{};
+  for (int j = 0; j < dimensions; ++j)
+    normalized[j] = (features.values[j] - center[j]) / scale[j];
+  for (int d = 0; d < voices; ++d)
+    for (int e = 0; e < lateCount[d]; ++e) {
+      double distance = 0.;
+      for (int j = 0; j < dimensions; ++j) {
+        const double delta = normalized[j] - double(late[d][e][j]) * .0625;
+        distance += delta * delta;
+      }
+      for (int k = 0; k < 5; ++k)
+        if (distance < distances[k]) {
+          for (int m = 4; m > k; --m) {
+            distances[m] = distances[m - 1];
+            labels[m] = labels[m - 1];
+          }
+          distances[k] = distance;
+          labels[k] = d;
+          break;
+        }
+    }
+  auto gated = distances;
+  std::array<bool, 5> noise{};
+  const int required = features.samples[2] >= expected[2] ? 7 : 3;
+  for (int i = 0; i < lateRejects; ++i) {
+    if ((negativeSlices[i] & required) != required)
+      continue;
+    double distance = 0.;
+    for (int j = 0; j < dimensions; ++j) {
+      const double delta = normalized[j] - double(negativeLate[i][j]) * .0625;
+      distance += delta * delta;
+    }
+    for (int k = 0; k < 5; ++k)
+      if (distance < gated[k]) {
+        for (int m = 4; m > k; --m) {
+          gated[m] = gated[m - 1];
+          noise[m] = noise[m - 1];
+        }
+        gated[k] = distance;
+        noise[k] = true;
+        break;
+      }
+  }
+  if (std::count(noise.begin(), noise.end(), true) >= 4)
+    return -1;
+  std::array<double, maxVoices> votes{};
+  for (int i = 0; i < 5; ++i)
+    if (distances[i] < 1e30)
+      votes[labels[i]] += 1.;
+  return int(std::max_element(votes.begin(), votes.begin() + voices) -
+             votes.begin());
 }
 void AttackTracker::prepare(double sr, bool transient) noexcept {
   sr = std::isfinite(sr) ? clamp(sr, 8000., 384000.) : 48000.;
@@ -378,7 +520,40 @@ Features AttackTracker::descriptor() const noexcept {
   features[16] = std::log(power + 1e-12);
   return features;
 }
+namespace {
+// Fault read-only model pages in during DSP setup, never on the first hit.
+// Touch every page, rather than just one synthetic path through each forest.
+template <class T> void resident(const T &table) noexcept {
+  const volatile auto *bytes =
+      reinterpret_cast<const volatile unsigned char *>(&table);
+  for (size_t i = 0; i < sizeof(table); i += 1024)
+    (void)bytes[i];
+  (void)bytes[sizeof(table) - 1];
+}
+void prepareModels() noexcept {
+  resident(model::nodes);
+  resident(model::leafVotes);
+  resident(model::roots);
+  resident(highrate::nodes);
+  resident(highrate::leafVotes);
+  resident(highrate::roots);
+  resident(recovery::nodes);
+  resident(recovery::leafVotes);
+  resident(recovery::roots);
+  resident(transient::nodes);
+  resident(transient::leafVotes);
+  resident(transient::roots);
+  // Resolve the mathematical and tree-walking code before entering DSP too.
+  volatile auto early = classifyAttack(Features{}, 48000.);
+  volatile auto high = classifyAttack(Features{}, 96000.);
+  volatile auto quiet = classifyTransientAttack(TransientFeatures{});
+  (void)early;
+  (void)high;
+  (void)quiet;
+}
+} // namespace
 void Detector::prepare(double sr) noexcept {
+  prepareModels();
   sr = std::isfinite(sr) ? clamp(sr, 8000., 384000.) : 48000.;
   primary_.prepare(sr);
   quiet_.prepare(sr);
@@ -407,11 +582,15 @@ bool Detector::process(double input, double beat, double threshold,
     lastAccepted_ = -1000000;
   }
   ++sample_;
+  boundary_ = false;
   if (policy == Policy::transientCandidates)
     return transient_.process(input, beat, threshold, result, policy);
   Detection primary{}, quiet{};
-  const bool ready = primary_.process(input, beat, threshold, primary, policy);
-  if (policy != Policy::automatic) {
+  const bool ready = primary_.process(
+      input, beat, threshold, primary,
+      policy == Policy::enrolled ? Policy::fixedVoice : policy);
+  boundary_ = primary_.started();
+  if (policy != Policy::automatic && policy != Policy::enrolled) {
     if (ready)
       result = primary;
     return ready;
@@ -425,7 +604,12 @@ bool Detector::process(double input, double beat, double threshold,
   // Compare sample positions, never beat subdivisions. All deadlines are
   // exactly one window after their own onset; no extra waiting or snapping.
   const bool available = sample_ - window_ + 1 - lastAccepted_ >= refractory_;
-  if (ready && primary.drum != Drum::noise && available) {
+  boundary_ =
+      boundary_ ||
+      (available && !primary_.pending() &&
+       (quiet_.started() || (transientEnabled_ && transient_.started())));
+  if (ready && (primary.drum != Drum::noise || policy == Policy::enrolled) &&
+      available) {
     result = primary;
     lastAccepted_ = sample_ - window_ + 1;
     return true;
@@ -444,12 +628,21 @@ bool Detector::process(double input, double beat, double threshold,
     lastAccepted_ = sample_ - window_ + 1;
     return true;
   }
-  if (ready) {
+  if (ready && policy != Policy::enrolled) {
     result = primary;
     result.drum = Drum::noise;
     return true;
   }
   return false;
+}
+int Detector::pendingAge() const noexcept {
+  int oldest = 0;
+  for (const auto *tracker : {&primary_, &quiet_, &transient_}) {
+    const auto age = tracker->pendingAge();
+    if (age && sample_ - age - lastAccepted_ >= refractory_)
+      oldest = std::max(oldest, age);
+  }
+  return oldest;
 }
 void Kit::prepare(double sr) noexcept {
   sr_ = sr;
@@ -561,6 +754,9 @@ void Engine::prepare(double sr) noexcept {
   earlyVoice_ = 0;
   detector_.prepare(sr_);
   kit_.prepare(sr_);
+  slices_.prepare(sr_);
+  pending_.active = false;
+  midiRead_ = midiWrite_ = 0;
   clockValid_ = scheduleValid_ = false;
   if (recording_ || tailOpen_)
     cancel();
@@ -568,7 +764,7 @@ void Engine::prepare(double sr) noexcept {
     captureStart_ = std::numeric_limits<double>::quiet_NaN();
 }
 void Engine::learn(int drum) noexcept {
-  if (drum < 0 || drum > 2)
+  if (drum < 0 || drum >= profile_.voices)
     return;
   cancel();
   detector_.reset();
@@ -577,6 +773,8 @@ void Engine::learn(int drum) noexcept {
   learning_ = drum;
   profile_.count[drum] = 0;
   profile_.examples[drum] = {};
+  profile_.lateCount[drum] = 0;
+  profile_.radius[drum] = 0.;
   ++revision_;
 }
 void Engine::arm() noexcept {
@@ -595,6 +793,7 @@ void Engine::arm() noexcept {
                                  : std::numeric_limits<double>::quiet_NaN();
 }
 void Engine::cancel() noexcept {
+  pending_.active = false;
   learning_ = -1;
   waitingForBoundary_ = recording_ = tailOpen_ = committed_ = false;
   take_.count = 0;
@@ -653,17 +852,72 @@ void Engine::restore(const Loop &loop) noexcept {
 void Engine::tap(Drum drum, float velocity) noexcept {
   hit(drum, velocity, clock_.beat);
 }
-void Engine::hit(Drum drum, float velocity, double beat, bool sound) noexcept {
+bool Engine::popMidi(MidiHit &hit) noexcept {
+  if (midiRead_ == midiWrite_)
+    return false;
+  hit = midi_[midiRead_];
+  midiRead_ = (midiRead_ + 1) % int(midi_.size());
+  return true;
+}
+Event Engine::voiceEvent(int voice, float velocity) const noexcept {
+  Event e{0., velocity, Drum::noise, voice, profile_.notes[voice]};
+  if (e.note == 35 || e.note == 36)
+    e.drum = Drum::kick;
+  else if (e.note == 38 || e.note == 40)
+    e.drum = Drum::snare;
+  else if (e.note == 42 || e.note == 44 || e.note == 46)
+    e.drum = Drum::hat;
+  return e;
+}
+void Engine::sound(Event e) noexcept {
+  if (e.drum != Drum::noise)
+    kit_.trigger(e.drum, e.velocity, settings_);
+  const int next = (midiWrite_ + 1) % int(midi_.size());
+  if (next != midiRead_) {
+    const int defaults[] = {36, 38, 42};
+    midi_[midiWrite_] = {e.note >= 0 ? e.note : defaults[int(e.drum)],
+                         e.velocity};
+    midiWrite_ = next;
+  }
+}
+void Engine::hitVoice(int voice, float velocity, double beat,
+                      bool audible) noexcept {
+  if (voice < 0 || voice >= profile_.voices || !std::isfinite(velocity) ||
+      !std::isfinite(beat))
+    return;
+  lastDrum_ = voice;
+  ++hitSerial_;
+  const auto e = voiceEvent(voice, velocity);
+  if (settings_.monitor && audible)
+    sound(e);
+  store(e, beat);
+}
+void Engine::hit(Drum drum, float velocity, double beat,
+                 bool audible) noexcept {
   if (int(drum) < 0 || int(drum) > 2 || !std::isfinite(velocity) ||
       !std::isfinite(beat))
     return;
   lastDrum_ = int(drum);
   ++hitSerial_;
-  if (settings_.monitor && sound)
-    kit_.trigger(drum, velocity, settings_);
+  Event e{0., velocity, drum};
+  if (settings_.monitor && audible)
+    sound(e);
+  store(e, beat);
+}
+void Engine::finishDecision() noexcept {
+  if (!pending_.active)
+    return;
+  const auto decision = pending_;
+  pending_.active = false;
+  const auto features = slices_.extract(decision.start, decision.end);
+  const auto voice = profile_.classifyLate(features, decision.voice);
+  if (voice >= 0)
+    store(voiceEvent(voice, decision.hit.velocity), decision.hit.beat);
+}
+void Engine::store(Event e, double beat) noexcept {
   if ((recording_ || tailOpen_) && beat >= captureStart_ &&
       beat < captureStart_ + loopBeats) {
-    Event e{beat - captureStart_, velocity, drum};
+    e.beat = beat - captureStart_;
     if (!take_.append(e)) {
       // Never replace a good loop with a silently truncated take.
       if (committed_ && historyCount_) {
@@ -718,7 +972,7 @@ void Engine::schedule(double beat) noexcept {
     const auto &event = active_.events[nextEvent_];
     if (active_.anchor + scheduleCycle_ * loopBeats + event.beat > beat + 1e-10)
       break;
-    kit_.trigger(event.drum, event.velocity, settings_);
+    sound(event);
     ++playbackSerial_;
     lastPlaybackBeat_ = beat;
     if (++nextEvent_ == active_.count) {
@@ -781,46 +1035,101 @@ void Engine::process(double input, Clock clock, double &left,
   if (recording_ && clock.beat >= captureStart_ + loopBeats) {
     recording_ = false;
     tailOpen_ = true;
-    tailSamples_ = int(.012 * sr_);
+    tailSamples_ = int((profile_.delayed() ? .082 : .012) * sr_);
     if (takeAdded_)
       commit();
   }
   inputSmooth_ += (settings_.inputGain - inputSmooth_) * .002;
   outputSmooth_ += (settings_.outputGain - outputSmooth_) * .002;
+  const double raw = clamp(input * inputSmooth_, -4., 4.);
+  slices_.push(raw);
   Detection detection{};
-  const bool complete = detector_.process(
-      clamp(input * inputSmooth_, -4., 4.), clock.beat, settings_.threshold,
-      detection,
-      settings_.voice < 0 && learning_ < 0 ? AttackTracker::Policy::automatic
-                                           : AttackTracker::Policy::fixedVoice);
+  const bool enrolled = profile_.ready() && profile_.sampleRate == sr_;
+  const bool complete =
+      detector_.process(raw, clock.beat, settings_.threshold, detection,
+                        settings_.voice < 0 && learning_ < 0
+                            ? (enrolled ? AttackTracker::Policy::enrolled
+                                        : AttackTracker::Policy::automatic)
+                            : AttackTracker::Policy::fixedVoice);
   if (detector_.started()) {
     earlyDrum_ = learning_ >= 0 ? learning_
                                 : (settings_.voice >= 0 && settings_.voice <= 2
                                        ? settings_.voice
                                        : -1);
     earlyVoice_ = 0;
-    if (earlyDrum_ >= 0 && settings_.monitor)
-      earlyVoice_ =
-          kit_.trigger(Drum(earlyDrum_), detector_.attackVelocity(), settings_);
+    if (earlyDrum_ >= 0 && settings_.monitor) {
+      const Event e =
+          learning_ >= 0
+              ? voiceEvent(earlyDrum_, detector_.attackVelocity())
+              : Event{0., detector_.attackVelocity(), Drum(earlyDrum_)};
+      sound(e);
+      if (e.drum != Drum::noise)
+        earlyVoice_ = kit_.triggerCount();
+    }
   }
   // A known voice sounds on the threshold-crossing sample. Refine the same
   // voice's dynamics as its attack unfolds; never make a second transient.
   if (earlyVoice_ && (detector_.pending() || complete))
     kit_.refine(earlyVoice_, detector_.attackVelocity());
   if (complete) {
+    if (pending_.active) {
+      pending_.end = std::min(pending_.end,
+                              slices_.position() - int(std::round(.010 * sr_)));
+      finishDecision();
+    }
     if (learning_ >= 0) {
       detection.drum = Drum(learning_);
       profile_.add(detection.drum, detection.features);
       ++revision_;
       if (profile_.count[learning_] >= 3)
         learning_ = -1;
-    } else if (earlyDrum_ >= 0)
-      detection.drum = Drum(earlyDrum_);
-    else
-      detection.drum = profile_.classify(detection);
-    hit(detection.drum, detection.velocity, detection.beat, earlyDrum_ < 0);
+      hitVoice(int(detection.drum), detection.velocity, detection.beat, false);
+    } else if (earlyDrum_ >= 0) {
+      hit(Drum(earlyDrum_), detection.velocity, detection.beat, false);
+    } else {
+      Slices first;
+      const bool richReject =
+          enrolled && profile_.delayed() && profile_.lateRejects >= 4;
+      if (richReject)
+        first =
+            slices_.extract(slices_.position() - int(std::round(.010 * sr_)),
+                            slices_.position());
+      const int voice =
+          (profile_.sampleRate == 0. || enrolled)
+              ? profile_.classifyVoice(detection, richReject ? &first : nullptr)
+              : (detection.drum == Drum::noise ? -1 : int(detection.drum));
+      if (voice >= 0) {
+        if (enrolled && profile_.delayed()) {
+          // Audible deadline is unchanged. Only capture waits for body/tail.
+          lastDrum_ = voice;
+          ++hitSerial_;
+          if (settings_.monitor)
+            sound(voiceEvent(voice, detection.velocity));
+          if (recording_ || tailOpen_) {
+            const auto start = slices_.position() - int(std::round(.010 * sr_));
+            if (pending_.active)
+              pending_.end = std::min(pending_.end, start);
+            finishDecision();
+            pending_ = {detection, voice, start,
+                        start + int(std::round(.080 * sr_)), true};
+          }
+        } else if (profile_.ready() && (enrolled || profile_.sampleRate == 0.))
+          hitVoice(voice, detection.velocity, detection.beat);
+        else
+          hit(Drum(voice), detection.velocity, detection.beat);
+      }
+    }
     earlyDrum_ = -1;
     earlyVoice_ = 0;
+  }
+  if (pending_.active && slices_.position() >= pending_.end) {
+    // At the deadline, an unresolved attack is conservatively excluded.
+    // Already-rejected helper candidates do not chop a drum's own tail.
+    const int age = detector_.pendingAge();
+    const auto boundary = slices_.position() - age;
+    if (age && boundary > pending_.start)
+      pending_.end = std::min(pending_.end, boundary);
+    finishDecision();
   }
   if (tailOpen_ && --tailSamples_ <= 0) {
     if (!committed_)

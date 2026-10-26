@@ -435,55 +435,56 @@ def reset() -> None:
 CLASSES_BY_DRUM = {0: "kick", 1: "snare", 2: "hat"}
 
 
-def export_pocket(binary: Path | str | None = None, sr: int = 48000, gate: float = 0.010) -> dict:
-    """Turn the enrolled clips into a Pocket Teach profile (3 medoids per voice).
+def export_pocket(binary: Path | str | None = None, sr: int = 48000, gate: float = 0.010,
+                  reject_clips: list[Path] | None = None) -> dict:
+    """Export every enrolled voice + MIDI mapping; keep up to 30 representatives per voice.
 
-    Pocket (the native realtime device) is the other device line; its
-    profile holds exactly three 17-feature examples per voice. Instead of
-    the three hits you happened to play at the mic, this runs Pocket's own
-    detector over every enrolled clip (resampled to the Set's rate, default
-    48 kHz) and keeps the three most representative hits per voice. Open-hat
-    clips count as hats — Pocket maps open to closed.
+    Clips are one class each. Breath/speech controls can be supplied explicitly;
+    neither a mixed calibration take nor a held-out evaluation take is enrollment.
     """
+    import hashlib
     import librosa
-
     from mouthflow import pocket
 
     bin_path = pocket.find_binary(binary)
-    scale = pocket.model_scale()
-    m = _load_manifest()
-    by_drum: dict[int, list[np.ndarray]] = {0: [], 1: [], 2: []}
-    detected: dict[str, int] = {}
-    used_clips: list[dict] = []
-    pocket_drum = {"kick": 0, "snare": 1, "hat": 2, "hat_open": 2}
-    skipped: dict[str, int] = {}  # Pocket's Profile holds exactly three voices
-    for e in m["clips"]:
-        path = Path(e.get("path", ""))
-        cls = e.get("class")
-        if not path.exists() or cls not in classes():
-            continue
-        if cls not in pocket_drum:
-            if cls != NOISE:  # Pocket has its own noise handling; a 'noise' Teach voice is the ask in the contract doc
-                skipped[cls] = skipped.get(cls, 0) + int(e.get("hits", 0))
-            continue
-        drum = pocket_drum[cls]
+    table = classes()
+    by_class: dict[str, list[np.ndarray]] = {}
+    sources = []
+    negatives = []
+    def read_rows(path):
         y = _load_audio(path)
         if sr != SR:
             y = librosa.resample(y, orig_sr=SR, target_sr=sr).astype(np.float32)
-        rows = pocket.accepted(pocket.analyze(bin_path, y, sr, gate))
-        detected[cls] = detected.get(cls, 0) + len(rows)
-        by_drum[drum].extend(rows[:, 4:])
-        used_clips.append({"class": cls, "path": str(path), "pocket_hits": int(len(rows))})
-    examples = pocket.pick_examples({d: np.array(v) for d, v in by_drum.items()}, scale)
-    doc = pocket.write_profile(
-        examples,
-        {
-            "sample_rate": sr,
-            "gate": gate,
-            "pick": "medoid",
-            "source": {"kind": "mouthflow-enroll", "clips": used_clips, "detected": detected,
-                       "exported_at": datetime.now().isoformat(timespec="seconds")},
-        },
-    )
-    return {"written": doc["written"], "detected": detected, "skipped": skipped,
-            "hits_per_drum": {CLASSES_BY_DRUM[d]: int(len(v)) for d, v in by_drum.items()}}
+        return pocket.analyze(bin_path, y, sr, gate, policy="enrollment")
+    for e in _load_manifest()["clips"]:
+        path, cls = Path(e.get("path", "")), e.get("class")
+        if not path.is_file() or cls not in table:
+            continue
+        rows = read_rows(path)
+        if cls == NOISE:
+            negatives.extend(rows)
+        else:
+            by_class.setdefault(cls, []).append(rows)
+        sources.append({"class": cls, "path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                        "pocket_hits": len(rows)})
+    # Stable K/S/H-first order preserves the built-in pads; every other name
+    # remains a distinct voice, including open hats and user-defined sounds.
+    names = sorted(by_class, key=lambda c: (c not in ("kick", "snare", "hat"),
+                                           ("kick", "snare", "hat").index(c) if c in ("kick", "snare", "hat") else c))
+    voices = [{"name": name, "note": table[name], "rows": np.concatenate(by_class[name])} for name in names]
+    for source in reject_clips or []:
+        path = Path(source)
+        if not path.is_file():
+            raise pocket.PocketError(f"rejection clip not found: {path}")
+        rows = read_rows(path)
+        negatives.extend(rows)
+        sources.append({"class": "__reject__", "path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                        "pocket_hits": len(rows)})
+    doc = pocket.build_profile(voices, sr, np.asarray(negatives).reshape(-1, 145))
+    doc["source"] = {"kind": "mouthflow-enroll", "clips": sources,
+                     "exported_at": datetime.now().isoformat(timespec="seconds")}
+    doc["gate"] = gate
+    written = pocket.write_profile_document(doc)
+    counts = {v["name"]: len(v["rows"]) for v in voices}
+    return {"written": written["written"], "detected": counts, "skipped": {}, "hits_per_drum": counts,
+            "reject_examples": doc["reject_examples"]}

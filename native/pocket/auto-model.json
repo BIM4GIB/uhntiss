@@ -1,7 +1,7 @@
 {
   "sklearn_version": "1.8.0",
   "version": 5,
-  "feature_version": 2,
+  "feature_version": 3,
   "features": 17,
   "window_ms": 10,
   "history_ms": 30,
@@ -186,5 +186,19 @@
     "isolated_context_scenes": 24,
     "context_seed": 93021
   },
-  "scope": "Source-held-out development model; recordings informed engineering choices. Not an untouched test or unseen-performer claim."
+  "scope": "Source-held-out development model; recordings informed engineering choices. Not an untouched test or unseen-performer claim.",
+  "enrollment": {
+    "state_version": 5,
+    "max_voices": 16,
+    "max_examples": 30,
+    "commit_features": 120,
+    "commit_slices_ms": [
+      0,
+      10,
+      40,
+      80
+    ],
+    "next_onset_truncation": true,
+    "negative_bank": 30
+  }
 }

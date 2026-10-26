@@ -1017,22 +1017,24 @@ def enroll_train() -> None:
 
 @enroll_app.command("export-pocket")
 def enroll_export_pocket(
+    reject_clip: list[Path] = typer.Option([], "--reject-clip", help="Breath/speech-only recording; repeat for multiple clips."),
     sr: int = typer.Option(48000, "--sr", help="The Live Set's sample rate (Pocket analyses at the Set rate)."),
     binary: Path | None = typer.Option(None, "--binary", help="pocket_analyze path (default: native/pocket/build)."),
 ) -> None:
-    """Turn the enrolled clips into a Pocket Teach profile (3 best hits per voice)."""
+    """Turn the enrolled clips into a Pocket Teach profile (up to 30 hits per voice)."""
     from mouthflow import enroll, pocket
 
     try:
-        rep = enroll.export_pocket(binary, sr=sr)
+        rep = enroll.export_pocket(binary, sr=sr, reject_clips=reject_clip)
     except (enroll.EnrollError, pocket.PocketError) as exc:
         _log(f"FAIL {exc}")
         raise typer.Exit(code=2)
     det = ", ".join(f"{c} {n}" for c, n in rep["detected"].items())
-    _log(f"pocket detected {det} at {sr} Hz; kept 3 medoids per voice")
+    _log(f"pocket detected {det} at {sr} Hz; kept up to 30 representatives per voice")
+    _log(f"personal rejection bank: {rep.get('reject_examples', 0)} examples")
     if rep.get("skipped"):
         sk = ", ".join(f"{c} ({n} hits)" for c, n in rep["skipped"].items())
-        _log(f"not exported: {sk} — Pocket's profile holds exactly kick/snare/hat today")
+        _log(f"not exported: {sk}")
     for w in rep["written"]:
         _log(f"wrote {w}")
     _log("in the Pocket device press PROFILE to load it (it then persists with the Set)")

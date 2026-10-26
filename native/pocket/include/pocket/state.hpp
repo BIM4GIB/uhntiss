@@ -6,32 +6,16 @@ namespace pocket {
 // All versions retain loop timing. Older feature profiles are reset because
 // their descriptors cannot classify the current causal attacks.
 constexpr size_t profileValues = 3 * (1 + 3 * Features{}.size());
-constexpr size_t maxStateValues = 3 + maxEvents * 3 + profileValues;
+constexpr size_t voiceValues = 30 + maxExamples * (17 + 30);
+constexpr size_t maxProfileValues =
+    6 + 240 + maxVoices * voiceValues + maxRejects * (17 + 31);
+constexpr size_t maxStateValues = 3 + maxEvents * 5 + maxProfileValues;
 using StateValues = std::array<double, maxStateValues>;
-inline size_t encodeState(const Loop &loop, const Profile &profile,
-                          StateValues &out) noexcept {
-  size_t n = 0;
-  out[n++] = 4.;
-  out[n++] = loop.anchor;
-  out[n++] = double(loop.count);
-  for (size_t i = 0; i < loop.count; ++i) {
-    out[n++] = loop.events[i].beat;
-    out[n++] = loop.events[i].velocity;
-    out[n++] = int(loop.events[i].drum);
-  }
-  for (int d = 0; d < 3; ++d) {
-    out[n++] = profile.count[d];
-    for (const auto &example : profile.examples[d])
-      for (double f : example)
-        out[n++] = f;
-  }
-  return n;
-}
 inline bool stateInteger(double v, int lo, int hi) noexcept {
   return std::isfinite(v) && v >= lo && v <= hi && v == std::floor(v);
 }
-inline bool decodeState(const double *values, size_t count, Loop &loop,
-                        Profile &profile) noexcept {
+inline bool decodeLegacyState(const double *values, size_t count, Loop &loop,
+                              Profile &profile) noexcept {
   if (!values || count < 3 || !stateInteger(values[0], 2, 4) ||
       !std::isfinite(values[1]) || !stateInteger(values[2], 0, int(maxEvents)))
     return false;
@@ -77,17 +61,220 @@ inline bool decodeState(const double *values, size_t count, Loop &loop,
 // per voice, profileValues doubles). Lets a host deliver a Teach profile
 // built offline (e.g. from one-class enrollment clips) without touching the
 // loop. Same validation as decodeState's current branch.
-inline bool decodeProfile(const double *values, size_t count,
-                          Profile &profile) noexcept {
+inline bool decodeLegacyProfile(const double *values, size_t count,
+                                Profile &profile) noexcept {
   if (!values || count != profileValues)
     return false;
-  StateValues scratch{};
+  std::array<double, 3 + profileValues> scratch{};
   scratch[0] = 4.;
   scratch[1] = 0.;
   scratch[2] = 0.;
   for (size_t i = 0; i < profileValues; ++i)
     scratch[3 + i] = values[i];
   Loop loop;
-  return decodeState(scratch.data(), 3 + profileValues, loop, profile);
+  return decodeLegacyState(scratch.data(), 3 + profileValues, loop, profile);
+}
+// v5: [5, featureVersion, voices, earlyRejects, sampleRate, richRejects],
+// 120 scales + 120 centers, then voices * voiceValues. Each voice contains
+// note, 24 ASCII bytes, early/late counts, radius, two reserved zeros,
+// 30x17 early doubles and 30x120 signed Q4 bytes packed four per uint32 double.
+// Negative banks follow: earlyRejects*17, richRejects*(mask + 30 packed words).
+// Masks 1/3/7 mark complete slices; current export uses sustained (7)
+// negatives.
+inline size_t encodeProfile(const Profile &p, double *out) noexcept {
+  size_t n = 0;
+  out[n++] = 5.;
+  out[n++] = featureVersion;
+  out[n++] = p.voices;
+  out[n++] = p.rejects;
+  out[n++] = p.sampleRate;
+  out[n++] = p.lateRejects;
+  for (auto f : p.scale)
+    out[n++] = f;
+  for (auto f : p.center)
+    out[n++] = f;
+  for (int d = 0; d < p.voices; ++d) {
+    out[n++] = p.notes[d];
+    for (int j = 0; j < 24; ++j)
+      out[n++] = p.names[d][j];
+    out[n++] = p.count[d];
+    out[n++] = p.lateCount[d];
+    out[n++] = p.radius[d];
+    out[n++] = 0.;
+    out[n++] = 0.;
+    for (const auto &e : p.examples[d])
+      for (auto f : e)
+        out[n++] = f;
+    for (const auto &e : p.late[d])
+      for (int j = 0; j < 120; j += 4) {
+        std::uint32_t packed = 0;
+        for (int k = 0; k < 4; ++k)
+          packed |= std::uint32_t(std::uint8_t(e[j + k])) << (k * 8);
+        out[n++] = double(packed);
+      }
+  }
+  for (int i = 0; i < p.rejects; ++i)
+    for (auto f : p.negative[i])
+      out[n++] = f;
+  for (int i = 0; i < p.lateRejects; ++i) {
+    out[n++] = p.negativeSlices[i];
+    for (int j = 0; j < 120; j += 4) {
+      std::uint32_t packed = 0;
+      for (int k = 0; k < 4; ++k)
+        packed |= std::uint32_t(std::uint8_t(p.negativeLate[i][j + k]))
+                  << (k * 8);
+      out[n++] = double(packed);
+    }
+  }
+  return n;
+}
+inline bool decodeProfile(const double *v, size_t count,
+                          Profile &profile) noexcept {
+  if (count == profileValues)
+    return decodeLegacyProfile(v, count, profile);
+  if (!v || count < 246 || v[0] != 5. || v[1] != featureVersion ||
+      !stateInteger(v[2], 2, maxVoices) || !stateInteger(v[3], 0, maxRejects) ||
+      !stateInteger(v[5], 0, maxRejects) || !std::isfinite(v[4]) ||
+      (v[4] != 0. && (v[4] < 8000. || v[4] > 384000.)))
+    return false;
+  const int voices = int(v[2]), rejects = int(v[3]);
+  if (count != 246 + voices * voiceValues + rejects * 17 + size_t(v[5]) * 31)
+    return false;
+  Profile p;
+  p.voices = voices;
+  p.rejects = rejects;
+  p.sampleRate = v[4];
+  p.lateRejects = int(v[5]);
+  size_t n = 6;
+  for (auto &f : p.scale) {
+    f = v[n++];
+    if (!std::isfinite(f) || f < 0. || f > 1e6 || (p.sampleRate && f < 1e-6))
+      return false;
+  }
+  for (auto &f : p.center) {
+    f = v[n++];
+    if (!std::isfinite(f) || std::abs(f) > 1024.)
+      return false;
+  }
+  for (int d = 0; d < voices; ++d) {
+    if (!stateInteger(v[n], 0, 127))
+      return false;
+    p.notes[d] = int(v[n++]);
+    bool ended = false;
+    for (int j = 0; j < 24; ++j) {
+      if (!stateInteger(v[n], 0, 127))
+        return false;
+      const char c = char(v[n++]);
+      if ((!j && (c < 'a' || c > 'z')) || (c && ended) ||
+          (c && !((c >= 'a' && c <= 'z') || (j && c >= '0' && c <= '9') ||
+                  (j && c == '_'))))
+        return false;
+      p.names[d][j] = c;
+      ended = ended || !c;
+    }
+    p.names[d][24] = 0;
+    for (int i = 0; i < d; ++i)
+      if (p.names[i] == p.names[d])
+        return false;
+    if (!stateInteger(v[n], 0, maxExamples) ||
+        !stateInteger(v[n + 1], 0, maxExamples))
+      return false;
+    p.count[d] = int(v[n++]);
+    p.lateCount[d] = int(v[n++]);
+    p.radius[d] = v[n++];
+    if (!std::isfinite(p.radius[d]) || p.radius[d] < 0. || p.radius[d] > 1e8 ||
+        v[n++] != 0. || v[n++] != 0.)
+      return false;
+    for (auto &e : p.examples[d])
+      for (auto &f : e) {
+        f = v[n++];
+        if (!std::isfinite(f) || std::abs(f) > 64.)
+          return false;
+      }
+    for (auto &e : p.late[d])
+      for (int j = 0; j < 120; j += 4) {
+        const double value = v[n++];
+        if (!std::isfinite(value) || value < 0. || value > 4294967295. ||
+            value != std::floor(value))
+          return false;
+        const auto packed = std::uint32_t(value);
+        for (int k = 0; k < 4; ++k) {
+          const auto byte = int((packed >> (k * 8)) & 255);
+          e[j + k] = std::int8_t(byte < 128 ? byte : byte - 256);
+        }
+      }
+  }
+  for (int i = 0; i < rejects; ++i)
+    for (auto &f : p.negative[i]) {
+      f = v[n++];
+      if (!std::isfinite(f) || std::abs(f) > 64.)
+        return false;
+    }
+  for (int i = 0; i < p.lateRejects; ++i) {
+    if (v[n] != 1. && v[n] != 3. && v[n] != 7.)
+      return false;
+    p.negativeSlices[i] = int(v[n++]);
+    for (int j = 0; j < 120; j += 4) {
+      const double value = v[n++];
+      if (!std::isfinite(value) || value < 0. || value > 4294967295. ||
+          value != std::floor(value))
+        return false;
+      const auto packed = std::uint32_t(value);
+      for (int k = 0; k < 4; ++k) {
+        const int byte = int((packed >> (k * 8)) & 255);
+        p.negativeLate[i][j + k] = std::int8_t(byte < 128 ? byte : byte - 256);
+      }
+    }
+  }
+  profile = p;
+  return true;
+}
+inline size_t encodeState(const Loop &loop, const Profile &profile,
+                          StateValues &out) noexcept {
+  size_t n = 0;
+  out[n++] = 5.;
+  out[n++] = loop.anchor;
+  out[n++] = double(loop.count);
+  for (size_t i = 0; i < loop.count; ++i) {
+    const auto &e = loop.events[i];
+    out[n++] = e.beat;
+    out[n++] = e.velocity;
+    out[n++] = int(e.drum);
+    out[n++] = e.voice;
+    out[n++] = e.note;
+  }
+  n += encodeProfile(profile, out.data() + n);
+  return n;
+}
+inline bool decodeState(const double *v, size_t count, Loop &loop,
+                        Profile &profile) noexcept {
+  if (!v || count < 3)
+    return false;
+  if (v[0] != 5.)
+    return decodeLegacyState(v, count, loop, profile);
+  if (!std::isfinite(v[1]) || !stateInteger(v[2], 0, int(maxEvents)))
+    return false;
+  const auto events = size_t(v[2]);
+  if (count < 3 + events * 5)
+    return false;
+  Loop next;
+  next.anchor = v[1];
+  Profile p;
+  size_t n = 3;
+  for (size_t i = 0; i < events; ++i) {
+    if (!std::isfinite(v[n + 1]) || v[n + 1] < double(.02f) || v[n + 1] > 1. ||
+        !stateInteger(v[n + 2], 0, 3) ||
+        !stateInteger(v[n + 3], -1, maxVoices - 1) ||
+        !stateInteger(v[n + 4], -1, 127) ||
+        !next.append({v[n], float(v[n + 1]), Drum(int(v[n + 2])), int(v[n + 3]),
+                      int(v[n + 4])}))
+      return false;
+    n += 5;
+  }
+  if (!decodeProfile(v + n, count - n, p))
+    return false;
+  loop = next;
+  profile = p;
+  return true;
 }
 } // namespace pocket

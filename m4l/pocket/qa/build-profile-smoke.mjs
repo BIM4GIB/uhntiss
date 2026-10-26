@@ -1,0 +1,11 @@
+import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} from 'node:url';
+const out=path.resolve(process.argv[2]);
+const buf=fs.readFileSync(path.join(out,'UHNTISS Pocket.amxd'));const data=JSON.parse(buf.subarray(32,-1));
+for(const [id,text] of [['qa','js pocket-profile-smoke.js'],['qa-midi','prepend midihit']])data.patcher.boxes.unshift({box:{id,maxclass:'newobj',text,patching_rect:[400,250,200,22]}});
+for(const [a,o,b] of [['engine',2,'qa'],['engine',3,'qa-midi'],['qa-midi',0,'qa']])data.patcher.lines.push({patchline:{source:[a,o],destination:[b,0]}});
+const payload=Buffer.from(JSON.stringify(data)+'\0'),header=Buffer.from(buf.subarray(0,32));header.writeUInt32LE(payload.length,28);
+fs.writeFileSync(path.join(out,'UHNTISS Pocket Profile QA.amxd'),Buffer.concat([header,payload]));
+fs.copyFileSync(fileURLToPath(new URL('./profile-smoke.js',import.meta.url)),path.join(out,'pocket-profile-smoke.js'));
+const probe={patcher:{fileversion:1,appversion:{major:9,minor:1,revision:0,architecture:'x64',modernui:1},rect:[0,0,400,200],boxes:[{box:{id:'in',maxclass:'newobj',text:'midiin',patching_rect:[10,10,60,22]}},{box:{id:'parse',maxclass:'newobj',text:'midiparse',patching_rect:[10,40,100,22]}},{box:{id:'qa',maxclass:'newobj',text:'js pocket-midi-probe.js',patching_rect:[10,70,200,22]}}],lines:[{patchline:{source:['in',0],destination:['parse',0]}},{patchline:{source:['parse',0],destination:['qa',0]}}]}};
+const pp=Buffer.from(JSON.stringify(probe)+'\0'),hh=Buffer.from(header);hh.write('mmmm',8);hh.writeUInt32LE(0,20);hh.writeUInt32LE(pp.length,28);fs.writeFileSync(path.join(out,'Pocket MIDI Probe.amxd'),Buffer.concat([hh,pp]));
+fs.writeFileSync(path.join(out,'pocket-midi-probe.js'),`inlets=1;outlets=0;var notes=[];function list(n,v){if(v<=0)return;notes.push({note:n,velocity:v,at:Date.now()});var f=new File('/tmp/uhntiss-pocket-midi-probe.json','write','TEXT');if(f.isopen){f.eof=0;f.writestring(JSON.stringify(notes));f.close();}}`);
