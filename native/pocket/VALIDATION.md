@@ -26,9 +26,14 @@ chunks below this per-call limit. `profile-reader-runtime.json` reproduces the
 old failure and the complete 7,229-value output in Max's actual JS runtime.
 The mock now models this cursor jump and ordinary short reads.
 
-MIDI Device I/O reports the probe track in its available destinations. End-to-end
-receiver verification remains pending; native MIDI-outlet replay alone does not
-establish routed delivery. The dedicated QA and reader patches are excluded
+MIDI receiver verification passes: a separate MIDI effect received the six
+controlled notes at velocities 57/67/77/88/98/108 and custom note 37 at velocity
+47 from restored-loop playback. `profile-host-smoke-061.json` includes both sides.
+A fresh instance also passed with the final deferred port/configuration query;
+`profile-startup-smoke-061.json` records its populated MIDI destination list.
+These are pad-driven host tests, not fresh-take accuracy or round-trip latency
+measurements. Pattr blob get/set was tested; saving and reopening the whole
+Live Set was not exercised during this session. The dedicated QA and reader patches are excluded
 from the playable bundle. JS/native resource names are versioned for coexistence.
 
 Factory model hashes and reserved sources are unchanged from Pocket 05. The

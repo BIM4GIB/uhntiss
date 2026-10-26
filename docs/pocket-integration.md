@@ -66,7 +66,10 @@ The loader now requests 2,048-byte chunks. A standalone Max runtime regression
 shows the old parse failing and the fixed script emitting all 7,229 values.
 An actual Live click then passed four-voice installation, six-hit capture,
 Clear/Undo, v5 pattr restoration and custom-note replay at its exact beat offset.
-Routed delivery to a separate MIDI receiver still needs verification.
+A separate MIDI receiver then received the complete controlled sequence and
+custom note 37 with the expected velocities. A fresh-instance test also confirms
+the final deferred port/configuration query populates the MIDI destination list.
+This checks pattr blob restoration; a whole-Set disk save/reopen is not claimed.
 
 Pocket 06.1 packages `uhntiss.pocket061~`, `pocket061-ui.js` and
 `pocket061-profile.js` so previous versions can remain in the same Set.
