@@ -156,7 +156,19 @@ snares. Two designs measured:
 A global "not a drum" class punishes whichever voice it hasn't seen (and
 the performer whose hums it *has* seen); a per-user one from a single
 ~20 s voice clip rejects singing an order of magnitude better with nothing
-lost. Shipped on the Python side as the built-in `noise` sound (verdict
+lost.
+
+**Speech (LibriSpeech dev-clean, 2026-10-25, 110 s / 10 files):** talking
+into the open mic gives **mouthflow 212 false hits/min, Pocket 170/min**
+(both mostly snare). With 2,892 speech onsets in the negative bank the
+global gate rejects speech 230 → 40/min and hums → 2.5/min held out, but
+silences **20/34 and 31/43** of the performer's real fixture hits — worse
+than before. Conclusion is final: the global gate is not a product
+path; the per-user `noise` clip must include *talking* as well as singing
+and breathing. The 3,104-onset negative bank (`datasets/avp/cache/
+negatives.all123.npz`) stays as a measurement set and as training
+negatives for the no-enrollment global fallback only if a future variant
+keeps the performer's hits (gate on it with `eval/negatives.py --fixtures`). Shipped on the Python side as the built-in `noise` sound (verdict
 DROP; `enroll record noise --duration 20`, panel `enroll_noise`).
 
 **Ask for Pocket:** the same clip could teach a 4th "noise" Teach voice

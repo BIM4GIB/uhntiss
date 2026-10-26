@@ -1,6 +1,6 @@
 # Mouthflow — session handover
 
-Last updated: 2026-10-25 (branch `feat/enroll-noise`; everything through PR #27 is on main).
+Last updated: 2026-10-25 (branch `feat/negatives-speech`; everything through PR #28 is on main).
 Read this first when picking up work.
 (Architecture overview for newcomers: [`ARCHITECTURE.md`](ARCHITECTURE.md);
 honest gap list: [`KNOWN-LIMITATIONS.md`](KNOWN-LIMITATIONS.md); audit findings
@@ -13,6 +13,16 @@ PR's description before summarising state. Merged history + main cannot see
 in-flight work; on 2026-10-22 a catch-up reported "last work = PR #18" while
 PR #19 (Pocket 05, the native rebuild, 10 commits, CI green) sat open as a
 draft.
+
+**2026-10-25 (later) — speech negatives (`feat/negatives-speech`).**
+LibriSpeech dev-clean downloaded to `datasets/librispeech/` (CC BY 4.0,
+gitignored). Talking into the open mic: mouthflow drums device **212 false
+hits/min**, Pocket **170/min**. With 2,892 speech onsets in the bank the
+global gate rejects speech 230 → 40/min held out but silences 20/34 and
+31/43 of René's real fixture hits — the global gate is conclusively not a
+product path (`eval/negatives.py --fixtures` reports this). The per-user
+`noise` clip must include talking, not just singing. Bank cached at
+`datasets/avp/cache/negatives.all123.npz` (3,104 onsets).
 
 **2026-10-25 — open-mic rejection = the `noise` sound (`feat/enroll-noise`).**
 On hummed bass takes the drums device fired 72 false hits/min (Pocket
