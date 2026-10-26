@@ -11,13 +11,25 @@ seam tails, clear/undo/restore/rate changes, no late retrigger and zero audio-pa
 allocations. ASan/UBSan pass. Python verifies native spectral parity and
 quantized classifier/rejection parity. JS checks the actual PROFILE int handler.
 
-Host status: the universal Pocket 06 QA device loaded on a separate test track
-and the local Live bridge remains responsive. The UI-control interface timed out
-before PROFILE could be clicked. PROFILE installation, host pattr persistence
-and routed custom-note delivery are therefore **not yet verified in Live**.
-`qa/build-profile-smoke.mjs` builds a harness that waits for the button click;
-it is excluded from the playable candidate bundle. Keep this change in draft
-until that host test passes. The candidate does not replace the existing device.
+## Pocket 06.1 host verification — 2026-10-26
+
+Live 12.4.3 / bundled Max 9.1.4, 48 kHz. An actual PROFILE click loaded four
+voices with 30 personal rejection examples; the audio thread acknowledged it.
+The host harness captured six pad hits, cleared/undid/restored the v5 pattr
+blob (7,262 values), then replayed custom note 37 at beat 0.127891. This checks
+host serialization and native MIDI-outlet replay, not acoustic classification.
+The fixed 10/80 ms deadlines and roll timing remain native-core test results.
+
+The first real click exposed Max File truncation: a 73,668-byte JSON returned
+32,767 characters while moving the file position to 73,668. Pocket 06.1 reads
+chunks below this per-call limit. `profile-reader-runtime.json` reproduces the
+old failure and the complete 7,229-value output in Max's actual JS runtime.
+The mock now models this cursor jump and ordinary short reads.
+
+MIDI Device I/O reports the probe track in its available destinations. End-to-end
+receiver verification remains pending; native MIDI-outlet replay alone does not
+establish routed delivery. The dedicated QA and reader patches are excluded
+from the playable bundle. JS/native resource names are versioned for coexistence.
 
 Factory model hashes and reserved sources are unchanged from Pocket 05. The
 following historical validation remains relevant to the fallback factory path;

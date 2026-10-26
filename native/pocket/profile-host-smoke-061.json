@@ -1,0 +1,90 @@
+{
+  "pass": true,
+  "detail": "PROFILE acknowledged; capture, clear, undo, pattr restore and custom-note replay checked",
+  "profile": {
+    "voices": 4,
+    "sample_rate": 48000,
+    "rejects": 30
+  },
+  "state": {
+    "version": 5,
+    "events": 6,
+    "values": 7262,
+    "custom_note": 37,
+    "custom_beat": 0.127891
+  },
+  "midi": [
+    {
+      "note": 36,
+      "velocity": 57,
+      "ms": 14832
+    },
+    {
+      "note": 38,
+      "velocity": 67,
+      "ms": 15184
+    },
+    {
+      "note": 42,
+      "velocity": 77,
+      "ms": 15533
+    },
+    {
+      "note": 36,
+      "velocity": 88,
+      "ms": 15883
+    },
+    {
+      "note": 38,
+      "velocity": 98,
+      "ms": 16232
+    },
+    {
+      "note": 42,
+      "velocity": 108,
+      "ms": 16589
+    },
+    {
+      "note": 36,
+      "velocity": 12,
+      "ms": 18570
+    },
+    {
+      "note": 38,
+      "velocity": 67,
+      "ms": 19184
+    },
+    {
+      "note": 37,
+      "velocity": 47,
+      "ms": 22669
+    }
+  ],
+  "routing": {
+    "device_class": [
+      "MxDeviceAudioEffect"
+    ],
+    "midi_outputs": [
+      "id",
+      7
+    ],
+    "types": [
+      "1-MIDI",
+      "2-Massive X",
+      "MF Ref starter_bass 1",
+      "MF Ref starter_bass 2",
+      "MF Ref starter_bass 3",
+      "Pocket MIDI probe",
+      "No Output"
+    ],
+    "selected": [
+      6
+    ]
+  },
+  "host": {
+    "live": "12.4.3",
+    "max": "9.1.4",
+    "date": "2026-10-26"
+  },
+  "routed_delivery_verified": false
+}

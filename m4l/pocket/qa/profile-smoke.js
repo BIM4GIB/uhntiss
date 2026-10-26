@@ -1,10 +1,14 @@
 // Host-only harness: waits for an actual PROFILE button click. Not shipped.
-inlets=1;outlets=0;
+autowatch=1;inlets=1;outlets=0;
+var routing={};
+function routing_types(){routing.types=arrayfromargs(arguments);if(!routing.initial_types)routing.initial_types=routing.types.slice(0);}
+function routing_selected(){routing.selected=arrayfromargs(arguments);}
+function routing_dump(){routing.dump=arrayfromargs(arguments);}
 var stage=0,tasks=[],saved=null,receipt=null,notes=[],summary={},started=Date.now();
 function later(ms,fn){var t=new Task(fn,this);tasks.push(t);t.schedule(ms);}
 function command(name,a,b){var e=this.patcher.getnamed('pocket_engine');if(arguments.length===1)e.message(name);else e.message(name,a,b);}
-function report(ok,detail){var f=new File('/tmp/uhntiss-pocket-profile-smoke.json','write','TEXT');if(f.isopen){f.eof=0;f.writestring(JSON.stringify({pass:ok,detail:detail,profile:receipt,state:summary,midi:notes},null,2));f.close();}post('POCKET PROFILE QA '+detail+'\n');}
-function profile_loaded(n,sr,rejects){if(stage)return;receipt={voices:n,sample_rate:sr,rejects:rejects};stage=1;command('setting','output',0);command('record');later(18000,function(){if(stage<8)report(false,'timeout stage '+stage);});}
+function report(ok,detail){var f=new File('/tmp/uhntiss-pocket-profile-smoke.json','write','TEXT');if(f.isopen){f.eof=0;f.writestring(JSON.stringify({pass:ok,detail:detail,profile:receipt,state:summary,midi:notes,routing:routing},null,2));f.close();}post('POCKET PROFILE QA '+detail+'\n');}
+function profile_loaded(n,sr,rejects){if(stage)return;try {var dev=new LiveAPI(null,'this_device');routing.device_class=dev.get('class_name');routing.midi_outputs=dev.get('midi_outputs');}catch(e){routing.api_error=e.message;}receipt={voices:n,sample_rate:sr,rejects:rejects};stage=1;command('setting','output',0);command('record');later(18000,function(){if(stage<8)report(false,'timeout stage '+stage);});}
 function profile_error(){report(false,'profile rejected');}
 function profile_rate_mismatch(){report(false,'sample-rate mismatch');}
 function midihit(note,vel){if(vel>0 && notes.length<50)notes.push({note:note,velocity:vel,ms:Date.now()-started});}

@@ -1,4 +1,4 @@
-# UHNTISS Pocket 06 · personal voices and delayed loop decisions
+# UHNTISS Pocket 06.1 · personal voices and delayed loop decisions
 
 A local voice-to-drum instrument and two-bar looper for Ableton Live. Native C++
 handles detection, synthesis, transport and recording. Max for Live supplies the
@@ -23,7 +23,7 @@ Requires macOS 11+, Ableton Live with Max for Live, and a mono mic input. The
 provided external is universal Apple Silicon/Intel. The portable core also builds
 on Linux; there is no Windows Max external in this release.
 
-1. Keep `UHNTISS Pocket.amxd`, `pocket-ui.js`, `pocket-profile.js` and `uhntiss.pocket06~.mxo` together.
+1. Keep `UHNTISS Pocket.amxd`, `pocket061-ui.js`, `pocket061-profile.js` and `uhntiss.pocket061~.mxo` together.
    Drag the `.amxd` onto an **audio track**. No API key, bridge, Python, Node server,
    network connection or downloaded kit is needed to play.
 2. Select your mono mic channel in Live; set the track's Monitor to **In**. The
@@ -73,6 +73,11 @@ representatives from enrollment alone. At least three complete, isolated
 80 ms attacks per playable voice are required. Scale, center and rejection
 radius come only from enrollment; query/take audio never fits the profile.
 The mislabeled CAL 48k 0003 take and the reserved uptempo take are not enrollment.
+
+Pocket 06.1 fixes large JSON loading: Max's single `readstring` can truncate
+at 32,767 characters even while advancing to EOF. The loader reads small
+chunks instead. Its scripts and native external use version-specific names
+so older Pocket devices can stay loaded alongside this build.
 
 Press **PROFILE**. A successful audio-thread acknowledgement shows the voice
 count; malformed files show an error and leave the old profile intact. A rate
