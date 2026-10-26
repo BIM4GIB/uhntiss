@@ -13,6 +13,7 @@ from types import SimpleNamespace
 import numpy as np
 from scipy.signal import resample_poly
 from sklearn.ensemble import ExtraTreesClassifier
+from mouthflow.pocket import FEATURE_VERSION
 from eval.native_auto import ROOT, read, analyze
 from eval.real_auto import (
     corpus,
@@ -273,9 +274,11 @@ def train(binary, cache):
     info = dict(
         sklearn_version=sklearn.__version__,
         version=5,
-        feature_version=3,
+        feature_version=FEATURE_VERSION,
         enrollment=dict(state_version=5, max_voices=16, max_examples=30, commit_features=120,
-                        commit_slices_ms=[0, 10, 40, 80], next_onset_truncation=True, negative_bank=30),
+                        commit_slices_ms=[0, 10, 40, 80], next_onset_truncation=True, negative_bank=30,
+                        metric="feature 4: feature-3 positive/late metrics retained; shrinkage discriminant veto on ambiguous 10 ms attacks; partial negatives use first slice only",
+                        rejected_candidates_consume_refractory=False),
         features=17,
         window_ms=10,
         history_ms=30,

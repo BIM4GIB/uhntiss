@@ -84,7 +84,7 @@ inline bool decodeLegacyProfile(const double *values, size_t count,
 inline size_t encodeProfile(const Profile &p, double *out) noexcept {
   size_t n = 0;
   out[n++] = 5.;
-  out[n++] = featureVersion;
+  out[n++] = p.metricVersion;
   out[n++] = p.voices;
   out[n++] = p.rejects;
   out[n++] = p.sampleRate;
@@ -132,7 +132,8 @@ inline bool decodeProfile(const double *v, size_t count,
                           Profile &profile) noexcept {
   if (count == profileValues)
     return decodeLegacyProfile(v, count, profile);
-  if (!v || count < 246 || v[0] != 5. || v[1] != featureVersion ||
+  if (!v || count < 246 || v[0] != 5. ||
+      (v[1] != 3. && v[1] != featureVersion) ||
       !stateInteger(v[2], 2, maxVoices) || !stateInteger(v[3], 0, maxRejects) ||
       !stateInteger(v[5], 0, maxRejects) || !std::isfinite(v[4]) ||
       (v[4] != 0. && (v[4] < 8000. || v[4] > 384000.)))
@@ -141,6 +142,7 @@ inline bool decodeProfile(const double *v, size_t count,
   if (count != 246 + voices * voiceValues + rejects * 17 + size_t(v[5]) * 31)
     return false;
   Profile p;
+  p.metricVersion = int(v[1]);
   p.voices = voices;
   p.rejects = rejects;
   p.sampleRate = v[4];
@@ -226,6 +228,7 @@ inline bool decodeProfile(const double *v, size_t count,
       }
     }
   }
+  p.prepareRejector();
   profile = p;
   return true;
 }

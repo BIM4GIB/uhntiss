@@ -7,7 +7,7 @@
 
 namespace pocket {
 constexpr int maxVoices = 16, maxExamples = 30, maxRejects = 30,
-              featureVersion = 3;
+              featureVersion = 4;
 constexpr std::size_t maxEvents = 512;
 constexpr std::size_t undoDepth = 16;
 constexpr double loopBeats = 8.; // Deliberate first release: two bars of 4/4.
@@ -82,6 +82,12 @@ Drum classifyAttack(const Features &features,
                     double sampleRate = 48000.) noexcept;
 Drum classifyTransientAttack(const TransientFeatures &features) noexcept;
 struct Profile {
+  int metricVersion = featureVersion;
+  // Derived once from the imported bank, outside DSP; not a new wire payload.
+  std::array<std::array<double, 41>, maxVoices + 1> noiseScores{};
+  bool noiseReady = false;
+  void prepareRejector() noexcept;
+  bool rejectsAttack(const Slices &features) const noexcept;
   int voices = 3, rejects = 0, lateRejects = 0;
   double sampleRate = 0.; // Zero: v4 compatibility, early-only Teach.
   std::array<std::array<Features, maxExamples>, maxVoices> examples{};
@@ -174,6 +180,9 @@ public:
                Policy policy = Policy::automatic) noexcept;
   bool started() const noexcept { return primary_.started(); }
   bool boundary() const noexcept { return boundary_; }
+  // Synchronous acknowledgement of the candidate just returned by process.
+  // Restore the previous accepted onset; never erase its exclusion window.
+  void rejectDecision() noexcept { lastAccepted_ = previousAccepted_; }
   int pendingAge() const noexcept;
   float attackVelocity() const noexcept { return primary_.attackVelocity(); }
   bool pending() const noexcept { return primary_.pending(); }
@@ -185,7 +194,8 @@ private:
   // Every tracker sees raw input; recovery never applies an audio gain boost.
   AttackTracker primary_{}, quiet_{}, transient_{};
   bool transientEnabled_ = false, boundary_ = false;
-  std::int64_t sample_ = 0, lastAccepted_ = -1000000;
+  std::int64_t sample_ = 0, lastAccepted_ = -1000000,
+               previousAccepted_ = -1000000;
   int refractory_ = 1680, window_ = 480;
   Policy previousPolicy_ = Policy::automatic;
 };
@@ -263,6 +273,7 @@ public:
     return kit_.triggerCount();
   }
   std::uint64_t hitSerial() const noexcept { return hitSerial_; }
+  double lastHitBeat() const noexcept { return lastHitBeat_; }
 
 private:
   void saveUndo() noexcept;
@@ -298,6 +309,7 @@ private:
   bool clockValid_ = false, scheduleValid_ = false, waitingForBoundary_ = false,
        recording_ = false, tailOpen_ = false, committed_ = false;
   std::uint64_t revision_ = 0, hitSerial_ = 0, playbackSerial_ = 0;
+  double lastHitBeat_ = 0.;
   double lastPlaybackBeat_ = 0., scheduleCycle_ = 0.;
   size_t nextEvent_ = 0;
   int tailSamples_ = 0, lastDrum_ = -1;

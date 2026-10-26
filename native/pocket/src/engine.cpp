@@ -174,10 +174,103 @@ Drum Profile::classify(const Detection &detection) const noexcept {
   const auto voice = classifyVoice(detection);
   return voice < 0 || voice > 2 ? Drum::noise : Drum(voice);
 }
+// Equal-prior, shrinkage-regularized discriminant fitted to the quantized
+// enrollment bank. Import/restore calls this on the message thread, never DSP.
+void Profile::prepareRejector() noexcept {
+  noiseReady = false;
+  noiseScores = {};
+  if (metricVersion < 4 || !delayed() || lateRejects < 4)
+    return;
+  std::array<std::array<double, 40>, maxVoices + 1> means{};
+  std::array<int, maxVoices + 1> counts{};
+  const auto visit = [&](auto consume) {
+    for (int d = 0; d < voices; ++d)
+      for (int i = 0; i < lateCount[d]; ++i)
+        consume(d, late[d][i]);
+    for (int i = 0; i < lateRejects; ++i)
+      if (negativeSlices[i] & 1)
+        consume(voices, negativeLate[i]);
+  };
+  visit([&](int d, const auto &example) {
+    ++counts[d];
+    for (int j = 0; j < 40; ++j)
+      means[d][j] += double(example[j]) * .0625;
+  });
+  if (counts[voices] < 4)
+    return;
+  for (int d = 0; d <= voices; ++d) {
+    if (!counts[d])
+      return;
+    for (auto &v : means[d])
+      v /= counts[d];
+  }
+  std::array<std::array<double, 80>, 40> matrix{};
+  visit([&](int d, const auto &example) {
+    for (int j = 0; j < 40; ++j)
+      for (int k = 0; k < 40; ++k)
+        matrix[j][k] += (double(example[j]) * .0625 - means[d][j]) *
+                        (double(example[k]) * .0625 - means[d][k]) /
+                        (counts[d] * (voices + 1.));
+  });
+  for (int j = 0; j < 40; ++j) {
+    const double diagonal = matrix[j][j];
+    for (int k = 0; k < 40; ++k)
+      matrix[j][k] *= .9;
+    matrix[j][j] += .1 * std::max(diagonal, .01) + .01;
+    matrix[j][40 + j] = 1.;
+  }
+  // Pivoted Gauss-Jordan. The positive ridge also bounds nearly singular
+  // banks (including repeated examples) without depending on a math library.
+  for (int j = 0; j < 40; ++j) {
+    int pivot = j;
+    for (int k = j + 1; k < 40; ++k)
+      if (std::abs(matrix[k][j]) > std::abs(matrix[pivot][j]))
+        pivot = k;
+    std::swap(matrix[j], matrix[pivot]);
+    const double divisor = matrix[j][j];
+    if (!std::isfinite(divisor) || std::abs(divisor) < 1e-12)
+      return;
+    for (auto &v : matrix[j])
+      v /= divisor;
+    for (int k = 0; k < 40; ++k)
+      if (k != j) {
+        const double factor = matrix[k][j];
+        for (int m = 0; m < 80; ++m)
+          matrix[k][m] -= factor * matrix[j][m];
+      }
+  }
+  for (int d = 0; d <= voices; ++d) {
+    for (int j = 0; j < 40; ++j) {
+      for (int k = 0; k < 40; ++k)
+        noiseScores[d][j] += matrix[j][40 + k] * means[d][k];
+      noiseScores[d][40] -= .5 * means[d][j] * noiseScores[d][j];
+    }
+  }
+  noiseReady = true;
+}
+bool Profile::rejectsAttack(const Slices &features) const noexcept {
+  if (!noiseReady || features.samples[0] < int(std::round(.010 * sampleRate)))
+    return false;
+  double bestPositive = -1e30, negativeScore = -1e30;
+  for (int d = 0; d <= voices; ++d) {
+    double score = noiseScores[d][40];
+    for (int j = 0; j < 40; ++j)
+      score += noiseScores[d][j] * (features.values[j] - center[j]) / scale[j];
+    if (d < voices)
+      bestPositive = std::max(bestPositive, score);
+    else
+      negativeScore = score;
+  }
+  // Exact ties retain the attack. A factory-positive ghost is protected by
+  // the caller; this adds a veto only for otherwise ambiguous candidates.
+  return negativeScore > bestPositive;
+}
 int Profile::classifyVoice(const Detection &detection,
                            const Slices *rich) const noexcept {
   if (!ready() || (sampleRate == 0. && detection.drum == Drum::noise))
     return detection.drum == Drum::noise ? -1 : int(detection.drum);
+  if (detection.drum == Drum::noise && rich && rejectsAttack(*rich))
+    return -1;
   Neighbours n;
   for (int d = 0; d < voices; ++d)
     for (int i = 0; i < count[d]; ++i)
@@ -206,7 +299,10 @@ int Profile::classifyVoice(const Detection &detection,
         break;
       }
   };
-  if (rich && delayed() && lateRejects >= 4) {
+  const int sustained = int(std::count(
+      negativeSlices.begin(), negativeSlices.begin() + lateRejects, 7));
+  if (rich && delayed() && lateRejects >= 4 &&
+      (metricVersion < 4 || sustained >= 4)) {
     std::array<double, 40> normalized{};
     for (int j = 0; j < 40; ++j)
       normalized[j] = (rich->values[j] - center[j]) / scale[j];
@@ -292,7 +388,8 @@ int Profile::classifyLate(const Slices &features,
   std::array<bool, 5> noise{};
   const int required = features.samples[2] >= expected[2] ? 7 : 3;
   for (int i = 0; i < lateRejects; ++i) {
-    if ((negativeSlices[i] & required) != required)
+    if ((metricVersion >= 4 && negativeSlices[i] != 7) ||
+        (negativeSlices[i] & required) != required)
       continue;
     double distance = 0.;
     for (int j = 0; j < dimensions; ++j) {
@@ -570,7 +667,7 @@ void Detector::reset() noexcept {
   quiet_.reset();
   transient_.reset();
   sample_ = 0;
-  lastAccepted_ = -1000000;
+  lastAccepted_ = previousAccepted_ = -1000000;
   previousPolicy_ = Policy::automatic;
 }
 bool Detector::process(double input, double beat, double threshold,
@@ -579,7 +676,7 @@ bool Detector::process(double input, double beat, double threshold,
     quiet_.reset();
     transient_.reset();
     previousPolicy_ = policy;
-    lastAccepted_ = -1000000;
+    lastAccepted_ = previousAccepted_ = -1000000;
   }
   ++sample_;
   boundary_ = false;
@@ -611,6 +708,7 @@ bool Detector::process(double input, double beat, double threshold,
   if (ready && (primary.drum != Drum::noise || policy == Policy::enrolled) &&
       available) {
     result = primary;
+    previousAccepted_ = lastAccepted_;
     lastAccepted_ = sample_ - window_ + 1;
     return true;
   }
@@ -619,12 +717,14 @@ bool Detector::process(double input, double beat, double threshold,
   if (quietReady && quiet.drum != Drum::noise && !primary_.pending() &&
       available) {
     result = quiet;
+    previousAccepted_ = lastAccepted_;
     lastAccepted_ = sample_ - window_ + 1;
     return true;
   }
   if (transientReady && transient.drum != Drum::noise && !primary_.pending() &&
       available) {
     result = transient;
+    previousAccepted_ = lastAccepted_;
     lastAccepted_ = sample_ - window_ + 1;
     return true;
   }
@@ -887,6 +987,7 @@ void Engine::hitVoice(int voice, float velocity, double beat,
     return;
   lastDrum_ = voice;
   ++hitSerial_;
+  lastHitBeat_ = beat;
   const auto e = voiceEvent(voice, velocity);
   if (settings_.monitor && audible)
     sound(e);
@@ -899,6 +1000,7 @@ void Engine::hit(Drum drum, float velocity, double beat,
     return;
   lastDrum_ = int(drum);
   ++hitSerial_;
+  lastHitBeat_ = beat;
   Event e{0., velocity, drum};
   if (settings_.monitor && audible)
     sound(e);
@@ -1098,11 +1200,14 @@ void Engine::process(double input, Clock clock, double &left,
           (profile_.sampleRate == 0. || enrolled)
               ? profile_.classifyVoice(detection, richReject ? &first : nullptr)
               : (detection.drum == Drum::noise ? -1 : int(detection.drum));
+      if (enrolled && profile_.metricVersion >= 4 && voice < 0)
+        detector_.rejectDecision();
       if (voice >= 0) {
         if (enrolled && profile_.delayed()) {
           // Audible deadline is unchanged. Only capture waits for body/tail.
           lastDrum_ = voice;
           ++hitSerial_;
+          lastHitBeat_ = detection.beat;
           if (settings_.monitor)
             sound(voiceEvent(voice, detection.velocity));
           if (recording_ || tailOpen_) {

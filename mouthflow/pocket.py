@@ -192,7 +192,7 @@ def max_library_dirs() -> list[Path]:
 
 
 # v5 extends (and does not replace) the 156-double v4 interchange above.
-FEATURE_VERSION = 3
+FEATURE_VERSION = 4
 MAX_VOICES = 16
 MAX_EXAMPLES = 30
 N_LATE = 120
@@ -363,14 +363,27 @@ def build_profile(
     masks = np.empty(0, dtype=int)
     if negative_rows.shape[1] == 145 and len(negative_rows):
         expected = np.round(np.array([0.010, 0.030, 0.040]) * sr).astype(int)
-        # Only sustained negative attacks teach the immediate veto. Short
-        # voice fragments can be acoustically indistinguishable from kicks.
-        usable = negative_rows[np.all(negative_rows[:, 141:144] >= expected, axis=1)]
+        # The new ambiguity gate uses complete first slices, including roll-
+        # truncated negatives. The legacy nearest-neighbour veto still uses
+        # sustained (mask 7) negatives only, so factory-positive ghosts retain
+        # the old protection.
+        full = negative_rows[np.all(negative_rows[:, 141:144] >= expected, axis=1)]
+        partial = negative_rows[
+            (negative_rows[:, 141] >= expected[0])
+            & ~np.all(negative_rows[:, 141:144] >= expected, axis=1)
+        ]
+        if len(full) > MAX_REJECTS:
+            full = full[medoid_indices(full[:, 21:141], scale, MAX_REJECTS)]
+        room = MAX_REJECTS - len(full)
+        if len(partial) > room:
+            partial = (
+                partial[medoid_indices(partial[:, 21:61], scale[:40], room)]
+                if room
+                else partial[:0]
+            )
+        usable = np.concatenate([full, partial])
         masks = (usable[:, 141:144] >= expected).astype(int) @ np.array([1, 2, 4])
         negative_late = usable[:, 21:141]
-        if len(negative_late) > MAX_REJECTS:
-            selection = medoid_indices(negative_late, scale, MAX_REJECTS)
-            negative_late, masks = negative_late[selection], masks[selection]
     quantized = np.clip(
         np.rint((negative_late - center) / scale * 16), -128, 127
     ).astype(np.int8)
@@ -424,6 +437,30 @@ def write_profile_document(doc: dict, path: Path | None = None) -> dict:
     return {**doc, "written": [str(p) for p in destinations]}
 
 
+def rejection_scores(late: list, negatives: np.ndarray) -> np.ndarray | None:
+    """Equal-prior shrinkage discriminant; only enrollment banks fit it.
+
+    Inputs are decoded Q4 coordinates. Native import derives the same cache
+    outside DSP. It is deliberately a veto, never a source of extra hits.
+    """
+    if len(negatives) < 4:
+        return None
+    nvoices = 1 + max(d for _, d in late)
+    groups = [np.asarray([f[:40] for f, d in late if d == i]) for i in range(nvoices)]
+    groups.append(negatives[:, :40])
+    means = np.array([g.mean(0) for g in groups])
+    covariance = sum((g - m).T @ (g - m) / len(g) for g, m in zip(groups, means)) / len(
+        groups
+    )
+    covariance = (
+        0.9 * covariance
+        + 0.1 * np.diag(np.maximum(np.diag(covariance), 0.01))
+        + 0.01 * np.eye(40)
+    )
+    weights = np.linalg.solve(covariance, means.T).T
+    return np.column_stack([weights, -0.5 * (means * weights).sum(1)])
+
+
 def predict_profile(doc: dict, rows: np.ndarray) -> np.ndarray:
     """Exact v5 native metric replica, including quantization and open-set rejection.
 
@@ -431,7 +468,7 @@ def predict_profile(doc: dict, rows: np.ndarray) -> np.ndarray:
     early rejected onset; no drum can appear after being silent live.
     """
     v = np.asarray(doc["values"], dtype=float)
-    if v[0] != 5 or v[1] != FEATURE_VERSION:
+    if v[0] != 5 or v[1] not in (3, FEATURE_VERSION):
         raise PocketError("predict_profile needs a v5 profile")
     nvoices, nrejects, sr = int(v[2]), int(v[3]), v[4]
     scale, center = v[6:126], v[126:246]
@@ -457,10 +494,21 @@ def predict_profile(doc: dict, rows: np.ndarray) -> np.ndarray:
     b = np.stack([(packed >> (8 * k)) & 255 for k in range(4)], axis=1).astype(np.uint8)
     negative_late = b.reshape(int(v[5]), 120).view(np.int8).astype(float) / 16
     early_scale = model_scale()
+    scores = (
+        rejection_scores(late, negative_late[(negative_masks & 1) != 0])
+        if v[1] >= 4 and late and sr
+        else None
+    )
     out = []
     expected = np.round(np.array([0.010, 0.030, 0.040]) * sr)
     for row in rows:
         f = row[4:21]
+        if scores is not None and row[1] == NOISE and row[141] >= expected[0]:
+            query = (row[21:61] - center[:40]) / scale[:40]
+            values = scores[:, :40] @ query + scores[:, 40]
+            if values[-1] > values[:-1].max():
+                out.append((-1, -1))
+                continue
         live = vote(f, early, early_scale)
         nearest = min(distance(f, ex, early_scale) for ex, d in early if d == live)
         noise_vote = sorted(
@@ -473,7 +521,7 @@ def predict_profile(doc: dict, rows: np.ndarray) -> np.ndarray:
                 for i, ex in enumerate(negatives)
             ]
         )
-        if len(negative_late) >= 4:
+        if len(negative_late) >= 4 and (v[1] < 4 or (negative_masks == 7).sum() >= 4):
             rich = (row[21:61] - center[:40]) / scale[:40]
             noise_vote = sorted(
                 [
@@ -508,7 +556,8 @@ def predict_profile(doc: dict, rows: np.ndarray) -> np.ndarray:
                 + [
                     (float(np.sum((f[mask] - ex[mask]) ** 2)), len(late) + i, True)
                     for i, ex in enumerate(negative_late)
-                    if negative_masks[i] & (7 if mask[-1] else 3)
+                    if (v[1] < 4 or negative_masks[i] == 7)
+                    and negative_masks[i] & (7 if mask[-1] else 3)
                     == (7 if mask[-1] else 3)
                 ]
             )
@@ -516,3 +565,36 @@ def predict_profile(doc: dict, rows: np.ndarray) -> np.ndarray:
                 commit = -1
         out.append((live, commit))
     return np.asarray(out, dtype=int).reshape(-1, 2)
+
+
+def perform(
+    binary: Path, doc: dict, samples: np.ndarray, sr: int
+) -> dict[str, np.ndarray]:
+    """Offline replay of the real Engine, with actual onset and dispatch times.
+
+    Rows are onset seconds, MIDI note, velocity, dispatch/report seconds.
+    The diagnostic capture span is 64 s; it never supplies labels to DSP.
+    """
+    import tempfile
+
+    with tempfile.TemporaryDirectory(prefix="pocket-perform-") as folder:
+        profile = Path(folder) / "profile.txt"
+        profile.write_text(" ".join(map(str, doc["values"])))
+        output = subprocess.run(
+            [str(binary), str(sr), str(profile)],
+            input=np.asarray(samples, dtype="<f4").tobytes(),
+            capture_output=True,
+            check=True,
+        )
+    lanes: dict[str, list] = {"live": [], "stored": []}
+    for line in output.stdout.decode().splitlines():
+        lane, *values = line.split(",")
+        if lane not in lanes or len(values) != 4:
+            raise PocketError(
+                "incompatible pocket_perform output; rebuild native tools"
+            )
+        lanes[lane].append(list(map(float, values)))
+    return {
+        lane: np.asarray(values, dtype=float).reshape(-1, 4)
+        for lane, values in lanes.items()
+    }

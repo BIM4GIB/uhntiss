@@ -1,0 +1,32 @@
+[
+  {
+    "audio_seconds": 10,
+    "processing_seconds": 0.1429,
+    "p99_block_ms": 0.103209,
+    "max_block_ms": 0.324166,
+    "p99_cpu_block_ms": 0.101625,
+    "max_cpu_block_ms": 0.324042,
+    "block_budget_ms": 1.33333,
+    "accepted_live_hits": 125,
+    "slow_blocks": [],
+    "sample_rate": 48000,
+    "profile": "16 voices x30 +30 negatives; 512-event playback during capture",
+    "input": "alternating seconds of 50 ms rolls and 200 ms spaced pulses",
+    "limits": "Core CPU timing on this machine; no host scheduling or round-trip latency measurement."
+  },
+  {
+    "audio_seconds": 10,
+    "processing_seconds": 0.247016,
+    "p99_block_ms": 0.062042,
+    "max_block_ms": 0.262709,
+    "p99_cpu_block_ms": 0.04025,
+    "max_cpu_block_ms": 0.2555,
+    "block_budget_ms": 0.666667,
+    "accepted_live_hits": 125,
+    "slow_blocks": [],
+    "sample_rate": 96000,
+    "profile": "16 voices x30 +30 negatives; 512-event playback during capture",
+    "input": "alternating seconds of 50 ms rolls and 200 ms spaced pulses",
+    "limits": "Core CPU timing on this machine; no host scheduling or round-trip latency measurement."
+  }
+]

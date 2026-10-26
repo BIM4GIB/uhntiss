@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "voices": [
+    {
+      "name": "kick",
+      "note": 36,
+      "source": "calibration/kick.wav",
+      "sha256": "60be61611d62897a1c0ec63387ae5feaab0d7cf210190ff436cd7320db899e05"
+    },
+    {
+      "name": "snare",
+      "note": 38,
+      "source": "calibration/snare.wav",
+      "sha256": "9f1988dc116a9bb3389639d1457916f10939fdcddea343819eb43ae6562f0cc9"
+    },
+    {
+      "name": "hat",
+      "note": 42,
+      "source": "calibration/hat_closed.wav",
+      "sha256": "963dccce31b5a7bc387e0d5c414007d0ba82f01822277ad6d3dc8c5c595cd1c2"
+    },
+    {
+      "name": "hat_open",
+      "note": 46,
+      "source": "calibration/hat_open.wav",
+      "sha256": "6dbac74d6e61c9e277a7ec09e7243bedda1dc1c24c15c4ed5ee35926265ed926"
+    }
+  ],
+  "negative_folds": [
+    {
+      "train": {
+        "source": "datasets/bass/b01.hum.wav",
+        "sha256": "9cf7a22a6968dc4b692aee34981e29822e6966da20c0928b3bceb35c78be6e5a"
+      },
+      "test": {
+        "source": "datasets/bass/b02.hum.wav",
+        "sha256": "fbfbc41fabe2e40831c963e1708ea80216d8dad8dead2e8e5a1c01520a494053"
+      }
+    },
+    {
+      "train": {
+        "source": "datasets/bass/b02.hum.wav",
+        "sha256": "fbfbc41fabe2e40831c963e1708ea80216d8dad8dead2e8e5a1c01520a494053"
+      },
+      "test": {
+        "source": "datasets/bass/b01.hum.wav",
+        "sha256": "9cf7a22a6968dc4b692aee34981e29822e6966da20c0928b3bceb35c78be6e5a"
+      }
+    }
+  ],
+  "drum_tests": "pocket-real-takes.json",
+  "roll_tests": "pocket-isolated-attacks.json",
+  "permanently_reserved": [
+    "live_6_uptempo"
+  ],
+  "limits": "Hums are not human breaths/speech. Roll snippets are per-attack holdouts from calibration, never independent fresh performances."
+}

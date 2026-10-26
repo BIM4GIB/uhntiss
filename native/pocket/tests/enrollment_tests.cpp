@@ -96,6 +96,58 @@ int main() {
   check(p.classifyVoice(custom) == -1,
         "outside enrollment support is rejected");
 
+  {
+    Profile bank;
+    bank.voices = 2;
+    bank.sampleRate = 48000.;
+    bank.scale.fill(1.);
+    bank.rejects = bank.lateRejects = 4;
+    bank.negativeSlices.fill(1); // Complete first slices, truncated tails.
+    for (int d = 0; d < 2; ++d) {
+      bank.count[d] = bank.lateCount[d] = 3;
+      for (int k = 0; k < 3; ++k) {
+        bank.examples[d][k].fill(d);
+        bank.late[d][k].fill(std::int8_t(16 + d * 16));
+      }
+    }
+    for (int i = 0; i < 4; ++i) {
+      bank.negativeLate[i].fill(-64);
+      bank.negative[i].fill(-10.);
+    }
+    bank.prepareRejector();
+    check(bank.noiseReady,
+          "partial negative banks derive a bounded import cache");
+    Detection ambiguous{Drum::noise, .12f, .123};
+    Slices first;
+    first.samples = {480, 0, 0};
+    first.values.fill(-4.);
+    inAudio = true;
+    const auto rejected = bank.classifyVoice(ambiguous, &first);
+    ambiguous.drum = Drum::hat;
+    const auto ghost = bank.classifyVoice(ambiguous, &first);
+    inAudio = false;
+    check(rejected == -1 && ghost >= 0,
+          "ambiguity rejection preserves a factory-positive ghost");
+    check(bank.classifyLate(first, ghost) == ghost,
+          "partial negatives cannot enter the legacy delayed veto");
+    StateValues encoded{};
+    const auto count = encodeProfile(bank, encoded.data());
+    Profile imported;
+    check(decodeProfile(encoded.data(), count, imported) && imported.noiseReady,
+          "state restore rebuilds the cache outside DSP");
+    check(imported.noiseScores == bank.noiseScores,
+          "derived noise decisions survive exact profile round-trip");
+    encoded[1] = 3.;
+    check(decodeProfile(encoded.data(), count, imported) &&
+              !imported.noiseReady && imported.metricVersion == 3,
+          "feature-3 profiles preserve their legacy classifier");
+    const auto preserved = imported.metricVersion;
+    encoded[1] = 5.;
+    check(!decodeProfile(encoded.data(), count, imported) &&
+              imported.metricVersion == preserved,
+          "unknown metrics fail transactionally");
+  }
+
   auto extractor = std::make_unique<SliceExtractor>();
   extractor->prepare(48000.);
   Detector detector;

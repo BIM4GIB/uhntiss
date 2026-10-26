@@ -1,0 +1,99 @@
+{
+  "feature_version": 4,
+  "sr": 48000,
+  "protocol": "Positive enrollment: four isolated calibration clips. Negative enrollment: one hum; test: the other. No threshold fitted on test audio.",
+  "limits": "Development source holdouts have informed engineering, not untouched final tests. Humming is not speech or breath. Additional rejections on drum fixtures include unannotated candidates; inspect matched-hit recall separately.",
+  "native_python_rows": 426,
+  "folds": [
+    {
+      "train": "b01.hum.wav",
+      "test": "b02.hum.wav",
+      "train_sha256": "9cf7a22a6968dc4b692aee34981e29822e6966da20c0928b3bceb35c78be6e5a",
+      "test_sha256": "fbfbc41fabe2e40831c963e1708ea80216d8dad8dead2e8e5a1c01520a494053",
+      "train_candidates": 46,
+      "retained": 30,
+      "seconds": 10.500020833333334,
+      "before": 6,
+      "after": 1,
+      "before_per_min": 34.28564625863837,
+      "after_per_min": 5.714274376439729,
+      "committed_after": 0,
+      "committed_after_per_min": 0.0,
+      "drums": [
+        {
+          "committed_lost": [],
+          "committed_matched_before": 28,
+          "committed_matched_after": 28,
+          "annotated": 31,
+          "matched_before": 28,
+          "matched_after": 28,
+          "lost": [],
+          "file": "01_boombap_mimic.wav",
+          "candidates": 41,
+          "before": 37,
+          "after": 37,
+          "additional_rejections": 0
+        },
+        {
+          "committed_lost": [],
+          "committed_matched_before": 23,
+          "committed_matched_after": 23,
+          "annotated": 31,
+          "matched_before": 23,
+          "matched_after": 23,
+          "lost": [],
+          "file": "02_bb100.wav",
+          "candidates": 36,
+          "before": 28,
+          "after": 28,
+          "additional_rejections": 0
+        }
+      ]
+    },
+    {
+      "train": "b02.hum.wav",
+      "test": "b01.hum.wav",
+      "train_sha256": "fbfbc41fabe2e40831c963e1708ea80216d8dad8dead2e8e5a1c01520a494053",
+      "test_sha256": "9cf7a22a6968dc4b692aee34981e29822e6966da20c0928b3bceb35c78be6e5a",
+      "train_candidates": 13,
+      "retained": 13,
+      "seconds": 13.833354166666666,
+      "before": 26,
+      "after": 1,
+      "before_per_min": 112.77091450163479,
+      "after_per_min": 4.337342865447492,
+      "committed_after": 1,
+      "committed_after_per_min": 4.337342865447492,
+      "drums": [
+        {
+          "committed_lost": [],
+          "committed_matched_before": 28,
+          "committed_matched_after": 28,
+          "annotated": 31,
+          "matched_before": 28,
+          "matched_after": 28,
+          "lost": [],
+          "file": "01_boombap_mimic.wav",
+          "candidates": 41,
+          "before": 37,
+          "after": 37,
+          "additional_rejections": 0
+        },
+        {
+          "committed_lost": [],
+          "committed_matched_before": 23,
+          "committed_matched_after": 23,
+          "annotated": 31,
+          "matched_before": 23,
+          "matched_after": 23,
+          "lost": [],
+          "file": "02_bb100.wav",
+          "candidates": 36,
+          "before": 28,
+          "after": 28,
+          "additional_rejections": 0
+        }
+      ]
+    }
+  ]
+}

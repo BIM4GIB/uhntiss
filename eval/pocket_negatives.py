@@ -61,9 +61,9 @@ def run(binary: Path, sr=48000):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "profile.txt"
             path.write_text(" ".join(map(str, doc["values"])))
-            data = "\n".join(" ".join(map(str, row[4:144])) for row in rows)
+            data = "\n".join(" ".join(map(str, np.r_[row[1], row[4:144]])) for row in rows)
             output = subprocess.run(
-                [str(binary.with_name("pocket_profile")), str(path)],
+                [str(binary.with_name("pocket_profile")), str(path), "--with-drum"],
                 input=data,
                 text=True,
                 capture_output=True,
@@ -137,7 +137,7 @@ def run(binary: Path, sr=48000):
         feature_version=pocket.FEATURE_VERSION,
         sr=sr,
         protocol="Positive enrollment: four isolated calibration clips. Negative enrollment: one hum; test: the other. No threshold fitted on test audio.",
-        limits="Humming is not speech or breath. Additional rejections on drum fixtures include unannotated candidates; inspect matched-hit recall separately.",
+        limits="Development source holdouts have informed engineering, not untouched final tests. Humming is not speech or breath. Additional rejections on drum fixtures include unannotated candidates; inspect matched-hit recall separately.",
         native_python_rows=parity_rows,
         folds=folds,
     )
