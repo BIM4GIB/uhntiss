@@ -36,7 +36,7 @@ function text(str,x,y,size,c,bold) {mgraphics.set_source_rgba(c);mgraphics.selec
 function line(x,y,x2,y2,c,width) {mgraphics.set_source_rgba(c);mgraphics.set_line_width(width||1);mgraphics.move_to(x,y);mgraphics.line_to(x2,y2);mgraphics.stroke();}
 function paint() {
     rect(0,0,1155,169,[.055,.068,.062,1]);
-    text("UHNTISS",16,27,23,ink,true);text("POCKET / 06",141,26,10,green,true);
+    text("UHNTISS",16,27,23,ink,true);text("POCKET / 07",141,26,10,green,true);
     text("INPUT VOICE",740,24,9,muted,false);text("LOCAL",924,24,10,green,true);
     line(16,38,964,38,[.17,.21,.18,1],1);
     var labels=["READY TO PLAY","ARMED / NEXT BAR","CAPTURING YOUR POCKET","LOOP LOCKED","NO HITS / LOOP KEPT","TAKE FULL / LOOP KEPT","USE 4/4 FOR THIS DEVICE","TAKE CANCELLED / TRANSPORT MOVED"];

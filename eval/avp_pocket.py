@@ -232,7 +232,9 @@ def run(
     return res
 
 
-def run_enrollment(binary, sr: int, gate: float, modality: str = "Personal") -> dict:
+def run_enrollment(
+    binary, sr: int, gate: float, modality: str = "Personal", runtime: bool = False
+) -> dict:
     """Native v5 banks from whole one-class clips; improvisations are test-only.
 
     Score every matched candidate, counting rejection as wrong. Also report
@@ -261,6 +263,7 @@ def run_enrollment(binary, sr: int, gate: float, modality: str = "Personal") -> 
                 rows=rows,
                 participant=first["participant"],
                 kind=first["kind"],
+                audio=y,
             )
         )
     result = {}
@@ -268,6 +271,13 @@ def run_enrollment(binary, sr: int, gate: float, modality: str = "Personal") -> 
         names = ["kick", "snare", "hat"] + (["hat_open"] if four else [])
         notes = [36, 38, 42, 46]
         truth, live, committed = [], [], []
+        runtime_totals = {
+            arm: {
+                lane: dict(annotated=0, correct=0, matched=0, extra=0)
+                for lane in ("live", "stored")
+            }
+            for arm in ("before", "after")
+        }
         totals = dict(
             annotated=0,
             matched_candidates=0,
@@ -307,9 +317,15 @@ def run_enrollment(binary, sr: int, gate: float, modality: str = "Personal") -> 
                 profile.write_text(" ".join(map(str, doc["values"])))
                 for fi in tests:
                     rows, source = fi["rows"], fi["source"]
-                    payload = "\n".join(" ".join(map(str, row[4:144])) for row in rows)
+                    payload = "\n".join(
+                        " ".join(map(str, np.r_[row[1], row[4:144]])) for row in rows
+                    )
                     process = subprocess.run(
-                        [str(Path(binary).with_name("pocket_profile")), str(profile)],
+                        [
+                            str(Path(binary).with_name("pocket_profile")),
+                            str(profile),
+                            "--with-drum",
+                        ],
                         input=payload,
                         text=True,
                         capture_output=True,
@@ -325,6 +341,35 @@ def run_enrollment(binary, sr: int, gate: float, modality: str = "Personal") -> 
                     if not np.array_equal(pred, replica):
                         raise AssertionError("native/Python profile metric mismatch")
                     totals["native_python_rows"] += len(rows)
+                    if runtime:
+                        from eval.pocket_reliability import legacy_profile
+
+                        for arm, profile_doc in (
+                            ("before", legacy_profile(doc)),
+                            ("after", doc),
+                        ):
+                            replay = pocket.perform(
+                                Path(binary).with_name("pocket_perform"),
+                                profile_doc,
+                                fi["audio"],
+                                sr,
+                            )
+                            for lane, events in replay.items():
+                                pairs_runtime = _match(
+                                    events[:, 0], np.array([r["t"] for r in source])
+                                )
+                                labels = [
+                                    0 if n == 36 else 1 if n == 38 else 2
+                                    for n in events[:, 1]
+                                ]
+                                cell = runtime_totals[arm][lane]
+                                cell["annotated"] += len(source)
+                                cell["matched"] += len(pairs_runtime)
+                                cell["extra"] += len(events) - len(pairs_runtime)
+                                cell["correct"] += sum(
+                                    labels[i] == LABEL_IDX[source[j]["label"]]
+                                    for i, j in pairs_runtime
+                                )
                     pairs = _match(rows[:, 0], np.array([r["t"] for r in source]))
                     accepted_pairs = _match(
                         rows[pred[:, 0] >= 0, 0], np.array([r["t"] for r in source])
@@ -345,6 +390,8 @@ def run_enrollment(binary, sr: int, gate: float, modality: str = "Personal") -> 
         result[name + "-live10"] = _acc(truth, live)
         result[name + "-loop80"] = _acc(truth, committed)
         result[name + "-coverage"] = totals
+        if runtime:
+            result[name + "-runtime"] = runtime_totals
     return result
 
 
@@ -365,10 +412,17 @@ def main() -> int:
         help="Also score native v5 banks from whole enrollment clips",
     )
     ap.add_argument(
+        "--runtime",
+        action="store_true",
+        help="With --enrollment, also compare actual Engine replay against feature 3",
+    )
+    ap.add_argument(
         "--report", type=str, help="Write all tables and denominators as JSON"
     )
     ap.add_argument("--modality", default="Personal")
     args = ap.parse_args()
+    if args.runtime and not args.enrollment:
+        ap.error("--runtime requires --enrollment")
     if not avp.available():
         print(f"AVP dataset not found at {avp.AVP_DIR}; see eval/avp.py")
         return 2
@@ -387,13 +441,15 @@ def main() -> int:
     for name, cell in res.items():
         print(f"{name:28s} {_fmt(cell):>24s}")
     if args.enrollment:
-        enrolled = run_enrollment(binary, args.sr, args.gate, args.modality)
+        enrolled = run_enrollment(
+            binary, args.sr, args.gate, args.modality, runtime=args.runtime
+        )
         all_results.update(enrolled)
         print(
             "\nNative v5: whole repetition clips -> improvisation; rejection counts as wrong; core K/S/H classes"
         )
         for name, cell in enrolled.items():
-            if name.endswith("coverage"):
+            if name.endswith(("coverage", "runtime")):
                 print(name + ": " + str(cell))
             else:
                 print(f"{name:28s} {_fmt(cell):>24s}")

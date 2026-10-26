@@ -1,10 +1,10 @@
-# UHNTISS Pocket 06 · personal voices and delayed loop decisions
+# UHNTISS Pocket 07 · recognition reliability candidate
 
 A local voice-to-drum instrument and two-bar looper for Ableton Live. Native C++
 handles detection, synthesis, transport and recording. Max for Live supplies the
 host connection and controls. Python remains an offline research tool.
 
-**Performance research alpha, not stage-qualified.** Pocket 06 accepts 2–16
+**Review candidate, not stage-qualified. Dense 50–100 ms rolls still fail.** Pocket 07 accepts 2–16
 named sounds mapped to MIDI notes, with up to 30 enrollment examples each.
 The performer hears Auto at the same 10 ms deadline; the loop can revise the
 voice using up to 80 ms of causal audio. Neither path moves the detected onset
@@ -23,7 +23,7 @@ Requires macOS 11+, Ableton Live with Max for Live, and a mono mic input. The
 provided external is universal Apple Silicon/Intel. The portable core also builds
 on Linux; there is no Windows Max external in this release.
 
-1. Keep `UHNTISS Pocket.amxd`, `pocket-ui.js`, `pocket-profile.js` and `uhntiss.pocket06~.mxo` together.
+1. Keep `UHNTISS Pocket.amxd`, `pocket07-ui.js`, `pocket07-profile.js` and `uhntiss.pocket07~.mxo` together.
    Drag the `.amxd` onto an **audio track**. No API key, bridge, Python, Node server,
    network connection or downloaded kit is needed to play.
 2. Select your mono mic channel in Live; set the track's Monitor to **In**. The
@@ -99,6 +99,16 @@ a voice in an imported v5 profile keeps its enrolled candidate policy.
 The v5 path lets personal examples classify primary candidates even when the
 factory forest rejects them; conservative quiet/transient helpers still use
 factory gating, so unseen quiet articulations can remain undetected.
+
+Feature-4 profiles add a personal ambiguity veto using cached linear scores
+from the same first 10 ms. It is derived at import from the quantized enrollment
+bank, on the message thread. Sustained negatives keep their existing priority;
+partial negatives use only their complete first slice. A rejected candidate no
+longer masks a later real hit through its own 35 ms exclusion window. Feature-3
+profiles retain the previous behavior; re-export for feature 4. State stays v5.
+See the [measured results and remaining failures](../../docs/pocket-integration.md#pocket-07-reliability-candidate--2026-10-26)
+and [recording sheet](../../docs/pocket07-calibration.md). The installed 06.1 has
+not been replaced; this build has native tests but no new Live host validation.
 
 V5 live classification uses three nearest 17-feature examples and a learned
 support radius. A personal reject bank uses a separate five-neighbour vote,

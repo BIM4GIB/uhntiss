@@ -3,9 +3,11 @@
 #include "pocket/state.hpp"
 #include <fstream>
 #include <iostream>
+#include <string>
 #include <vector>
 int main(int argc, char **argv) {
-  if (argc != 2)
+  if ((argc != 2 && argc != 3) ||
+      (argc == 3 && std::string(argv[2]) != "--with-drum"))
     return 1;
   std::ifstream file(argv[1]);
   std::vector<double> values;
@@ -18,7 +20,17 @@ int main(int argc, char **argv) {
     return 2;
   pocket::Detection hit{pocket::Drum::noise, .5f, 0.};
   pocket::Slices slices;
-  while (std::cin >> hit.features[0]) {
+  const bool withDrum = argc == 3 && std::string(argv[2]) == "--with-drum";
+  double first;
+  while (std::cin >> first) {
+    if (withDrum) {
+      if (!pocket::stateInteger(first, 0, 3))
+        return 3;
+      hit.drum = pocket::Drum(int(first));
+      if (!(std::cin >> hit.features[0]))
+        return 3;
+    } else
+      hit.features[0] = first;
     for (size_t i = 1; i < hit.features.size(); ++i)
       if (!(std::cin >> hit.features[i]))
         return 3;

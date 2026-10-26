@@ -58,6 +58,84 @@ filename on Max's search path remains `uhntiss_pocket_profile.json`.
    poll. Internal synthesis and stored timestamps remain sample-exact.
    Routing reference: [Cycling ’74 live.routing](https://docs.cycling74.com/legacy/max8/refpages/live.routing).
 
+## Pocket 07 reliability candidate — 2026-10-26
+
+Feature version **4**, state **v5** (same wire layout and capacity). The 17
+positive features, their scale and the 120 late features are unchanged. Import
+accepts feature-3 v5 banks and preserves their feature tag and old decisions;
+156-double v4 remains exact. Re-export for the new behavior. The Max filename
+is still `uhntiss_pocket_profile.json`; native/JS resources are versioned `07`.
+The loader includes the independently necessary chunk-read and routing startup
+fixes from the still-separate 06.1 host work.
+
+Two changes are retained:
+
+- A rejected personal candidate restores the **previous accepted onset's**
+  35 ms exclusion window. It no longer reserves its own window. Accepted hits
+  still use 35 ms separation, the same onset/velocity, and a 10 ms audible decision.
+- An additional personal noise veto uses only the first 10 ms. At import on
+  the message thread, a fixed-size equal-prior discriminant is derived from
+  the decoded Q4 bank: pooled within-class covariance, 0.9 covariance + 0.1
+  diagonal (floor 0.01) + 0.01 identity. DSP evaluates cached 40-feature linear
+  scores. A negative must beat every positive strictly, and factory-positive
+  attacks retain their old protection. This is an extra veto, not a new onset
+  source or a late audible decision.
+
+Full (mask 7) negatives keep their previous selection priority. Spare bank slots
+may contain masks 1/3 with a complete first slice; these only train the new veto.
+They cannot enter either legacy sustained-negative vote or the late loop veto.
+Fewer than four sustained negatives retain the early 17-feature fallback. Import
+and pattr restore rebuild the cache outside DSP; nothing new is serialized.
+`pocket_profile --with-drum` carries the actual candidate's factory label for
+native/Python parity; its old input mode remains available for legacy probes.
+
+Actual Engine replay (`eval.pocket_reliability`, four approved calibration clips,
+one hum trains and the other tests; no mixed-take fitting). These are development
+source holdouts that have informed engineering, not untouched final tests:
+
+| Noise enrollment → test | Live false/min before → after | Stored false/min before → after |
+|---|---:|---:|
+| b01 → b02 | 5.7 → 5.7 | 0 → 0 |
+| b02 → b01 | 99.8 → 4.3 | 95.4 → 4.3 |
+
+Across all eight real drum takes (271 references), the b01-enrolled profile's
+live correct counts are **147 → 151**, **135 → 139**, **131 → 133** at
+1/.5/.25 gain. Extras remain **52/36/26**. Newly recovered attacks include
+wrong voice choices at reduced gain: wrong counts are 44→44, 48→49, 61→62.
+Stored correct counts are 169→173, 156→161 and 169→170. These are personal-profile
+results, not the stronger factory regression scores from earlier releases.
+All 1,817 paired previously-correct event checks across both noise folds retain
+their core voice, detected onset (within 1.01 samples) and velocity.
+The permanently reserved uptempo take improves **25→26/37 live** and
+**26→27/37 stored** at normal gain, with five extras unchanged. Half/quarter
+accuracy is unchanged. It never fits the profile or a new model.
+
+The unchanged-onset AVP classifier table below was rerun at both rates for
+feature 4. Actual runtime is now separately measurable with
+`eval.avp_pocket --enrollment --runtime`; restoring the exclusion window can
+change which later candidates reach classification, so the same-onset table
+alone is insufficient evidence of waveform behavior. At 48 kHz, actual Engine
+three-voice live/stored correct counts are 987→987 / 1052→1054 out of 1,433
+annotations; accepted matches 1,336→1,340 and extras 289→290. With four voices,
+correct counts are 983→984 / 1042→1046; accepted matches 1,335→1,343 and extras
+285→286. This small extra-trigger increase across AVP is disclosed separately
+from the unchanged extras in the performer's eight-take audit.
+
+**Release blocked:** per-attack-held-out, overlapping 24-hit roll montages at
+50/75/100 ms spacing remain poor (only 1/1/5 correct at full level), while
+140 ms spacing scores 24/24, including the alternating quarter-level ghost
+case. The roll snippets were excluded with ±200 ms margins before fitting
+that separate profile. They are constructed stress tests, not fresh human rolls.
+A broader onset policy added many extras and was discarded; overlap enrollment
+augmentation also failed to solve the gap and is not shipped. Humming is not
+human breath/speech. Fresh independent recordings are still required; see
+[the exact recording sheet](pocket07-calibration.md). Pocket 07 is a review
+candidate and has not replaced the installed Pocket 06.1.
+
+Reports: `native/pocket/reliability-48k.json`, `reliability-negatives.json`,
+`reliability-avp-48000.json`, `reliability-avp-44100.json` and
+`reliability-benchmark.json`. Factory model bytes remain unchanged.
+
 ## Current measurements (2026-10-25)
 
 **Timestamp correction:** earlier evaluations matched/extracted at CSV column 3,

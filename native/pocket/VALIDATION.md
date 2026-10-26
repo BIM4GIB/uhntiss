@@ -1,3 +1,37 @@
+# Pocket 07 candidate validation — 2026-10-26
+
+Retained changes, source-separated results and explicit dense-roll failures are
+in [the shared contract](../../docs/pocket-integration.md#pocket-07-reliability-candidate--2026-10-26).
+This is not a stage qualification. Pocket 06.1 remains installed.
+
+- Actual Engine replay checks the 479-sample onset-to-dispatch interval at 48 kHz,
+  raw onset/velocity retention, eight complete mixed takes, one-hum-to-other-hum
+  rejection and separately fitted per-attack-held-out roll stress tests.
+- Feature-3 v5 and exact 156-double v4 imports retain their previous behavior.
+  Import/restore rebuilds the fixed-size rejection cache on the message thread.
+  New tests cover partial negatives, legacy veto fallback, transactional imports,
+  degenerate covariance, factory-positive ghost protection and zero audio allocations.
+- The 27 frozen synthetic breath-shaped controls retain 19 false triggers;
+  this is no regression, not zero breath errors or a human-breath measurement.
+- Native core, ASan/UBSan, Python bridge/parity tests and packaged JS tests pass.
+  Factory trees are unchanged; constructed factory regression and full-take
+  capture/causality checks pass. The new universal external is signed and verified.
+- No new PROFILE click or whole-Set save/reopen has been tested in Live for 07.
+  Historical 06.1 host tests below belong to that build.
+
+Reproduce with the README build, then:
+
+```sh
+uv run python -m eval.pocket_reliability --binary native/pocket/build/pocket_perform --report native/pocket/reliability-48k.json
+uv run python -m eval.avp_pocket --sr 48000 --enrollment --runtime --report native/pocket/reliability-avp-48000.json
+uv run python -m eval.pocket_negatives --report native/pocket/reliability-negatives.json
+uv run python -m eval.pocket_benchmark --report native/pocket/reliability-benchmark.json
+```
+
+Private hum sources are copied locally as described in the manifest; they are
+not committed. Source hashes are checked. The existing reserved uptempo source
+and every derivative stay outside all fitting, scaling and augmentation.
+
 # Pocket 06 validation
 
 Current enrollment results and limitations are in

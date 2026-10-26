@@ -152,7 +152,7 @@ def test_export_pocket_builds_profile_from_enrollment(tmp_path, monkeypatch):
     assert rep["hits_per_drum"] == {"kick": 10, "snare": 10, "hat": 10, "rimshot": 10}
     assert not rep["skipped"]
     doc = json.loads(pocket.profile_path().read_text())  # isolated by conftest
-    assert doc["version"] == 5 and doc["feature_version"] == pocket.FEATURE_VERSION == 3
+    assert doc["version"] == 5 and doc["feature_version"] == pocket.FEATURE_VERSION == 4
     assert [v["name"] for v in doc["voices"]] == ["kick", "snare", "hat", "rimshot"]
     assert doc["voices"][-1]["note"] == 37
     assert doc["reject_examples"] == 10
@@ -283,9 +283,9 @@ def test_native_v5_metric_negative_masks_and_legacy_payload(tmp_path):
     rows[-1, 142:144] = 0
     path = tmp_path / "profile.txt"
     path.write_text(" ".join(map(str, doc["values"])))
-    data = "\n".join(" ".join(map(str, row[4:144])) for row in rows)
+    data = "\n".join(" ".join(map(str, np.r_[row[1], row[4:144]])) for row in rows)
     output = subprocess.run(
-        [str(pocket.BINARY.with_name("pocket_profile")), str(path)],
+        [str(pocket.BINARY.with_name("pocket_profile")), str(path), "--with-drum"],
         input=data,
         text=True,
         capture_output=True,
@@ -295,3 +295,66 @@ def test_native_v5_metric_negative_masks_and_legacy_payload(tmp_path):
         [list(map(int, line.split(","))) for line in output.stdout.splitlines()]
     )
     np.testing.assert_array_equal(native, pocket.predict_profile(doc, rows))
+
+
+def test_feature4_keeps_full_negative_bank_before_partial_fragments():
+    voices = [
+        dict(name=f"voice_{d}", note=36 + d, rows=enrollment_rows(d)) for d in range(2)
+    ]
+    full = enrollment_rows(3, 30)
+    partial = enrollment_rows(4, 12)
+    partial[:, 142:144] = 0
+    doc = pocket.build_profile(voices, 48000, np.concatenate([full, partial]))
+    assert doc["commit_reject_examples"] == 30
+    at = 246 + 2 * pocket.VOICE_VALUES + doc["reject_examples"] * 17
+    assert np.asarray(doc["values"][at:]).reshape(-1, 31)[:, 0].tolist() == [7] * 30
+    # Spare capacity can represent complete early slices without teaching a
+    # shortened tail as an 80 ms negative.
+    doc = pocket.build_profile(voices, 48000, np.concatenate([full[:4], partial]))
+    at = 246 + 2 * pocket.VOICE_VALUES + doc["reject_examples"] * 17
+    masks = np.asarray(doc["values"][at:]).reshape(-1, 31)[:, 0]
+    assert masks.tolist() == [7] * 4 + [1] * 12
+
+
+def test_feature3_profiles_keep_legacy_decisions():
+    voices = [
+        dict(name=f"voice_{d}", note=36 + d, rows=enrollment_rows(d)) for d in range(3)
+    ]
+    doc = pocket.build_profile(voices, 48000)
+    doc["values"][1] = doc["feature_version"] = 3
+    rows = np.concatenate([v["rows"] for v in voices])
+    assert np.array_equal(
+        pocket.predict_profile(doc, rows)[:, 0], np.repeat(np.arange(3), 30)
+    )
+
+
+@pytest.mark.skipif(
+    not pocket.BINARY.with_name("pocket_perform").exists(),
+    reason="native tools not built",
+)
+def test_actual_engine_profile_replay_keeps_10ms_deadline_and_pocket():
+    sr = 48000
+    y = np.zeros(sr, dtype=np.float32)
+    t = np.arange(4000) / sr
+    y[9600:13600] = 0.6 * np.sin(2 * np.pi * 110 * t) * np.exp(-40 * t)
+    rows = pocket.analyze(pocket.BINARY, y, sr, policy="enrollment")
+    assert len(rows)
+    train = np.repeat(rows[:1], 3, axis=0)
+    other = train.copy()
+    other[:, 4:141] += 10
+    doc = pocket.build_profile(
+        [
+            dict(name="kick", note=36, rows=train),
+            dict(name="snare", note=38, rows=other),
+        ],
+        sr,
+    )
+    result = pocket.perform(pocket.BINARY.with_name("pocket_perform"), doc, y, sr)
+    live, stored = result["live"], result["stored"]
+    assert len(live) == len(stored) == 1
+    assert abs((live[0, 3] - live[0, 0]) * sr - 479) < 1e-5
+    np.testing.assert_allclose(live[:, :3], stored[:, :3], atol=1e-9)
+    changed = y.copy()
+    changed[round((live[0, 0] + 0.08) * sr) :] = 0.9
+    after = pocket.perform(pocket.BINARY.with_name("pocket_perform"), doc, changed, sr)
+    np.testing.assert_array_equal(after["live"][0], live[0])
