@@ -1,0 +1,3 @@
+[submodule "plugins/pocket/dpf"]
+	path = plugins/pocket/dpf
+	url = https://github.com/DISTRHO/DPF.git
