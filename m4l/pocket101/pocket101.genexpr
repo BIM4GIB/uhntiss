@@ -1,0 +1,194 @@
+// Pocket 101 - gen~ core. Same voice as proto/voice.h (C mirror used for blind design).
+// SH-101 style mono bass: one VCO (saw / PWM pulse / sub / noise mixer), IR3109-style 4-pole OTA filter,
+// ADSR, free-running LFO, portamento. Inputs as the Pocket 303 (same js):
+//   in1 note (MIDI)  in2 held (0/1)  in3 unused (velocity accent)  in4 legato (0/1)  in5 trig (counter)
+// Outputs: out1/out2 audio  out3 gate (LED)
+// Continuous params are 0..1 (Daisy pots); switches are small ints (see README).
+// gen~ rule: function definitions must precede ALL statements, Param/History included.
+polyblep(t, dt) {
+	r = 0;
+	if (t < dt) {
+		tt = t / dt;
+		r = tt + tt - tt * tt - 1;
+	} else if (t > 1 - dt) {
+		tt = (t - 1) / dt;
+		r = tt * tt + tt + tt + 1;
+	}
+	return r;
+}
+bsaw(p, dt) {
+	return 2 * p - 1 - polyblep(p, dt);
+}
+fracp(x) {
+	return x - floor(x);
+}
+
+Param oct_range(1, min=0, max=3);
+Param lfo_vco(0, min=0, max=1);
+Param pw(0, min=0, max=1);
+Param pwm_src(1, min=0, max=2);
+Param mix_pulse(0, min=0, max=1);
+Param mix_saw(1, min=0, max=1);
+Param mix_sub(0.7, min=0, max=1);
+Param mix_noise(0, min=0, max=1);
+Param sub_type(0, min=0, max=2);
+Param cutoff(0.3, min=0, max=1);
+Param resonance(0.55, min=0, max=1);
+Param env_vcf(0.55, min=0, max=1);
+Param lfo_vcf(0, min=0, max=1);
+Param kybd(0.3, min=0, max=1);
+Param vca_mode(0, min=0, max=1);
+Param attack(0, min=0, max=1);
+Param decay(0.55, min=0, max=1);
+Param sustain(0, min=0, max=1);
+Param release(0.15, min=0, max=1);
+Param lfo_wave(0, min=0, max=3);
+Param lfo_rate(0.5, min=0, max=1);
+Param porta(0.3, min=0, max=1);
+Param porta_mode(1, min=0, max=2);
+Param tuning(0.5, min=0, max=1);
+Param volume(0.8, min=0, max=1);
+
+History ph(0);
+History ph_sub(0);
+History pitch_s(60);
+History trig_s(0);
+History adsr_lvl(0);
+History stage(0);
+History vca(0);
+History cut_s(0.3);
+History lfo_ph(0);
+History lfo_sh(0);
+History lfo_sh_prev(0);
+History s1(0);
+History s2(0);
+History s3(0);
+History s4(0);
+History fb(0);
+History hp_x(0);
+History hp_y(0);
+
+T = 1 / samplerate;
+
+// ---- note events (js does the mono logic; trig counts note-ons; every note retriggers) ----
+newtrig = (in5 != trig_s) ? 1 : 0;
+legato = (in4 > 0.5) ? 1 : 0;
+gateon = (in2 > 0.5) ? 1 : 0;
+
+// ---- LFO: free running 0.1 .. 30 Hz; tri / square / S&H / smooth random ----
+lfo_hz = 0.1 * pow(300, lfo_rate);
+lp = lfo_ph + lfo_hz * T;
+lfo_new = (lp >= 1) ? 1 : 0;
+lp = lp - floor(lp);
+n1 = noise();
+sh_prev = (lfo_new > 0.5) ? lfo_sh : lfo_sh_prev;
+sh = (lfo_new > 0.5) ? n1 : lfo_sh;
+tri = (lp < 0.5) ? (4 * lp - 1) : (3 - 4 * lp);
+sqr = (lp < 0.5) ? 1 : -1;
+rnd_smooth = sh_prev + (sh - sh_prev) * lp;
+lfo = (lfo_wave < 0.5) ? tri : ((lfo_wave < 1.5) ? sqr : ((lfo_wave < 2.5) ? sh : rnd_smooth));
+
+// ---- portamento: off / auto (legato only) / on; RC glide 5 ms .. 2 s ----
+porta_on = (porta_mode > 1.5) ? 1 : ((porta_mode > 0.5) ? legato : 0);
+tau_p = 0.005 * pow(400, porta);
+glided = pitch_s + (in1 - pitch_s) * (1 - exp(-T / tau_p));
+pitch = (porta_on > 0.5) ? glided : in1;
+semis = pitch + (tuning - 0.5) * 24 + (oct_range - 1) * 12 + lfo * 7 * lfo_vco * lfo_vco;
+freq = 440 * pow(2, (semis - 69) / 12);
+inc = clamp(freq * T, 0, 0.45);
+
+// ---- VCO: saw, pulse (PWM from LFO / manual / env), sub, noise; linear mixer ----
+p = fracp(ph + inc);
+saw = bsaw(p, inc);
+pwv = (pwm_src < 0.5) ? (0.5 - 0.45 * pw * (0.5 + 0.5 * lfo)) : ((pwm_src < 1.5) ? (0.5 - 0.45 * pw) : (0.5 - 0.45 * pw * adsr_lvl));
+pwv = clamp(pwv, 0.05, 0.95);
+pls = saw - bsaw(fracp(p + pwv), inc);
+inc_sub = (sub_type < 0.5) ? inc * 0.5 : inc * 0.25;
+q = fracp(ph_sub + inc_sub);
+subosc = bsaw(q, inc_sub) - bsaw(fracp(q + ((sub_type > 1.5) ? 0.25 : 0.5)), inc_sub);
+nz = noise();
+osc = mix_saw * saw + mix_pulse * pls + mix_sub * subosc + mix_noise * nz * 0.7;
+
+// ---- ADSR: A 1.5 ms .. 3 s, D/R 2 ms .. 12 s, exponential segments ----
+ta = 0.0015 * pow(2000, attack);
+td = 0.002 * pow(6000, decay);
+tr = 0.002 * pow(6000, release);
+st = (newtrig > 0.5) ? 1 : stage;
+st = ((gateon < 0.5) && (st > 0.5)) ? 3 : st;
+env_l = adsr_lvl;
+if (st == 1) {
+	env_l = env_l + (1.3 - env_l) * (1 - exp(-T / ta));
+	if (env_l >= 1) {
+		env_l = 1;
+		st = 2;
+	}
+} else if (st == 2) {
+	env_l = env_l + (sustain - env_l) * (1 - exp(-T / td));
+} else if (st == 3) {
+	env_l = env_l + (0 - env_l) * (1 - exp(-T / tr));
+	if (env_l < 0.0001) {
+		env_l = 0;
+		st = 0;
+	}
+}
+
+// ---- VCA: envelope or gate, 2 ms smoothing ----
+vt = (vca_mode > 0.5) ? gateon : env_l;
+va = vca + (vt - vca) * (1 - exp(-T / 0.002));
+
+// ---- VCF: IR3109-style 4-pole OTA cascade, tanh per stage, 2x oversampled, half-sample feedback ----
+cs = cut_s + (cutoff - cut_s) * (1 - exp(-T / 0.005));
+cut_hz = 20 * pow(2, cs * 9.5);
+env_oct = env_l * env_vcf * 8 + lfo * lfo_vcf * 3 + (pitch - 60) / 12 * kybd;
+fc = clamp(cut_hz * pow(2, env_oct), 10, 18000);
+k = resonance * 4.3;
+g = 1 - exp(-twopi * fc / (samplerate * 2));
+a1 = s1;
+a2 = s2;
+a3 = s3;
+a4 = s4;
+f = fb;
+y = 0;
+for (i = 0; i < 2; i += 1) {
+	u = tanh(osc * 0.5 - k * f);
+	t1 = tanh(a1);
+	t2 = tanh(a2);
+	t3 = tanh(a3);
+	t4 = tanh(a4);
+	a1 = a1 + g * (u - t1);
+	a2 = a2 + g * (t1 - t2);
+	a3 = a3 + g * (t2 - t3);
+	a4n = a4 + g * (t3 - t4);
+	f = 0.5 * (a4n + a4);
+	a4 = a4n;
+	y = a4;
+}
+
+// ---- output: resonance make-up, soft clip, DC block, VCA, volume ----
+y = tanh(y * (1 + 0.25 * k));
+hp = y - hp_x + 0.997 * hp_y;
+sig = hp * va * volume * volume;
+
+// ---- write History ----
+ph = p;
+ph_sub = q;
+pitch_s = pitch;
+trig_s = in5;
+adsr_lvl = env_l;
+stage = st;
+vca = va;
+cut_s = cs;
+lfo_ph = lp;
+lfo_sh = sh;
+lfo_sh_prev = sh_prev;
+s1 = fixdenorm(a1);
+s2 = fixdenorm(a2);
+s3 = fixdenorm(a3);
+s4 = fixdenorm(a4);
+fb = fixdenorm(f);
+hp_x = y;
+hp_y = fixdenorm(hp);
+
+out1 = sig;
+out2 = sig;
+out3 = gateon;
