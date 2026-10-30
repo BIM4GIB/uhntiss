@@ -1,0 +1,41 @@
+{
+	"name": "pocket303",
+	"max_apps": 1,
+	"defines": {
+		"OOPSY_TARGET_HAS_MIDI_INPUT": 1
+	},
+	"components": {
+		"cutoff":    { "component": "AnalogControl", "pin": 15 },
+		"resonance": { "component": "AnalogControl", "pin": 16 },
+		"envmod":    { "component": "AnalogControl", "pin": 17 },
+		"decay":     { "component": "AnalogControl", "pin": 18 },
+		"accent":    { "component": "AnalogControl", "pin": 19 },
+		"tuning":    { "component": "AnalogControl", "pin": 20 },
+		"slide":     { "component": "AnalogControl", "pin": 21 },
+		"volume":    { "component": "AnalogControl", "pin": 22 },
+		"wave":      { "component": "Switch", "pin": 0, "type": "daisy::Switch::TYPE_TOGGLE" },
+		"gate_led":  { "component": "Led", "pin": 1, "invert": false }
+	},
+	"aliases": {
+		"cut": "cutoff",
+		"res": "resonance",
+		"reso": "resonance",
+		"env": "envmod",
+		"envelope": "envmod",
+		"dec": "decay",
+		"acc": "accent",
+		"tune": "tuning",
+		"glide": "slide",
+		"vol": "volume",
+		"led": "gate_led",
+		"square": "wave",
+		"knob1": "cutoff",
+		"knob2": "resonance",
+		"knob3": "envmod",
+		"knob4": "decay",
+		"knob5": "accent",
+		"knob6": "tuning",
+		"knob7": "slide",
+		"knob8": "volume"
+	}
+}
