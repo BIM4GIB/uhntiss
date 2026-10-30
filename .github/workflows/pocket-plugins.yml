@@ -14,19 +14,25 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-        with: { submodules: recursive }
+        with:
+          submodules: recursive
       - run: make -C plugins/pocket universal
       - run: |
           for f in plugins/pocket/bin/*/Contents/MacOS/*; do lipo -archs "$f"; done
           cd plugins/pocket/bin && zip -qry "$RUNNER_TEMP/pocket-plugins-macos.zip" .
       - uses: actions/upload-artifact@v4
-        with: { name: pocket-plugins-macos, path: ${{ runner.temp }}/pocket-plugins-macos.zip }
+        with:
+          name: pocket-plugins-macos
+          path: ${{ runner.temp }}/pocket-plugins-macos.zip
   windows:
     runs-on: windows-latest
-    defaults: { run: { shell: 'msys2 {0}' } }
+    defaults:
+      run:
+        shell: msys2 {0}
     steps:
       - uses: actions/checkout@v4
-        with: { submodules: recursive }
+        with:
+          submodules: recursive
       - uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
@@ -34,24 +40,32 @@ jobs:
       - run: make -C plugins/pocket all
       - run: cd plugins/pocket/bin && zip -qry "$RUNNER_TEMP/pocket-plugins-windows.zip" .
       - uses: actions/upload-artifact@v4
-        with: { name: pocket-plugins-windows, path: ${{ runner.temp }}/pocket-plugins-windows.zip }
+        with:
+          name: pocket-plugins-windows
+          path: ${{ runner.temp }}/pocket-plugins-windows.zip
   linux:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with: { submodules: recursive }
+        with:
+          submodules: recursive
       - run: make -C plugins/pocket all
       - run: cd plugins/pocket/bin && zip -qry "$RUNNER_TEMP/pocket-plugins-linux.zip" .
       - uses: actions/upload-artifact@v4
-        with: { name: pocket-plugins-linux, path: ${{ runner.temp }}/pocket-plugins-linux.zip }
+        with:
+          name: pocket-plugins-linux
+          path: ${{ runner.temp }}/pocket-plugins-linux.zip
   release:
     if: startsWith(github.ref, 'refs/tags/pocket-plugins-v')
     needs: [macos, windows, linux]
     runs-on: ubuntu-latest
-    permissions: { contents: write }
+    permissions:
+      contents: write
     steps:
       - uses: actions/download-artifact@v4
-        with: { path: dist, merge-multiple: true }
+        with:
+          path: dist
+          merge-multiple: true
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*.zip
