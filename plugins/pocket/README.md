@@ -38,7 +38,8 @@ values exactly as the M4L patch does, so a plug-in preset and a device preset ar
   (9 / 25 / 16 parameters, programs present, render tests pass; one "Recommended Property is not supported"
   warning from DPF). Installed into René's `~/Library/Audio/Plug-Ins/{Components,VST3,CLAP}`; a shareable zip
   is `plugins/pocket/dist/pocket-plugins-macos-universal.zip` (ignored by git, 0.5 MB).
-- Not yet verified: MIDI → sound inside a host (needs a plug-in rescan in Live and an ear), Windows and
-  Linux builds (the workflow does them on push, nothing has run yet), code signing / notarisation (friends
+- The `pocket-plugins` workflow built macOS (universal), Windows (MinGW) and Linux green on its first real run
+  (PR #34); zips are run artifacts until a `pocket-plugins-v*` tag makes a release.
+- Not yet verified: MIDI → sound inside a host (needs a plug-in rescan in Live and an ear), code signing / notarisation (friends
   on macOS will have to allow the unsigned bundles once: right-click ▸ Open, or `xattr -dr com.apple.quarantine`).
 - Versions follow the devices: Pocket 303 0.6, Pocket 101 0.1, Pocket Kick 0.3.
